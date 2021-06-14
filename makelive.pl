@@ -7,9 +7,9 @@ use warnings;
 # this script makes a live system on hdd /dev/sdX
 # where X is the letter for the drive.
 # The drive must have been paritioned:
-# /dev/sdX1 8g     label = ubuntu-mate
-# /dev/sdX2 8g     label= ubuntu
-# /dev/sdX3 rest   label = ssd
+# /dev/sdX1 8g      vfat     label = MACRIUM
+# /dev/sdX2 8g      vfat     label= UBUNTU  UUID=4444-4444
+# /dev/sdX3 rest    ntfs     label = ssd
 # Macrium Reflect 7 must have been installed into partition 1.
 #
 # Command line parameters:
@@ -49,10 +49,36 @@ sub getversion {
 	return $version;
 }
 
+####################################################
+# sub to setup partition 1. This is the ubuntu-mate
+# partition. Filesystem must be built.
+# ubuntu-mate iso must be mounted
+# parameters passed:
+# setparition1(chroot-directory, path-to-device)
+####################################################
+sub setpartition1 {
+	my $chroot-dir = shift;
+	my $device = shift;
+	
+	# unsquash filesystem.squashfs to the chroot directory
+	system("unsquashfs -d $chroot-dir /mnt/cdrom/casper/filesystem.squashfs");
+	
+	# copy other files
+	system("cp /etc/resolv.conf /etc/hosts " . $chroot-dir . "/etc/");
+	
+	# copy etc/apt files
+	chdir "/etc/apt";
+	system("cp -a trustedgpg trusted.gpg.d sources.list " . $chroot-dir . "/etc/apt/");
+	
+	# copy from subversion
+	system("svn --force export --depth files file:///mnt/svn/root/my-linux/livescripts " . $chroot-dir . "/usr/local/bin/");
+}
 ##################
 # Main entry point
 ##################
 
+# command line parameters
+# makelive.pl ubuntuiso-name chroot-directory path-to-hdd partition-no
 # get command line argument
 # this is the name of the ubuntu iso image
 my $ubuntuiso = $ARGV[0];
@@ -61,4 +87,7 @@ my $version = getversion($ubuntuiso);
 
 print "$version\n";
 
-# mount ubuntu iso image
+# mount ubuntu iso image at /mnt/cdrom
+system("mount " . $ubuntuiso . " /mnt/cdrom -o ro");
+
+
