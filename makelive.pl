@@ -57,7 +57,7 @@ sub getversion {
 # partition. Filesystem must be built.
 # ubuntu-mate iso must be mounted
 # parameters passed:
-# setparition1(chroot-directory, path-to-device)
+# setparition1(ubuntuiso-name, chroot-directory, path-to-device)
 ####################################################
 sub setpartition1 {
 	my ($ubuntuiso, $chroot_dir, $dev_path)  = @_;
@@ -71,7 +71,7 @@ sub setpartition1 {
 	
 	# unsquash filesystem.squashfs to the chroot directory
 	# the directory must not exist
-	system("unsquashfs -d $chroot_dir /mnt/cdrom/casper/filesystem.squashfs");
+	# system("unsquashfs -d $chroot_dir /mnt/cdrom/casper/filesystem.squashfs");
 	
 	# copy other files
 	system("cp /etc/resolv.conf /etc/hosts " . $chroot_dir . "/etc/");
@@ -86,11 +86,30 @@ sub setpartition1 {
 	
 	# copy from subversion
 	system("svn --force export --depth files file:///mnt/svn/root/my-linux/livescripts " . $chroot_dir . "/usr/local/bin/");
-	system("svn --force export --depth files file:///mnt/svn/root/live/scripts/grub/vat/mbr/grub.cfg " . $chroot_dir . "/boot/grub/");
-    system("svn --force export --depth files file:///mnt/svn/root/live/scripts/grub/vat/efi/grub.cfg " . $chroot_dir . "/boot/EFI/grub/");
+	system("svn --force export --depth files file:///mnt/svn/root/my-linux/livescripts/grub/vfat/mbr/grub.cfg " . $chroot_dir . "/boot/grub/");
+    system("svn --force export --depth files file:///mnt/svn/root/my-linux/livescripts/grub/vfat/efi/grub.cfg " . $chroot_dir . "/boot/EFI/grub/");
     
-    # now edit grub.cfg with the new version
+    # now edit grub.cfg with the new version no.
+    # edit mbr grub and set version
+    # get version
+    my $version = getversion($ubuntuiso);
     
+	chdir $chroot_dir . "/boot/grub";
+	system("sed -i -e 's/ubuntu-version/$version/' grub.cfg");
+	chdir $chroot_dir . "/boot/EFI/grub";
+	system("sed -i -e 's/ubuntu-version/$version/' grub.cfg");
+	
+	# edit fstab in chroot for ad64 which includes debhome
+	chdir $chroot_dir . "/etc";
+	system("sed -i -e 'a \ LABEL=ad64 /mnt/ad64 ext4 defaults,noauto 0 0' fstab");
+	
+	# make directories in chroot
+	chdir $chroot_dir . "/mnt";
+	mkdir "ad64";
+	# make link
+	system("ln -s ad64 hdd");
+	
+	
 }
 ##################
 # Main entry point
@@ -101,10 +120,6 @@ sub setpartition1 {
 # get command line argument
 # this is the name of the ubuntu iso image
 my ($ubuntuiso, $chroot_dir, $dev_path, $part_no) = @ARGV;
-
-my $version = getversion($ubuntuiso);
-
-print "$version\n";
 
 # setup correct partition no
 if ($part_no == 1) {
