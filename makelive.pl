@@ -66,7 +66,7 @@ sub setpartition1 {
 	system("mount " . $ubuntuiso . " /mnt/cdrom -o ro");
 	
 	# mount the dev under chroot/boot if not mounted
-	my $rc = system("grep " . $dev_path . "1 /etc/mtab");
+	my $rc = system("grep -q " . $dev_path . "1 /etc/mtab");
 	system("mount -L MACRIUM " . $chroot_dir . "/boot") unless $rc == 0;
 	
 	# unsquash filesystem.squashfs to the chroot directory
@@ -82,7 +82,7 @@ sub setpartition1 {
 	
 	# copy etc/apt files
 	chdir "/etc/apt";
-	system("cp -a trustedgpg trusted.gpg.d sources.list " . $chroot_dir . "/etc/apt/");
+	system("cp -a trusted.gpg trusted.gpg.d sources.list " . $chroot_dir . "/etc/apt/");
 	
 	# copy from subversion
 	system("svn --force export --depth files file:///mnt/svn/root/my-linux/livescripts " . $chroot_dir . "/usr/local/bin/");
@@ -101,12 +101,14 @@ sub setpartition1 {
 	
 	# edit fstab in chroot for ad64 which includes debhome
 	chdir $chroot_dir . "/etc";
+	system("sed -i -e '/LABEL=ad64/d' fstab");
 	system("sed -i -e 'a \ LABEL=ad64 /mnt/ad64 ext4 defaults,noauto 0 0' fstab");
 	
 	# make directories in chroot
 	chdir $chroot_dir . "/mnt";
-	mkdir "ad64";
+	mkdir "ad64" unless -d "ad64";
 	# make link
+	unlink "hdd" if -l "hdd";
 	system("ln -s ad64 hdd");
 	
 	
