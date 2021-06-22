@@ -2,6 +2,7 @@
 
 use strict;
 use warnings;
+use Getopt::Std;
 
 #######################################################
 # this script makes a live system on hdd /dev/sdX
@@ -57,16 +58,28 @@ sub getversion {
 # partition. Filesystem must be built.
 # ubuntu-mate iso must be mounted
 # parameters passed:
-# setparition1(ubuntuiso-name, chroot-directory, path-to-device)
+# setparition1(ubuntuiso-name, chroot-directory)
 ####################################################
 sub setpartition1 {
-	my ($ubuntuiso, $chroot_dir, $dev_path)  = @_;
+	my ($ubuntuiso, $chroot_dir)  = @_;
+
+	# edit fstab in chroot for ad64 which includes debhome
+	chdir $chroot_dir . "/etc";
+	system("sed -i -e '/LABEL=ad64/d' fstab");
+	system("sed -i -e 'a \ LABEL=ad64 /mnt/ad64 ext4 defaults,noauto 0 0' fstab");
+
+	# get dev_path ex: /dev/sda1
+	my $dev_path = `blkid -L MACRIUM`;
+	chomp $dev_path;
+	print "$dev_path\n";
 
 	# mount ubuntu iso image at /mnt/cdrom
 	system("mount " . $ubuntuiso . " /mnt/cdrom -o ro");
 	
 	# mount the dev under chroot/boot if not mounted
-	my $rc = system("grep -q " . $dev_path . "1 /etc/mtab");
+	my $rc = system("grep $dev_path /etc/mtab");
+	print "rc = $rc\n";
+	
 	system("mount -L MACRIUM " . $chroot_dir . "/boot") unless $rc == 0;
 	
 	# unsquash filesystem.squashfs to the chroot directory
@@ -99,10 +112,6 @@ sub setpartition1 {
 	chdir $chroot_dir . "/boot/EFI/grub";
 	system("sed -i -e 's/ubuntu-version/$version/' grub.cfg");
 	
-	# edit fstab in chroot for ad64 which includes debhome
-	chdir $chroot_dir . "/etc";
-	system("sed -i -e '/LABEL=ad64/d' fstab");
-	system("sed -i -e 'a \ LABEL=ad64 /mnt/ad64 ext4 defaults,noauto 0 0' fstab");
 	
 	# make directories in chroot
 	chdir $chroot_dir . "/mnt";
@@ -110,23 +119,46 @@ sub setpartition1 {
 	# make link
 	unlink "hdd" if -l "hdd";
 	system("ln -s ad64 hdd");
+
+	# install apps in the chroot environment
+	system("/usr/local/bin/bindall $chroot_dir");
+	system("chroot $chroot_dir /usr/local/bin/liveinstall.sh");
+	system("/usr/local/bin/unbindall $chroot_dir");
 	
-	
+	# umount /chroot/boot
+	system("umount /chroot/boot");
+}
+
+sub usage {
+	print "-i ubuntu iso full name\n";
+	print "-c chroot directory\n";
+	print "-p partition no\n";
+	print "-a list of packages to install in chroot in quotes\n";
+	exit 0;
 }
 ##################
 # Main entry point
 ##################
 
 # command line parameters
-# makelive.pl ubuntuiso-name chroot-directory path-to-hdd partition-no
+# makelive.pl ubuntuiso-name chroot-directory partition-no
 # get command line argument
-# this is the name of the ubuntu iso image
-my ($ubuntuiso, $chroot_dir, $dev_path, $part_no) = @ARGV;
+# this is the name of the ubuntu iso ima
+our($opt_i, $opt_c, $opt_p, $opt_a, $opt_h);
+
+getopts('i:c:p:a:h');
+
+my $ubuntuiso = $opt_i if $opt_i;
+my $chroot_dir = $opt_c if $opt_c;
+my $part_no = $opt_p if $opt_p;
+my $packages = $opt_a if $opt_a;
+
+usage() if $opt_h;
 
 # setup correct partition no
 if ($part_no == 1) {
 	# setup partition 1
-	setpartition1($ubuntuiso, $chroot_dir, $dev_path);
+	setpartition1($ubuntuiso, $chroot_dir);
 } elsif ($part_no == 2) {
 	# setup partition 2
 }
