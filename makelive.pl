@@ -61,7 +61,7 @@ sub getversion {
 # setparition1(ubuntuiso-name, chroot-directory)
 ####################################################
 sub setpartition1 {
-	my ($ubuntuiso, $chroot_dir)  = @_;
+	my ($ubuntuiso, $chroot_dir, $packages)  = @_;
 
 	# edit fstab in chroot for ad64 which includes debhome
 	chdir $chroot_dir . "/etc";
@@ -76,19 +76,20 @@ sub setpartition1 {
 	# mount ubuntu iso image at /mnt/cdrom
 	system("mount " . $ubuntuiso . " /mnt/cdrom -o ro");
 	
-	# mount the dev under chroot/boot if not mounted
-	my $rc = system("grep $dev_path /etc/mtab");
-	print "rc = $rc\n";
-	
-	system("mount -L MACRIUM " . $chroot_dir . "/boot") unless $rc == 0;
-	
+
 	# unsquash filesystem.squashfs to the chroot directory
 	# the directory must not exist
 	# system("unsquashfs -d $chroot_dir /mnt/cdrom/casper/filesystem.squashfs");
 	
+	# mount the dev under chroot/boot if not mounted
+	my $rc = system("grep $dev_path /etc/mtab");
+	system("mount -L MACRIUM " . $chroot_dir . "/boot") unless $rc == 0;
+	
+	
 	# copy other files
 	system("cp /etc/resolv.conf /etc/hosts " . $chroot_dir . "/etc/");
-	system("cp /mnt/cdrom/casper/vmlinuz /mnt/cdrom/casper/initrd " . $chroot_dir . "/boot/");
+	mkdir $chroot_dir . "/boot/casper" unless -d $chroot_dir . "/boot/casper";
+	system("cp /mnt/cdrom/casper/vmlinuz /mnt/cdrom/casper/initrd " . $chroot_dir . "/boot/casper/");
 	
 	# un mount /mnt/cdrom
 	system("umount /mnt/cdrom");
@@ -120,20 +121,44 @@ sub setpartition1 {
 	unlink "hdd" if -l "hdd";
 	system("ln -s ad64 hdd");
 
+	# enter the chroot environment
 	# install apps in the chroot environment
 	system("/usr/local/bin/bindall $chroot_dir");
+
 	system("chroot $chroot_dir /usr/local/bin/liveinstall.sh");
+	# install extra apps if there are any
+	system("chroot $chroot_dir apt -y install $packages") unless $packages eq "none";
+
+	# for exiting the chroot environment
 	system("/usr/local/bin/unbindall $chroot_dir");
+
+	# make the persistence file
+	chdir $chroot_dir . "/boot/casper";
+	system("dd if=/dev/zero of=writable bs=1M count=3000");
+	system("mkfs.ext4 -v -j -F writable");
 	
-	# umount /chroot/boot
+	# rename macrium file to stop only macrium_pe booting
+	mkdir $chroot_dir . "/boot/EFI/Microsoft/Boot";
+	system("mv bootmgfw.efi bootmgfw.efi.old") if -e "bootmgfw.efi";
+	
+	# install grub
+	# get device from partition path
+	my $device = $dev_path;
+	chop $device;
+	print "$device\n";
+	#system("grub-install -v --no-floppy --boot-directory=" . $chroot_dir . "/boot --target=i386-pc " . $device);
+	#system(" grub-install -v --no-floppy --boot-directory=" . $chroot_dir . "/boot/EFI --efi-directory=" . $chroot_dir . "/boot --removable --target=x86_64-efi " . $device);
+
+	# umount chroot boot
 	system("umount /chroot/boot");
 }
 
 sub usage {
 	print "-i ubuntu iso full name\n";
 	print "-c chroot directory\n";
-	print "-p partition no\n";
-	print "-a list of packages to install in chroot in quotes\n";
+	print "-1 for partition 1\n";
+	print "-2 for partition 2\n";
+	print "-p list of packages to install in chroot in quotes\n";
 	exit 0;
 }
 ##################
@@ -144,21 +169,29 @@ sub usage {
 # makelive.pl ubuntuiso-name chroot-directory partition-no
 # get command line argument
 # this is the name of the ubuntu iso ima
-our($opt_i, $opt_c, $opt_p, $opt_a, $opt_h);
+our($opt_i, $opt_c, $opt_p, $opt_h, $opt_1, $opt_2);
 
-getopts('i:c:p:a:h');
-
-my $ubuntuiso = $opt_i if $opt_i;
-my $chroot_dir = $opt_c if $opt_c;
-my $part_no = $opt_p if $opt_p;
-my $packages = $opt_a if $opt_a;
+getopts('12i:c:p:h');
 
 usage() if $opt_h;
 
+my $ubuntuiso = $opt_i or die "ubuntu iso name required\n";
+my $chroot_dir = $opt_c or die "chroot directory rquired\n";
+
+# packages may or may not have a value
+my $packages;
+if ($opt_p) {
+	$packages = $opt_p;
+} else {
+	$packages = "none";
+}
+
 # setup correct partition no
-if ($part_no == 1) {
+if ($opt_1) {
 	# setup partition 1
-	setpartition1($ubuntuiso, $chroot_dir);
-} elsif ($part_no == 2) {
+	setpartition1($ubuntuiso, $chroot_dir, $packages);
+
+} elsif ($opt_2) {
 	# setup partition 2
+
 }
