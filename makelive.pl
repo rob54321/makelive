@@ -62,29 +62,33 @@ sub getversion {
 ####################################################
 sub setpartition1 {
 	my ($ubuntuiso, $chroot_dir, $packages)  = @_;
-
-	# edit fstab in chroot for ad64 which includes debhome
-	chdir $chroot_dir . "/etc";
-	system("sed -i -e '/LABEL=ad64/d' fstab");
-	system("sed -i -e 'a \ LABEL=ad64 /mnt/ad64 ext4 defaults,noauto 0 0' fstab");
-
+	
 	# get dev_path ex: /dev/sda1
 	my $dev_path = `blkid -L MACRIUM`;
 	chomp $dev_path;
 	print "$dev_path\n";
 
 	# mount ubuntu iso image at /mnt/cdrom
-	system("mount " . $ubuntuiso . " /mnt/cdrom -o ro");
+	my $rc = system("findmnt /mnt/cdrom");
+	system("mount " . $ubuntuiso . " /mnt/cdrom -o ro") unless $rc == 0;
 	
 
 	# unsquash filesystem.squashfs to the chroot directory
 	# the directory must not exist
-	# system("unsquashfs -d $chroot_dir /mnt/cdrom/casper/filesystem.squashfs");
+	system("unsquashfs -d $chroot_dir /mnt/cdrom/casper/filesystem.squashfs");
+
+	# delete all files in $chroot_dir / boot
+	system("rm -rf " . $chroot_dir . "/boot");
+	mkdir $chroot_dir . "/boot";
 	
+	# edit fstab in chroot for ad64 which includes debhome
+	chdir $chroot_dir . "/etc";
+	system("sed -i -e '/LABEL=ad64/d' fstab");
+	system("sed -i -e 'a \ LABEL=ad64 /mnt/ad64 ext4 defaults,noauto 0 0' fstab");
+
 	# mount the dev under chroot/boot if not mounted
-	my $rc = system("grep $dev_path /etc/mtab");
+	$rc = system("findmnt " . $chroot_dir . "/boot");
 	system("mount -L MACRIUM " . $chroot_dir . "/boot") unless $rc == 0;
-	
 	
 	# copy other files
 	system("cp /etc/resolv.conf /etc/hosts " . $chroot_dir . "/etc/");
@@ -99,9 +103,9 @@ sub setpartition1 {
 	system("cp -a trusted.gpg trusted.gpg.d sources.list " . $chroot_dir . "/etc/apt/");
 	
 	# copy from subversion
-	system("svn --force export --depth files file:///mnt/svn/root/my-linux/livescripts " . $chroot_dir . "/usr/local/bin/");
-	system("svn --force export --depth files file:///mnt/svn/root/my-linux/livescripts/grub/vfat/mbr/grub.cfg " . $chroot_dir . "/boot/grub/");
-    system("svn --force export --depth files file:///mnt/svn/root/my-linux/livescripts/grub/vfat/efi/grub.cfg " . $chroot_dir . "/boot/EFI/grub/");
+	system("svn export --force --depth files file:///mnt/svn/root/my-linux/livescripts " . $chroot_dir . "/usr/local/bin/");
+	system("svn export --force --depth files file:///mnt/svn/root/my-linux/livescripts/grub/vfat/mbr/ " . $chroot_dir . "/boot/grub/");
+    system("svn export --force --depth files file:///mnt/svn/root/my-linux/livescripts/grub/vfat/efi/ " . $chroot_dir . "/boot/EFI/grub/");
     
     # now edit grub.cfg with the new version no.
     # edit mbr grub and set version
@@ -137,20 +141,27 @@ sub setpartition1 {
 	system("dd if=/dev/zero of=writable bs=1M count=3000");
 	system("mkfs.ext4 -v -j -F writable");
 	
+	# write new filesystem.squashfs to boot directory
+	chdir "/mnt/hdint";
+	system("mksquashfs " . $chroot_dir . " /mnt/hdint/filesystem.squashfs -e boot");
+	system("mv -vf filesystem.squashfs " . $chroot_dir . "/boot/casper/");
+	
 	# rename macrium file to stop only macrium_pe booting
-	mkdir $chroot_dir . "/boot/EFI/Microsoft/Boot";
-	system("mv bootmgfw.efi bootmgfw.efi.old") if -e "bootmgfw.efi";
+#	chdir $chroot_dir . "/boot/EFI/Microsoft/Boot";
+	#system("mv bootmgfw.efi bootmgfw.efi.old") if -e "bootmgfw.efi";
 	
 	# install grub
 	# get device from partition path
 	my $device = $dev_path;
 	chop $device;
 	print "$device\n";
-	#system("grub-install -v --no-floppy --boot-directory=" . $chroot_dir . "/boot --target=i386-pc " . $device);
-	#system(" grub-install -v --no-floppy --boot-directory=" . $chroot_dir . "/boot/EFI --efi-directory=" . $chroot_dir . "/boot --removable --target=x86_64-efi " . $device);
+	system("grub-install -v --no-floppy --boot-directory=" . $chroot_dir . "/boot --target=i386-pc " . $device);
+	system(" grub-install -v --no-floppy --boot-directory=" . $chroot_dir . "/boot/EFI --efi-directory=" . $chroot_dir . "/boot --removable --target=x86_64-efi " . $device);
 
-	# umount chroot boot
-	system("umount /chroot/boot");
+	# umount chroot boot nees a little time to finish copying
+	system("umount " . $chroot_dir . "/boot");
+	$rc = system("findmnt " . $chroot_dir . "/boot");
+	print "count not umount " . $chroot_dir . "/boot\n" if $rc == 0;
 }
 
 sub usage {
@@ -176,7 +187,11 @@ getopts('12i:c:p:h');
 usage() if $opt_h;
 
 my $ubuntuiso = $opt_i or die "ubuntu iso name required\n";
+#check if ubuntuiso exists
+die "$ubuntuiso does not exist\n" unless -f $ubuntuiso;
+
 my $chroot_dir = $opt_c or die "chroot directory rquired\n";
+die "chroot directory must not exist\n"	if -d $chroot_dir;
 
 # packages may or may not have a value
 my $packages;
