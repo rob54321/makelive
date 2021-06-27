@@ -63,14 +63,22 @@ sub getversion {
 sub setpartition1 {
 	my ($ubuntuiso, $chroot_dir, $packages)  = @_;
 	
+	# check MACRIUM ad64 is attached
+	my $rc = system("blkid -L ad64");
+	my $rc1 = system("blkid -L MACRIUM");
+	print "$rc $rc1\n";
+	die "MACRIUM and ad64 must be attached\n" unless ($rc == 0 and $rc1 == 0);
+
 	# get dev_path ex: /dev/sda1
 	my $dev_path = `blkid -L MACRIUM`;
 	chomp $dev_path;
 	print "$dev_path\n";
-
+	
 	# mount ubuntu iso image at /mnt/cdrom
-	my $rc = system("findmnt /mnt/cdrom");
-	system("mount " . $ubuntuiso . " /mnt/cdrom -o ro") unless $rc == 0;
+	$rc = system("findmnt /mnt/cdrom");
+	# umount /mnt/cdrom
+	system("umount /mnt/cdrom") if $rc == 0;
+	system("mount " . $ubuntuiso . " /mnt/cdrom -o ro");
 	
 
 	# unsquash filesystem.squashfs to the chroot directory
@@ -90,13 +98,14 @@ sub setpartition1 {
 	$rc = system("findmnt " . $chroot_dir . "/boot");
 	system("mount -L MACRIUM " . $chroot_dir . "/boot") unless $rc == 0;
 	
+	# copy pool and install files for ubuntu mate
+	chdir "/mnt/cdrom";
+	system("cp -a dists install pool preseed " . $chroot_dir . "/boot/");
+	
 	# copy other files
 	system("cp /etc/resolv.conf /etc/hosts " . $chroot_dir . "/etc/");
 	mkdir $chroot_dir . "/boot/casper" unless -d $chroot_dir . "/boot/casper";
 	system("cp /mnt/cdrom/casper/vmlinuz /mnt/cdrom/casper/initrd " . $chroot_dir . "/boot/casper/");
-	
-	# un mount /mnt/cdrom
-	system("umount /mnt/cdrom");
 	
 	# copy etc/apt files
 	chdir "/etc/apt";
@@ -147,21 +156,26 @@ sub setpartition1 {
 	system("mv -vf filesystem.squashfs " . $chroot_dir . "/boot/casper/");
 	
 	# rename macrium file to stop only macrium_pe booting
-#	chdir $chroot_dir . "/boot/EFI/Microsoft/Boot";
-	#system("mv bootmgfw.efi bootmgfw.efi.old") if -e "bootmgfw.efi";
-	
+	system("mv " . $chroot_dir . "/boot/EFI/Microsoft/Boot/bootmgfw.efi "
+	             . $chroot_dir . "/boot/EFI/Microsoft/Boot/bootmgfw.efi.old")
+	             if -e $chroot_dir . "/boot/EFI/Microsoft/Boot/bootmgfw.efi";
+
 	# install grub
 	# get device from partition path
 	my $device = $dev_path;
 	chop $device;
 	print "$device\n";
-	system("grub-install -v --no-floppy --boot-directory=" . $chroot_dir . "/boot --target=i386-pc " . $device);
-	system(" grub-install -v --no-floppy --boot-directory=" . $chroot_dir . "/boot/EFI --efi-directory=" . $chroot_dir . "/boot --removable --target=x86_64-efi " . $device);
+	system("grub-install --no-floppy --boot-directory=" . $chroot_dir . "/boot --target=i386-pc " . $device);
+	
+	system(" grub-install --no-floppy --boot-directory=" . $chroot_dir . "/boot/EFI --efi-directory="  . $chroot_dir . "/boot --removable --target=x86_64-efi " . $device);
 
-	# umount chroot boot nees a little time to finish copying
-	system("umount " . $chroot_dir . "/boot");
-	$rc = system("findmnt " . $chroot_dir . "/boot");
-	print "count not umount " . $chroot_dir . "/boot\n" if $rc == 0;
+	# un mount /mnt/cdrom
+	system("umount /mnt/cdrom");
+	
+	# umount chroot boot
+	#system("umount " . $chroot_dir . "/boot");
+	#$rc = system("findmnt " . $chroot_dir . "/boot");
+	#print "count not umount " . $chroot_dir . "/boot\n" if $rc == 0;
 }
 
 sub usage {
