@@ -66,13 +66,12 @@ sub setpartition1 {
 	# check MACRIUM ad64 is attached
 	my $rc = system("blkid -L ad64");
 	my $rc1 = system("blkid -L MACRIUM");
-	print "$rc $rc1\n";
 	die "MACRIUM and ad64 must be attached\n" unless ($rc == 0 and $rc1 == 0);
 
 	# get dev_path ex: /dev/sda1
 	my $dev_path = `blkid -L MACRIUM`;
 	chomp $dev_path;
-	print "$dev_path\n";
+	print "MACRIUM is: $dev_path\n";
 	
 	# mount ubuntu iso image at /mnt/cdrom
 	$rc = system("findmnt /mnt/cdrom");
@@ -129,6 +128,7 @@ sub setpartition1 {
 	
 	# make directories in chroot
 	chdir $chroot_dir . "/mnt";
+	mkdir "ssd" unless -d "ssd";
 	mkdir "ad64" unless -d "ad64";
 	# make link
 	unlink "hdd" if -l "hdd";
@@ -138,9 +138,13 @@ sub setpartition1 {
 	# install apps in the chroot environment
 	system("/usr/local/bin/bindall $chroot_dir");
 
-	system("chroot $chroot_dir /usr/local/bin/liveinstall.sh");
-	# install extra apps if there are any
-	system("chroot $chroot_dir apt -y install $packages") unless $packages eq "none";
+	if ($packages eq  "none") {
+		print "no packages to install\n";
+		system("chroot $chroot_dir /usr/local/bin/liveinstall.sh");
+	} else {
+		print "packages to install = $packages\n";
+		system("chroot $chroot_dir /usr/local/bin/liveinstall.sh $packages");
+	}
 
 	# for exiting the chroot environment
 	system("/usr/local/bin/unbindall $chroot_dir");
@@ -173,9 +177,9 @@ sub setpartition1 {
 	system("umount /mnt/cdrom");
 	
 	# umount chroot boot
-	#system("umount " . $chroot_dir . "/boot");
-	#$rc = system("findmnt " . $chroot_dir . "/boot");
-	#print "count not umount " . $chroot_dir . "/boot\n" if $rc == 0;
+	system("umount " . $chroot_dir . "/boot");
+	$rc = system("findmnt " . $chroot_dir . "/boot");
+	print "count not umount " . $chroot_dir . "/boot\n" if $rc == 0;
 }
 
 sub usage {
@@ -210,7 +214,9 @@ die "chroot directory must not exist\n"	if -d $chroot_dir;
 # packages may or may not have a value
 my $packages;
 if ($opt_p) {
-	$packages = $opt_p;
+	# make a list between quotes
+	$packages = "\"" . $opt_p . "\"";
+	print "$packages\n";
 } else {
 	$packages = "none";
 }
