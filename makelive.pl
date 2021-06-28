@@ -61,7 +61,7 @@ sub getversion {
 # setparition1(ubuntuiso-name, chroot-directory)
 ####################################################
 sub setpartition1 {
-	my ($ubuntuiso, $chroot_dir, $packages)  = @_;
+	my ($ubuntuiso, $chroot_dir, $packages, $upgrade)  = @_;
 	
 	# check MACRIUM ad64 is attached
 	my $rc = system("blkid -L ad64 > /dev/null");
@@ -123,15 +123,24 @@ sub setpartition1 {
 	#########################################################################################################################
 	# enter the chroot environment
 	#########################################################################################################################
+	
 	# install apps in the chroot environment
 	system("/usr/local/bin/bindall $chroot_dir");
 
-	if ($packages eq  "none") {
+	if (($packages eq  "none") and ($upgrade eq "noupgrade")) {
 		print "no packages to install\n";
-		system("chroot $chroot_dir /usr/local/bin/liveinstall.sh");
-	} else {
-		print "packages to install = $packages\n";
-		system("chroot $chroot_dir /usr/local/bin/liveinstall.sh $packages");
+		system("chroot $chroot_dir /usr/local/bin/liveinstall.sh noupgrade none");
+	
+	} elsif (($packages eq "none") and ($upgrade eq "upgrade")) {
+		system("chroot $chroot_dir /usr/local/bin/liveinstall.sh upgrade none");
+	
+	} elsif (($packages ne "none") and ($upgrade eq "noupgrade")) {
+		$packages = "\"" . $packages . "\"";
+		system("chroot $chroot_dir /usr/local/bin/liveinstall.sh noupgrade $packages");
+	
+	} elsif (($packages ne "none") and ($upgrade eq "upgrade"))	{
+		$packages = "\"" . $packages . "\"";
+		system("chroot $chroot_dir /usr/local/bin/liveinstall.sh upgrade $packages");
 	}
 
 	# for exiting the chroot environment
@@ -148,8 +157,16 @@ sub setpartition1 {
 	$rc = system("findmnt " . $chroot_dir . "/boot");
 	system("mount -L MACRIUM " . $chroot_dir . "/boot") unless $rc == 0;
 	
+	# copy vmlinuz and initrd from /boot on host to casper
 	mkdir $chroot_dir . "/boot/casper" unless -d $chroot_dir . "/boot/casper";
-	system("cp /mnt/cdrom/casper/vmlinuz /mnt/cdrom/casper/initrd " . $chroot_dir . "/boot/casper/");
+	
+	# copy new vmlinuz and initrd if upgrade option was given
+	if ($upgrade eq "noupgrade") {
+		system("cp /mnt/cdrom/casper/vmlinuz /mnt/cdrom/casper/initrd " . $chroot_dir . "/boot/casper/");
+	} elsif ($upgrade eq "upgrade") {
+		
+	}		
+	
 	system("svn export --force --depth files file:///mnt/svn/root/my-linux/livescripts/grub/vfat/mbr/ " . $chroot_dir . "/boot/grub/");
     system("svn export --force --depth files file:///mnt/svn/root/my-linux/livescripts/grub/vfat/efi/ " . $chroot_dir . "/boot/EFI/grub/");
 
@@ -205,6 +222,7 @@ sub setpartition1 {
 sub usage {
 	print "-i ubuntu iso full name\n";
 	print "-c chroot directory\n";
+	print "-u do a full-upgrade\n";
 	print "-1 for partition 1\n";
 	print "-2 for partition 2\n";
 	print "-p list of packages to install in chroot in quotes\n";
@@ -218,9 +236,9 @@ sub usage {
 # makelive.pl ubuntuiso-name chroot-directory partition-no
 # get command line argument
 # this is the name of the ubuntu iso ima
-our($opt_i, $opt_c, $opt_p, $opt_h, $opt_1, $opt_2);
+our($opt_u, $opt_i, $opt_c, $opt_p, $opt_h, $opt_1, $opt_2);
 
-getopts('12i:c:p:h');
+getopts('12i:c:p:hu');
 
 usage() if $opt_h;
 
@@ -231,20 +249,43 @@ die "$ubuntuiso does not exist\n" unless -f $ubuntuiso;
 my $chroot_dir = $opt_c or die "chroot directory rquired\n";
 die "chroot directory must not exist\n"	if -d $chroot_dir;
 
+
 # packages may or may not have a value
 my $packages;
+
 if ($opt_p) {
 	# make a list between quotes
-	$packages = "\"" . $opt_p . "\"";
-	print "$packages\n";
+	$packages = $opt_p;
 } else {
-	$packages = "none";
+	$packages = "";
 }
 
+# if and upgrade is selected
+# the modules version matching vmlinuz must be installed
+# in the chroot environment	
+my $host_version;
+my $upgrade;
+
+if ($opt_u) {
+	# determine version of modules to be installed.
+	# the hosts initrd and vmlinuz will be copied to casper
+	# of the form 5.11.0-23-generic
+	$upgrade = "upgrade";
+	$host_version = `uname -r`;
+	chomp($host_version);
+	$packages = $packages . " linux-modules-" . $host_version . " linux-modules-extra-" . $host_version;
+} else {
+	# no upgrade
+	$upgrade = "";
+}
+
+print "$upgrade\n" if $upgrade;
+print "$packages\n" if $packages;
+exit 0;
 # setup correct partition no
 if ($opt_1) {
 	# setup partition 1
-	setpartition1($ubuntuiso, $chroot_dir, $packages);
+	setpartition1($ubuntuiso, $chroot_dir, $packages, $upgrade);
 
 } elsif ($opt_2) {
 	# setup partition 2
