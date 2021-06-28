@@ -64,68 +64,46 @@ sub setpartition1 {
 	my ($ubuntuiso, $chroot_dir, $packages)  = @_;
 	
 	# check MACRIUM ad64 is attached
-	my $rc = system("blkid -L ad64");
-	my $rc1 = system("blkid -L MACRIUM");
+	my $rc = system("blkid -L ad64 > /dev/null");
+	my $rc1 = system("blkid -L MACRIUM > /dev/null");
 	die "MACRIUM and ad64 must be attached\n" unless ($rc == 0 and $rc1 == 0);
 
-	# get dev_path ex: /dev/sda1
+	# get dev_path of MACRIUM ex: /dev/sda1
 	my $dev_path = `blkid -L MACRIUM`;
 	chomp $dev_path;
 	print "MACRIUM is: $dev_path\n";
 	
-	# mount ubuntu iso image at /mnt/cdrom
+	# check if MACRIUM is mounted else where
+	# un mount it if it is mounted
+	my $macrium = `grep "$dev_path" /etc/mtab | cut -d " " -f 1-2`;
+	chomp($macrium);
+	my ($macrium_dev, $mtpt) = split /\s+/, $macrium;
+	print "$mtpt\n" if $mtpt;
+	system("umount $mtpt") if $mtpt;
+	
+	# unmount iso image if it is mounted
+	# mount ubuntu-mate iso image
 	$rc = system("findmnt /mnt/cdrom");
 	# umount /mnt/cdrom
 	system("umount /mnt/cdrom") if $rc == 0;
 	system("mount " . $ubuntuiso . " /mnt/cdrom -o ro");
 	
 
+	#####################################################################################
+	# copy and edit files to chroot
+	#####################################################################################
 	# unsquash filesystem.squashfs to the chroot directory
 	# the directory must not exist
 	system("unsquashfs -d $chroot_dir /mnt/cdrom/casper/filesystem.squashfs");
 
-	# delete all files in $chroot_dir / boot
-	system("rm -rf " . $chroot_dir . "/boot");
-	mkdir $chroot_dir . "/boot";
-	
 	# edit fstab in chroot for ad64 which includes debhome
 	chdir $chroot_dir . "/etc";
 	system("sed -i -e '/LABEL=ad64/d' fstab");
 	system("sed -i -e 'a \ LABEL=ad64 /mnt/ad64 ext4 defaults,noauto 0 0' fstab");
 
-	# mount the dev under chroot/boot if not mounted
-	$rc = system("findmnt " . $chroot_dir . "/boot");
-	system("mount -L MACRIUM " . $chroot_dir . "/boot") unless $rc == 0;
-	
-	# copy pool and install files for ubuntu mate
-	chdir "/mnt/cdrom";
-	system("cp -a dists install pool preseed " . $chroot_dir . "/boot/");
-	
-	# copy other files
 	system("cp /etc/resolv.conf /etc/hosts " . $chroot_dir . "/etc/");
-	mkdir $chroot_dir . "/boot/casper" unless -d $chroot_dir . "/boot/casper";
-	system("cp /mnt/cdrom/casper/vmlinuz /mnt/cdrom/casper/initrd " . $chroot_dir . "/boot/casper/");
-	
-	# copy etc/apt files
-	chdir "/etc/apt";
-	system("cp -a trusted.gpg trusted.gpg.d sources.list " . $chroot_dir . "/etc/apt/");
-	
-	# copy from subversion
-	system("svn export --force --depth files file:///mnt/svn/root/my-linux/livescripts " . $chroot_dir . "/usr/local/bin/");
-	system("svn export --force --depth files file:///mnt/svn/root/my-linux/livescripts/grub/vfat/mbr/ " . $chroot_dir . "/boot/grub/");
-    system("svn export --force --depth files file:///mnt/svn/root/my-linux/livescripts/grub/vfat/efi/ " . $chroot_dir . "/boot/EFI/grub/");
-    
-    # now edit grub.cfg with the new version no.
-    # edit mbr grub and set version
-    # get version
-    my $version = getversion($ubuntuiso);
-    
-	chdir $chroot_dir . "/boot/grub";
-	system("sed -i -e 's/ubuntu-version/$version/' grub.cfg");
-	chdir $chroot_dir . "/boot/EFI/grub";
-	system("sed -i -e 's/ubuntu-version/$version/' grub.cfg");
-	
-	
+	system("cp /etc/network/interfaces " . $chroot_dir . "/etc/network/");
+
 	# make directories in chroot
 	chdir $chroot_dir . "/mnt";
 	mkdir "ssd" unless -d "ssd";
@@ -134,7 +112,17 @@ sub setpartition1 {
 	unlink "hdd" if -l "hdd";
 	system("ln -s ad64 hdd");
 
+	
+	# copy etc/apt files
+	chdir "/etc/apt";
+	system("cp -dR trusted.gpg trusted.gpg.d sources.list " . $chroot_dir . "/etc/apt/");
+	
+	# copy from subversion
+	system("svn export --force --depth files file:///mnt/svn/root/my-linux/livescripts " . $chroot_dir . "/usr/local/bin/");
+
+	#########################################################################################################################
 	# enter the chroot environment
+	#########################################################################################################################
 	# install apps in the chroot environment
 	system("/usr/local/bin/bindall $chroot_dir");
 
@@ -149,6 +137,38 @@ sub setpartition1 {
 	# for exiting the chroot environment
 	system("/usr/local/bin/unbindall $chroot_dir");
 
+	# delete all files in $chroot_dir / boot
+	system("rm -rf " . $chroot_dir . "/boot");
+	mkdir $chroot_dir . "/boot";
+	
+	#########################################################################################################################
+	# copy and edit files to chroot/boot
+	#########################################################################################################################
+	# mount the MACRIUM under chroot/boot if not mounted
+	$rc = system("findmnt " . $chroot_dir . "/boot");
+	system("mount -L MACRIUM " . $chroot_dir . "/boot") unless $rc == 0;
+	
+	mkdir $chroot_dir . "/boot/casper" unless -d $chroot_dir . "/boot/casper";
+	system("cp /mnt/cdrom/casper/vmlinuz /mnt/cdrom/casper/initrd " . $chroot_dir . "/boot/casper/");
+	system("svn export --force --depth files file:///mnt/svn/root/my-linux/livescripts/grub/vfat/mbr/ " . $chroot_dir . "/boot/grub/");
+    system("svn export --force --depth files file:///mnt/svn/root/my-linux/livescripts/grub/vfat/efi/ " . $chroot_dir . "/boot/EFI/grub/");
+
+	# copy pool and install files for ubuntu mate
+	chdir "/mnt/cdrom";
+	system("cp -dR dists install pool preseed " . $chroot_dir . "/boot/");
+	
+    
+    # now edit grub.cfg with the new version no.
+    # edit mbr grub and set version
+    # get version
+    my $version = getversion($ubuntuiso);
+    
+	chdir $chroot_dir . "/boot/grub";
+	system("sed -i -e 's/ubuntu-version/$version/' grub.cfg");
+	chdir $chroot_dir . "/boot/EFI/grub";
+	system("sed -i -e 's/ubuntu-version/$version/' grub.cfg");
+	
+	
 	# make the persistence file
 	chdir $chroot_dir . "/boot/casper";
 	system("dd if=/dev/zero of=writable bs=1M count=3000");
