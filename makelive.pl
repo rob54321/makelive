@@ -61,7 +61,7 @@ sub getversion {
 # setparition1(ubuntuiso-name, chroot-directory)
 ####################################################
 sub setpartition1 {
-	my ($ubuntuiso, $chroot_dir, $packages, $upgrade)  = @_;
+	my ($ubuntuiso, $chroot_dir, $upgrade, $packages)  = @_;
 	
 	# check MACRIUM ad64 is attached
 	my $rc = system("blkid -L ad64 > /dev/null");
@@ -127,21 +127,11 @@ sub setpartition1 {
 	# install apps in the chroot environment
 	system("/usr/local/bin/bindall $chroot_dir");
 
-	if (($packages eq  "none") and ($upgrade eq "noupgrade")) {
-		print "no packages to install\n";
-		system("chroot $chroot_dir /usr/local/bin/liveinstall.sh noupgrade none");
-	
-	} elsif (($packages eq "none") and ($upgrade eq "upgrade")) {
-		system("chroot $chroot_dir /usr/local/bin/liveinstall.sh upgrade none");
-	
-	} elsif (($packages ne "none") and ($upgrade eq "noupgrade")) {
-		$packages = "\"" . $packages . "\"";
-		system("chroot $chroot_dir /usr/local/bin/liveinstall.sh noupgrade $packages");
-	
-	} elsif (($packages ne "none") and ($upgrade eq "upgrade"))	{
-		$packages = "\"" . $packages . "\"";
-		system("chroot $chroot_dir /usr/local/bin/liveinstall.sh upgrade $packages");
-	}
+	# parameters must be quoted
+	$upgrade = "\"" . $upgrade . "\"";
+	$packages = "\"" . $packages . "\"";
+	# execute liveinstall.sh in the chroot environment
+	system("chroot $chroot_dir /usr/local/bin/liveinstall.sh $upgrade $packages");
 
 	# for exiting the chroot environment
 	system("/usr/local/bin/unbindall $chroot_dir");
@@ -149,6 +139,9 @@ sub setpartition1 {
 	# delete all files in $chroot_dir / boot
 	system("rm -rf " . $chroot_dir . "/boot");
 	mkdir $chroot_dir . "/boot";
+	
+	# delete all files in chroot/var/cache
+	system("rm -rf " . $chroot_dir . "/var/cache/*");
 	
 	#########################################################################################################################
 	# copy and edit files to chroot/boot
@@ -161,12 +154,19 @@ sub setpartition1 {
 	mkdir $chroot_dir . "/boot/casper" unless -d $chroot_dir . "/boot/casper";
 	
 	# copy new vmlinuz and initrd if upgrade option was given
-	if ($upgrade eq "noupgrade") {
-		system("cp /mnt/cdrom/casper/vmlinuz /mnt/cdrom/casper/initrd " . $chroot_dir . "/boot/casper/");
-	} elsif ($upgrade eq "upgrade") {
-		
-	}		
-	
+	if ($upgrade eq "\"upgrade\"") {
+		# copy vmlinuz and initrd.img from host
+		# get host version
+		my $host_version = `uname -r`;
+		chomp $host_version;
+		system("cp -v /boot/vmlinuz-" . $host_version . " " . $chroot_dir . "/boot/casper/");
+		system("cp -v /boot/initrd.img-" . $host_version . " " . $chroot_dir . "/boot/casper/initrd");
+	} else {
+		# for no upgrade use vmlinuz initrd from the iso image
+		system("cp -v /mnt/cdrom/casper/vmlinuz /mnt/cdrom/casper/initrd " . $chroot_dir . "/boot/casper/");
+	}
+
+	# export the grub.cfg for mbr and uefi
 	system("svn export --force --depth files file:///mnt/svn/root/my-linux/livescripts/grub/vfat/mbr/ " . $chroot_dir . "/boot/grub/");
     system("svn export --force --depth files file:///mnt/svn/root/my-linux/livescripts/grub/vfat/efi/ " . $chroot_dir . "/boot/EFI/grub/");
 
@@ -184,7 +184,6 @@ sub setpartition1 {
 	system("sed -i -e 's/ubuntu-version/$version/' grub.cfg");
 	chdir $chroot_dir . "/boot/EFI/grub";
 	system("sed -i -e 's/ubuntu-version/$version/' grub.cfg");
-	
 	
 	# make the persistence file
 	chdir $chroot_dir . "/boot/casper";
@@ -279,13 +278,10 @@ if ($opt_u) {
 	$upgrade = "";
 }
 
-print "$upgrade\n" if $upgrade;
-print "$packages\n" if $packages;
-exit 0;
 # setup correct partition no
 if ($opt_1) {
 	# setup partition 1
-	setpartition1($ubuntuiso, $chroot_dir, $packages, $upgrade);
+	setpartition1($ubuntuiso, $chroot_dir, $upgrade, $packages);
 
 } elsif ($opt_2) {
 	# setup partition 2
