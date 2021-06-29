@@ -141,7 +141,7 @@ sub setpartition1 {
 	mkdir $chroot_dir . "/boot";
 	
 	# delete all files in chroot/var/cache
-	system("rm -rf " . $chroot_dir . "/var/cache/*");
+	# system("rm -rf " . $chroot_dir . "/var/cache/*");
 	
 	#########################################################################################################################
 	# copy and edit files to chroot/boot
@@ -150,8 +150,15 @@ sub setpartition1 {
 	$rc = system("findmnt " . $chroot_dir . "/boot");
 	system("mount -L MACRIUM " . $chroot_dir . "/boot") unless $rc == 0;
 	
-	# copy vmlinuz and initrd from /boot on host to casper
-	mkdir $chroot_dir . "/boot/casper" unless -d $chroot_dir . "/boot/casper";
+	# make casper dir if it does not exist
+	if ( -d $chroot_dir . "/boot/casper") {
+		# clean directory
+		chdir $chroot_dir . "/boot/casper";
+		unlink glob "*.*";
+	} else {
+		# create directory
+		mkdir $chroot_dir . "/boot/casper";
+	}
 	
 	# copy new vmlinuz and initrd if upgrade option was given
 	if ($upgrade eq "\"upgrade\"") {
@@ -159,11 +166,11 @@ sub setpartition1 {
 		# get host version
 		my $host_version = `uname -r`;
 		chomp $host_version;
-		system("cp -v /boot/vmlinuz-" . $host_version . " " . $chroot_dir . "/boot/casper/");
-		system("cp -v /boot/initrd.img-" . $host_version . " " . $chroot_dir . "/boot/casper/initrd");
+		system("cp -vf /boot/vmlinuz-" . $host_version . " " . $chroot_dir . "/boot/casper/vmlinuz");
+		system("cp -vf /boot/initrd.img-" . $host_version . " " . $chroot_dir . "/boot/casper/initrd");
 	} else {
 		# for no upgrade use vmlinuz initrd from the iso image
-		system("cp -v /mnt/cdrom/casper/vmlinuz /mnt/cdrom/casper/initrd " . $chroot_dir . "/boot/casper/");
+		system("cp -vf /mnt/cdrom/casper/vmlinuz /mnt/cdrom/casper/initrd " . $chroot_dir . "/boot/casper/");
 	}
 
 	# export the grub.cfg for mbr and uefi
