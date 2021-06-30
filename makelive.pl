@@ -58,10 +58,10 @@ sub getversion {
 # partition. Filesystem must be built.
 # ubuntu-mate iso must be mounted
 # parameters passed:
-# setparition1(ubuntuiso-name, chroot-directory)
+# setparition1(ubuntuiso-name, chroot-directory, packages, part_no)
 ####################################################
 sub setpartition1 {
-	my ($ubuntuiso, $chroot_dir, $upgrade, $packages)  = @_;
+	my ($ubuntuiso, $chroot_dir, $upgrade, $packages, $part_no)  = @_;
 	
 	# check MACRIUM ad64 is attached
 	my $rc = system("blkid -L ad64 > /dev/null");
@@ -117,7 +117,7 @@ sub setpartition1 {
 	chdir "/etc/apt";
 	system("cp -dR trusted.gpg trusted.gpg.d sources.list " . $chroot_dir . "/etc/apt/");
 	
-	# copy from subversion
+	# export livescripts from subversion
 	system("svn export --force --depth files file:///mnt/svn/root/my-linux/livescripts " . $chroot_dir . "/usr/local/bin/");
 
 	#########################################################################################################################
