@@ -134,11 +134,11 @@ sub setpartition {
 	# unmount iso image if it is mounted
 	# mount ubuntu-mate iso image
 	$rc = system("findmnt /mnt/cdrom");
+	
 	# umount /mnt/cdrom
 	system("umount /mnt/cdrom") if $rc == 0;
 	system("mount " . $ubuntuiso . " /mnt/cdrom -o ro");
-
-
+	
 	#####################################################################################
 	# copy and edit files to chroot
 	#####################################################################################
