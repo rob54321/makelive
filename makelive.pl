@@ -137,7 +137,7 @@ sub setpartition {
 	# umount /mnt/cdrom
 	system("umount /mnt/cdrom") if $rc == 0;
 	system("mount " . $ubuntuiso . " /mnt/cdrom -o ro");
-	exit 0;
+
 
 	#####################################################################################
 	# copy and edit files to chroot
