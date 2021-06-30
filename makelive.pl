@@ -127,7 +127,7 @@ sub setpartition1 {
 	# install apps in the chroot environment
 	system("/usr/local/bin/bindall $chroot_dir");
 
-	# parameters must be quoted
+	# parameters must be quoted for Bash
 	$upgrade = "\"" . $upgrade . "\"";
 	$packages = "\"" . $packages . "\"";
 	# execute liveinstall.sh in the chroot environment
@@ -139,9 +139,6 @@ sub setpartition1 {
 	# delete all files in $chroot_dir / boot
 	system("rm -rf " . $chroot_dir . "/boot");
 	mkdir $chroot_dir . "/boot";
-	
-	# delete all files in chroot/var/cache
-	# system("rm -rf " . $chroot_dir . "/var/cache/*");
 	
 	#########################################################################################################################
 	# copy and edit files to chroot/boot
