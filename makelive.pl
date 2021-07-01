@@ -105,7 +105,7 @@ sub setpartition {
 	# hash part parameters: containing parameters that are partition dependent
 	my %pparam = ("1" => {"casper"   => "$chroot_dir/boot/casper",
 	                      "label"    => "MACRIUM"},
-	              "2" => {"casper"   => "$chroot_dir/boot/casper2",
+	              "2" => {"casper"   => "$chroot_dir/boot/casper1",
 				          "label"    => "UBUNTU"});
 
 	# some short cuts
