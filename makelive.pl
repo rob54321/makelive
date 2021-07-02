@@ -91,6 +91,8 @@ sub grubsetup {
 	
 	system(" grub-install --no-floppy --boot-directory=" . $chroot_dir . "/boot/EFI --efi-directory="  . $chroot_dir . "/boot --removable --target=x86_64-efi " . $device);
 
+	# sleep for a few seconds to allow the install to finish
+	sleep 7;
 }
 ####################################################
 # sub to setup partition 1. This is the ubuntu-mate
@@ -130,20 +132,22 @@ sub setpartition {
 	chomp $partition_path;
 	print $label . " is: $partition_path\n";
 	
-	# check if the partition is mounted at any localtion
+	# check if the partition is mounted at any location
 	# un mount it if it is mounted
 	my $devandmtpt = `grep "$partition_path" /etc/mtab | cut -d " " -f 1-2`;
 	chomp($devandmtpt);
 	my ($dev, $mtpt) = split /\s+/, $devandmtpt;
 	print "$label mounted at: $mtpt\n" if $mtpt;
-	system("umount $mtpt") if $mtpt;
+	$rc = system("umount $mtpt") if $mtpt;
+	die "$label cannot be unmounted\n" unless $rc == 0;
 	
 	# unbind chroot and delete chroot dir
 	if (-d $chroot_dir){
 		# unbind
 		system("unbindall " . $chroot_dir);
 		# remove directory
-		system("rm -rf " . $chroot_dir);
+		$rc = system("rm -rf " . $chroot_dir);
+		die "cannot remove $chroot_dir\n" unless $rc == 0;
 	}
 	
 	# unmount iso image if it is mounted
