@@ -100,40 +100,55 @@ sub grubsetup {
 # setparition(ubuntuiso-name, chroot-directory, packages, part_no)
 ####################################################
 sub setpartition {
-	my ($ubuntuiso, $chroot_dir, $upgrade, $packages, $part_no)  = @_;
+	my ($ubuntuiso, $upgrade, $packages, $part_no)  = @_;
 
+	# set up chroot dirs for partition 1 and 2
+	my $chroot_dir1 = "/tmp/chroot1";
+	my $chroot_dir2 = "/tmp/chroot2";
+	
 	# hash part parameters: containing parameters that are partition dependent
-	my %pparam = ("1" => {"casper"   => "$chroot_dir/boot/casper",
+	my %pparam = ("1" => {"chroot"   => "$chroot_dir1",
+		                  "casper"   => "$chroot_dir1/boot/casper",
 	                      "label"    => "MACRIUM"},
-	              "2" => {"casper"   => "$chroot_dir/boot/casper1",
+	              "2" => {"chroot"   => "$chroot_dir2",
+					      "casper"   => "$chroot_dir2/boot/casper1",
 				          "label"    => "UBUNTU"});
 
 	# some short cuts
+	my $chroot_dir = $pparam{$part_no}->{"chroot"};
 	my $casper = $pparam{$part_no}->{"casper"};
 	my $label = $pparam{$part_no}->{"label"};
-	print $label . " " . $casper . "\n";
+	print $chroot_dir . " " . $label . " " . $casper . "\n";
 	
 	# check MACRIUM ad64 is attached
 	my $rc = system("blkid -L ad64 > /dev/null");
 	my $rc1 = system("blkid -L " . $label . " > /dev/null");
 	die $label . " and ad64 must be attached\n" unless ($rc == 0 and $rc1 == 0);
 
-	# get partition_path of MACRIUM ex: /dev/sda1
+	# get partition_path of partition ex: /dev/sda1
 	my $partition_path = `blkid -L $label`;
 	chomp $partition_path;
 	print $label . " is: $partition_path\n";
 	
-	# check if the partition is mounted else where
+	# check if the partition is mounted at any localtion
 	# un mount it if it is mounted
 	my $devandmtpt = `grep "$partition_path" /etc/mtab | cut -d " " -f 1-2`;
 	chomp($devandmtpt);
 	my ($dev, $mtpt) = split /\s+/, $devandmtpt;
-	print "$mtpt\n" if $mtpt;
+	print "$label mounted at: $mtpt\n" if $mtpt;
 	system("umount $mtpt") if $mtpt;
+	
+	# unbind chroot and delete chroot dir
+	if (-d $chroot_dir){
+		# unbind
+		system("unbindall " . $chroot_dir);
+		# remove directory
+		system("rm -rf " . $chroot_dir);
+	}
 	
 	# unmount iso image if it is mounted
 	# mount ubuntu-mate iso image
-	$rc = system("findmnt /mnt/cdrom");
+	$rc = system("findmnt /mnt/cdrom > /dev/null");
 	
 	# umount /mnt/cdrom
 	system("umount /mnt/cdrom") if $rc == 0;
@@ -248,10 +263,9 @@ sub setpartition {
 }
 
 sub usage {
-	print "-i ubuntu iso full name\n";
-	print "-c chroot directory\n";
+	print "-1 full name of ubuntu-mate iso for partition 1\n";
+	print "-2 full name of ubuntu iso for partition 2\n";
 	print "-u do a full-upgrade\n";
-	print "-P partition no 1 or 2\n";
 	print "-p list of packages to install in chroot in quotes\n";
 	exit 0;
 }
@@ -263,24 +277,12 @@ sub usage {
 # makelive.pl ubuntuiso-name chroot-directory partition-no
 # get command line argument
 # this is the name of the ubuntu iso ima
-our($opt_u, $opt_i, $opt_c, $opt_p, $opt_h, $opt_P);
+our($opt_u, $opt_1, $opt_2, $opt_p, $opt_h);
 
-getopts('i:c:p:huP:');
+
+getopts('1:2:p:hu');
 
 usage() if $opt_h;
-
-my $ubuntuiso = $opt_i or die "ubuntu iso name required\n";
-#check if ubuntuiso exists
-die "$ubuntuiso does not exist\n" unless -f $ubuntuiso;
-
-# check if partition number given and must be 1 or 2
-die "Partition no 1 or 2 must be given\n" unless $opt_P;
-die "Partition no must be 1 or 2\n" unless ($opt_P == 1 or $opt_P == 2);
-
-# the chroot directory must not exist
-my $chroot_dir = $opt_c or die "chroot directory rquired\n";
-die "chroot directory must not exist\n"	if -d $chroot_dir;
-
 
 # packages may or may not have a value
 my $packages;
@@ -311,5 +313,22 @@ if ($opt_u) {
 	$upgrade = "";
 }
 
-# setup correct partition no
-setpartition($ubuntuiso, $chroot_dir, $upgrade, $packages, $opt_P);
+# check if iso 1 exists
+if ($opt_1){
+	die "$opt_1 does not exist\n" unless -f $opt_1;
+}
+
+# check if iso 2 exists
+if ($opt_2) {
+	die "$opt_2 does not exist\n" unless -f $opt_2
+}
+
+# invoke set partition for each iso given
+if ($opt_1) {
+	setpartition($opt_1, $upgrade, $packages, 1);
+}
+
+# invoke set partition for each iso given
+if ($opt_2) {
+	setpartition($opt_2, $upgrade, $packages, 2);
+}
