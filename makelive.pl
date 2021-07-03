@@ -90,9 +90,6 @@ sub grubsetup {
 	system("grub-install --no-floppy --boot-directory=" . $chroot_dir . "/boot --target=i386-pc " . $device);
 	
 	system(" grub-install --no-floppy --boot-directory=" . $chroot_dir . "/boot/EFI --efi-directory="  . $chroot_dir . "/boot --removable --target=x86_64-efi " . $device);
-
-	# sleep for a few seconds to allow the install to finish
-	sleep 7;
 }
 ####################################################
 # sub to setup partition 1. This is the ubuntu-mate
@@ -212,9 +209,8 @@ sub setpartition {
 	#########################################################################################################################
 	# copy and edit files to chroot/boot
 	#########################################################################################################################
-	# mount the partition under chroot/boot if not mounted
-	$rc = system("findmnt " . $chroot_dir . "/boot");
-	system("mount -L " . $label . " " . $chroot_dir . "/boot") unless $rc == 0;
+	# mount the partition under chroot/boot, it was unmounted before chroot
+	system("mount -L " . $label . " " . $chroot_dir . "/boot");
 	
 	# make casper dir if it does not exist
 	if ( -d $casper) {
