@@ -74,10 +74,12 @@ sub grubsetup {
 	system("sed -i -e 's/ubuntu-version/$version/' grub.cfg");
 	chdir $chroot_dir . "/boot/EFI/grub";
 	system("sed -i -e 's/ubuntu-version/$version/' grub.cfg");
+
+	# this doesn't seem necessary from MACRIUM version 7.3
 	# rename macrium file to stop only macrium_pe booting
-	system("mv " . $chroot_dir . "/boot/EFI/Microsoft/Boot/bootmgfw.efi "
-	             . $chroot_dir . "/boot/EFI/Microsoft/Boot/bootmgfw.efi.old")
-	             if -e $chroot_dir . "/boot/EFI/Microsoft/Boot/bootmgfw.efi";
+	#system("mv " . $chroot_dir . "/boot/EFI/Microsoft/Boot/bootmgfw.efi "
+	#             . $chroot_dir . "/boot/EFI/Microsoft/Boot/bootmgfw.efi.old")
+	#             if -e $chroot_dir . "/boot/EFI/Microsoft/Boot/bootmgfw.efi";
 
 	# install grub
 	# get device from partition path
@@ -239,6 +241,8 @@ sub setpartition {
 	chdir "/mnt/cdrom";
 	system("cp -dR dists install pool preseed " . $chroot_dir . "/boot/");
 	
+	# setup and install grub if this is the first partition
+	grubsetup($ubuntuiso, $chroot_dir, $partition_path) if $part_no == 1;
 	
 	# make the persistence file
 	chdir $casper;
@@ -252,9 +256,6 @@ sub setpartition {
 	
 	# un mount /mnt/cdrom
 	system("umount /mnt/cdrom");
-	
-	# setup and install grub if this is the first partition
-	grubsetup($ubuntuiso, $chroot_dir, $partition_path) if $part_no == 1;
 	
 	# umount chroot boot
 	system("umount " . $chroot_dir . "/boot");
