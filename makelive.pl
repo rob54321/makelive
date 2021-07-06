@@ -237,6 +237,10 @@ sub setpartition {
 		system("cp -vf /mnt/cdrom/casper/vmlinuz /mnt/cdrom/casper/initrd " . $casper);
 	}
 
+	# delete ubuntu install files in chroot/boot
+	chdir $chroot_dir . "/boot";
+	system("rm -rf dists install pool preseed");
+	
 	# copy pool and install files for ubuntu mate
 	chdir "/mnt/cdrom";
 	system("cp -dR dists install pool preseed " . $chroot_dir . "/boot/");
