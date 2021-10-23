@@ -5,22 +5,60 @@ use warnings;
 use Getopt::Std;
 
 #######################################################
-# this script makes a live system on hdd /dev/sdX
-# where X is the letter for the drive.
-# The drive must have been paritioned:
-# /dev/sdX1 8g      vfat     label = MACRIUM
-# /dev/sdX2 8g      vfat     label= UBUNTU  UUID=4444-4444
-# /dev/sdX3 rest    ntfs     label = ssd
+# this script makes a live system on MACRIUM and UBUNTU paritions
 # Macrium Reflect 7 must have been installed into partition 1.
 #
-# Command line parameters:
-# makelive.pl ubuntuisoname /dev/sdX partition-no
-# partition 1 and 2 have different installation.
-# partition 1 has filesystem built
-# partition 2 has filesystem copied from iso image.
+#
+# command line parameters:
+# makelive.pl -1 ubuntu-mate iso name | -2 ubuntu iso name and -u for upgrade and -p package list
+#
+# the disk
+# partition 1 [MACRIUM] fat32   contains macrium and ubuntu-mate, boots from grub
+# partition 2 [UBUNTU]  fat32   contains ubuntu
+# partition 3 [ssd]     ntfs    contains backup files
 #
 #######################################################
 
+#######################################################
+# sub to bind sys tmp dev dev/pts proc for chroot
+# environment
+# usage: bindall chroot_dir
+# returns: none
+# exceptions: dies if chroot dir does not exist
+#######################################################
+sub bindall {
+	# parameters
+	my $chroot_dir = $_[0];
+	chdir $chroot_dir or die "$chroot_dir does not exist, exiting\n";
+
+	# bind
+	system("mount --bind /proc proc");
+	system("mount --bind /dev dev");
+	system("mount --bind /dev/pts dev/pts");
+	system("mount --bind /tmp tmp");
+	system("mount --bind /sys sys");
+}
+
+#######################################################
+# sub to unbind sys tmp dev dev/pts proc for chroot
+# environment
+# usage: unbindall chroot_dir
+# returns: none
+# exceptions: dies if chroot dir does not exist
+#######################################################
+sub unbindall {
+	# parameters
+	my $chroot_dir = $_[0];
+	chdir $chroot_dir or die "$chroot_dir does not exist, exiting\n";
+
+	# bind
+	system("umount proc");
+	system("umount dev/pts");
+	system("umount dev");
+	system("umount tmp");
+	system("umount sys");
+}
+	
 #######################################################
 # this sub determines the version
 # which will be used for grub
@@ -57,18 +95,19 @@ sub getversion {
 # this is only necessary for partition 1
 # the call: grubsetup(ubuntu_iso_name, chroot_directory, partition_path)
 sub grubsetup {
+	
 	##########################################################################################################
 	# export the grub.cfg for mbr and uefi and edit grub only for partition 1
 	##########################################################################################################
 	my ($ubuntuiso, $chroot_dir, $partition_path) = @_;
 	
 	system("svn export --force --depth files file:///mnt/svn/root/my-linux/livescripts/grub/vfat/mbr/ " . $chroot_dir . "/boot/grub/");
-    system("svn export --force --depth files file:///mnt/svn/root/my-linux/livescripts/grub/vfat/efi/ " . $chroot_dir . "/boot/EFI/grub/");
-
-    # now edit grub.cfg with the new version no.
-    # edit mbr grub and set version
-    # get version
-    my $version = getversion($ubuntuiso);
+	system("svn export --force --depth files file:///mnt/svn/root/my-linux/livescripts/grub/vfat/efi/ " . $chroot_dir . "/boot/EFI/grub/");
+	
+	# now edit grub.cfg with the new version no.
+	# edit mbr grub and set version
+	# get version
+	my $version = getversion($ubuntuiso);
     
 	chdir $chroot_dir . "/boot/grub";
 	system("sed -i -e 's/ubuntu-version/$version/' grub.cfg");
@@ -143,25 +182,30 @@ sub setpartition {
 	# unbind chroot and delete chroot dir
 	if (-d $chroot_dir){
 		# unbind
-		system("unbindall " . $chroot_dir);
+		unbindall $chroot_dir;
 		# remove directory
 		$rc = system("rm -rf " . $chroot_dir);
 		die "cannot remove $chroot_dir\n" unless $rc == 0;
 	}
 	
-	# unmount iso image if it is mounted
+	# if /mnt/cdrom exists, unmount iso image if it is mounted
 	# mount ubuntu-mate iso image
-	$rc = system("findmnt /mnt/cdrom > /dev/null");
+	if (-d "/mnt/cdrom") {
+		$rc = system("findmnt /mnt/cdrom > /dev/null");
 	
-	# umount /mnt/cdrom
-	system("umount /mnt/cdrom") if $rc == 0;
+		# umount /mnt/cdrom
+		system("umount /mnt/cdrom") if $rc == 0;
+	} else {
+		# /mnt/cdrom does not exist, create it
+		mkdir "/mnt/cdrom";
+	}
 	system("mount " . $ubuntuiso . " /mnt/cdrom -o ro");
 	
 	#####################################################################################
 	# copy and edit files to chroot
 	#####################################################################################
 	# unsquash filesystem.squashfs to the chroot directory
-	# the directory must not exist
+	# the chroot_dir directory must not exist
 	system("unsquashfs -d " . $chroot_dir . " /mnt/cdrom/casper/filesystem.squashfs");
 
 	# edit fstab in chroot for ad64 which includes debhome
@@ -193,7 +237,7 @@ sub setpartition {
 	#########################################################################################################################
 	
 	# install apps in the chroot environment
-	system("/usr/local/bin/bindall $chroot_dir");
+	bindall $chroot_dir;
 
 	# parameters must be quoted for Bash
 	$upgrade = "\"" . $upgrade . "\"";
@@ -202,7 +246,7 @@ sub setpartition {
 	system("chroot $chroot_dir /usr/local/bin/liveinstall.sh $upgrade $packages");
 
 	# for exiting the chroot environment
-	system("/usr/local/bin/unbindall $chroot_dir");
+	unbindall $chroot_dir;
 
 	# delete all files in $chroot_dir / boot
 	system("rm -rf " . $chroot_dir . "/boot");
@@ -279,12 +323,18 @@ sub usage {
 ##################
 
 # command line parameters
-# makelive.pl ubuntuiso-name chroot-directory partition-no
+# -1 ubuntu-mate iso name
+# -2 ubuntu iso name
+# -p "package list of extra packages
+# -u upgrade or not
+# One or both iso's can be given.
+# package list in quotes, if given
+
 # get command line argument
 # this is the name of the ubuntu iso ima
 our($opt_u, $opt_1, $opt_2, $opt_p, $opt_h);
 
-
+# get command line options
 getopts('1:2:p:hu');
 
 usage() if $opt_h;
