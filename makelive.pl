@@ -35,8 +35,8 @@ sub bindall {
 	system("mount --bind /proc proc");
 	system("mount --bind /dev dev");
 	system("mount --bind /dev/pts dev/pts");
-	system("mount --bind /tmp tmp");
 	system("mount --bind /sys sys");
+	system("mount --bind /tmp tmp");
 }
 
 #######################################################
@@ -55,8 +55,8 @@ sub unbindall {
 	system("umount proc");
 	system("umount dev/pts");
 	system("umount dev");
-	system("umount tmp");
 	system("umount sys");
+	system("umount tmp");
 }
 	
 #######################################################
@@ -137,10 +137,10 @@ sub grubsetup {
 # partition. Filesystem must be built.
 # ubuntu-mate iso must be mounted
 # parameters passed:
-# setparition(ubuntuiso-name, chroot-directory, packages, part_no)
+# ubuntuiso-name, chroot-directory, debhome dev label, svn full path, packages list, part_no)
 ####################################################
 sub setpartition {
-	my ($ubuntuiso, $upgrade, $packages, $part_no)  = @_;
+	my ($ubuntuiso, $upgrade, $debhomedev, $svn, $packages, $part_no)  = @_;
 
 	# set up chroot dirs for partition 1 and 2
 	my $chroot_dir1 = "/tmp/chroot1";
@@ -160,10 +160,10 @@ sub setpartition {
 	my $label = $pparam{$part_no}->{"label"};
 	print $chroot_dir . " " . $label . " " . $casper . "\n";
 	
-	# check MACRIUM ad64 is attached
-	my $rc = system("blkid -L ad64 > /dev/null");
+	# check MACRIUM and debhomedev is attached
+	my $rc = system("blkid -L $debhomedev > /dev/null");
 	my $rc1 = system("blkid -L " . $label . " > /dev/null");
-	die $label . " and ad64 must be attached\n" unless ($rc == 0 and $rc1 == 0);
+	die "Either $label and/or $debhomedev is not attached\n" unless ($rc == 0 and $rc1 == 0);
 
 	# get partition_path of partition ex: /dev/sda1
 	my $partition_path = `blkid -L $label`;
@@ -199,19 +199,21 @@ sub setpartition {
 		# /mnt/cdrom does not exist, create it
 		mkdir "/mnt/cdrom";
 	}
-	system("mount " . $ubuntuiso . " /mnt/cdrom -o ro");
+	$rc = system("mount " . $ubuntuiso . " /mnt/cdrom -o ro");
+	die "Could not mount $ubuntuiso\n" unless $rc == 0;
 	
 	#####################################################################################
 	# copy and edit files to chroot
 	#####################################################################################
 	# unsquash filesystem.squashfs to the chroot directory
 	# the chroot_dir directory must not exist
-	system("unsquashfs -d " . $chroot_dir . " /mnt/cdrom/casper/filesystem.squashfs");
-
-	# edit fstab in chroot for ad64 which includes debhome
+	$rc = system("unsquashfs -d " . $chroot_dir . " /mnt/cdrom/casper/filesystem.squashfs");
+	die "Error unsquashing /mnt/cdrom/casper/filesystem.squashfs\n"unless $rc == 0;
+	
+	# edit fstab in chroot for debhome which includes debhome
 	chdir $chroot_dir . "/etc";
-	system("sed -i -e '/LABEL=ad64/d' fstab");
-	system("sed -i -e 'a \ LABEL=ad64 /mnt/ad64 ext4 defaults,noauto 0 0' fstab");
+	system("sed -i -e '/LABEL=$debhomedev/d' fstab");
+	system("sed -i -e 'a \ LABEL=$debhomedev /mnt/$debhomedev ext4 defaults,noauto 0 0' fstab");
 
 	system("cp /etc/resolv.conf /etc/hosts " . $chroot_dir . "/etc/");
 	system("cp /etc/network/interfaces " . $chroot_dir . "/etc/network/");
@@ -219,10 +221,10 @@ sub setpartition {
 	# make directories in chroot
 	chdir $chroot_dir . "/mnt";
 	mkdir "ssd" unless -d "ssd";
-	mkdir "ad64" unless -d "ad64";
-	# make link
+	mkdir "$debhomedev" unless -d "$debhomedev";
+	# make link since sources.list contains hdd
 	unlink "hdd" if -l "hdd";
-	system("ln -s ad64 hdd");
+	system("ln -s $debhomedev hdd");
 
 	
 	# copy etc/apt files
@@ -230,7 +232,8 @@ sub setpartition {
 	system("cp -dR trusted.gpg trusted.gpg.d sources.list " . $chroot_dir . "/etc/apt/");
 	
 	# export livescripts from subversion
-	system("svn export --force --depth files file:///mnt/svn/root/my-linux/livescripts " . $chroot_dir . "/usr/local/bin/");
+	$rc = system("svn export --force --depth files file://$svn/root/my-linux/livescripts " . $chroot_dir . "/usr/local/bin/");
+	die "Could not export liveinstall.sh from svn\n" unless $rc == 0;
 
 	#########################################################################################################################
 	# enter the chroot environment
@@ -243,10 +246,12 @@ sub setpartition {
 	$upgrade = "\"" . $upgrade . "\"";
 	$packages = "\"" . $packages . "\"";
 	# execute liveinstall.sh in the chroot environment
-	system("chroot $chroot_dir /usr/local/bin/liveinstall.sh $upgrade $packages");
+	$rc = system("chroot $chroot_dir /usr/local/bin/liveinstall.sh $upgrade $packages");
 
 	# for exiting the chroot environment
 	unbindall $chroot_dir;
+	# check if liveinstall exited with error in chroot environment
+	die "liveinstall.sh exited with error" unless $rc == 0;
 
 	# delete all files in $chroot_dir / boot
 	system("rm -rf " . $chroot_dir . "/boot");
@@ -256,7 +261,8 @@ sub setpartition {
 	# copy and edit files to chroot/boot
 	#########################################################################################################################
 	# mount the partition under chroot/boot, it was unmounted before chroot
-	system("mount -L " . $label . " " . $chroot_dir . "/boot");
+	$rc = system("mount -L " . $label . " " . $chroot_dir . "/boot");
+	die "Could not mount $label at $chroot_dir/boot\n" unless $rc == 0;
 	
 	# make casper dir if it does not exist
 	if ( -d $casper) {
@@ -312,10 +318,13 @@ sub setpartition {
 }
 
 sub usage {
+	my ($debhomedev, $svn) = @_;
 	print "-1 full name of ubuntu-mate iso for partition 1\n";
 	print "-2 full name of ubuntu iso for partition 2\n";
 	print "-u do a full-upgrade\n";
 	print "-p list of packages to install in chroot in quotes\n";
+	print "-d disk label for debhome, default is $debhomedev\n";
+	print "-s full path to subversion, default is $svn\n";
 	exit 0;
 }
 ##################
@@ -327,17 +336,33 @@ sub usage {
 # -2 ubuntu iso name
 # -p "package list of extra packages
 # -u upgrade or not
+# -d disk label of debhome
+# -s full path to subersion
+#
 # One or both iso's can be given.
 # package list in quotes, if given
 
+# default for local repository debhome
+my $debhomedev = "ad64";
+my $svn = "/mnt/svn";
+
 # get command line argument
 # this is the name of the ubuntu iso ima
-our($opt_u, $opt_1, $opt_2, $opt_p, $opt_h);
+our($opt_u, $opt_1, $opt_2, $opt_p, , $opt_d, $opt_s, $opt_h);
 
 # get command line options
-getopts('1:2:p:hu');
+getopts('1:2:p:hud:s:');
 
-usage() if $opt_h;
+# setup debhome if it has change from the default
+$debhomedev = $opt_d if $opt_d;
+
+# setup subversion if it has changed
+$svn = $opt_s if $opt_s;
+
+usage($debhomedev, $svn) if $opt_h;
+
+# check for existence of svn
+die "Could not find subversion respository at $svn\n" unless -d $svn;
 
 # packages may or may not have a value
 my $packages;
@@ -377,13 +402,12 @@ if ($opt_1){
 if ($opt_2) {
 	die "$opt_2 does not exist\n" unless -f $opt_2
 }
-
 # invoke set partition for each iso given
 if ($opt_1) {
-	setpartition($opt_1, $upgrade, $packages, 1);
+	setpartition($opt_1, $upgrade, $debhomedev, $svn, $packages, 1);
 }
 
 # invoke set partition for each iso given
 if ($opt_2) {
-	setpartition($opt_2, $upgrade, $packages, 2);
+	setpartition($opt_2, $upgrade, $debhomedev, $svn, $packages, 2);
 }
