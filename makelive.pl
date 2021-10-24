@@ -90,22 +90,43 @@ sub getversion {
 	}
 	return $version;
 }
+#################################################
+# this sub sets up sources.list and debhome.list
+# in chroot_dir/etc/apt and chroot_dir/etc/apt/sources.list.d
+# The call setaptsources (codename, chroot_dir)
+#################################################
+sub setaptsources {
+	my ($codename, $chroot_dir) = @_;
+	# create sources.list
+	open (SOURCES, ">", "$chroot_dir/etc/apt/sources.list");
+	print SOURCES "deb http://archive.ubuntu.com/ubuntu $codename main restricted multiverse universe
+deb http://archive.ubuntu.com/ubuntu $codename-security main restricted multiverse universe
+deb http://archive.ubuntu.com/ubuntu $codename-updates  main restricted multiverse universe
+deb http://archive.ubuntu.com/ubuntu $codename-proposed  main restricted multiverse universe";
+	close SOURCES;
+
+	# create debhome.list
+	open (DEBHOME, ">", "$chroot_dir/etc/apt/sources.list.d/debhome.list");
+	print DEBHOME "deb file:///mnt/debhome home main";
+	close DEBHOME;
+}
 
 # this sub sets up grub and installs it.
 # this is only necessary for partition 1
-# the call: grubsetup(ubuntu_iso_name, chroot_directory, partition_path)
+# the call: grubsetup(ubuntu_iso_name, chroot_directory, partition_path, subversion path)
+#################################################
 sub grubsetup {
 	
 	##########################################################################################################
 	# export the grub.cfg for mbr and uefi and edit grub only for partition 1
 	##########################################################################################################
-	my ($ubuntuiso, $chroot_dir, $partition_path) = @_;
+	my ($ubuntuiso, $chroot_dir, $partition_path, $svn) = @_;
 	my $rc;
 
 	# export grub
-	$rc = system("svn export --force --depth files file:///mnt/svn/root/my-linux/livescripts/grub/vfat/mbr/ " . $chroot_dir . "/boot/grub/");
+	$rc = system("svn export --force --depth files file://$svn/root/my-linux/livescripts/grub/vfat/mbr/ " . $chroot_dir . "/boot/grub/");
 	die "Could not export mbr grub\n" unless $rc == 0;
-	$rc = system("svn export --force --depth files file:///mnt/svn/root/my-linux/livescripts/grub/vfat/efi/ " . $chroot_dir . "/boot/EFI/grub/");
+	$rc = system("svn export --force --depth files file://$svn/root/my-linux/livescripts/grub/vfat/efi/ " . $chroot_dir . "/boot/EFI/grub/");
 	die "Could not export efi grub\n" unless $rc == 0;
 	
 	# now edit grub.cfg with the new version no.
@@ -141,10 +162,10 @@ sub grubsetup {
 # partition. Filesystem must be built.
 # ubuntu-mate iso must be mounted
 # parameters passed:
-# ubuntuiso-name, chroot-directory, debhome dev label, svn full path, packages list, part_no)
+# codename, ubuntuiso-name, chroot-directory, debhome dev label, svn full path, packages list, part_no)
 ####################################################
 sub setpartition {
-	my ($ubuntuiso, $upgrade, $debhomedev, $svn, $packages, $part_no)  = @_;
+	my ($codename, $ubuntuiso, $upgrade, $debhomedev, $svn, $packages, $part_no)  = @_;
 
 	# set up chroot dirs for partition 1 and 2
 	my $chroot_dir1 = "/tmp/chroot1";
@@ -233,7 +254,11 @@ sub setpartition {
 	
 	# copy etc/apt files
 	chdir "/etc/apt";
-	system("cp -dR trusted.gpg trusted.gpg.d sources.list " . $chroot_dir . "/etc/apt/");
+
+	# generate chroot_dir/etc/apt/sources.list
+	# and chroot_dir/etc/sources.list.d/debhome.list
+	setaptsources ($codename, $chroot_dir);
+	system("cp -dR trusted.gpg trusted.gpg.d" . $chroot_dir . "/etc/apt/");
 	
 	# export livescripts from subversion
 	$rc = system("svn export --force --depth files file://$svn/root/my-linux/livescripts " . $chroot_dir . "/usr/local/bin/");
@@ -300,7 +325,7 @@ sub setpartition {
 	system("cp -dR dists install pool preseed " . $chroot_dir . "/boot/");
 	
 	# setup and install grub if this is the first partition
-	grubsetup($ubuntuiso, $chroot_dir, $partition_path) if $part_no == 1;
+	grubsetup($ubuntuiso, $chroot_dir, $partition_path, $svn) if $part_no == 1;
 	
 	# make the persistence file
 	chdir $casper;
@@ -327,8 +352,9 @@ sub usage {
 	print "-2 full name of ubuntu iso for partition 2\n";
 	print "-u do a full-upgrade\n";
 	print "-p list of packages to install in chroot in quotes\n";
-	print "-d disk label for debhome, default is $debhomedev\n";
+	print "-l disk label for debhome, default is $debhomedev\n";
 	print "-s full path to subversion, default is $svn\n";
+	print "-d code name of distro [hirsute|impish] must be given\n";
 	exit 0;
 }
 ##################
@@ -340,7 +366,7 @@ sub usage {
 # -2 ubuntu iso name
 # -p "package list of extra packages
 # -u upgrade or not
-# -d disk label of debhome
+# -l disk label of debhome
 # -s full path to subersion
 #
 # One or both iso's can be given.
@@ -349,22 +375,32 @@ sub usage {
 # default for local repository debhome
 my $debhomedev = "ad64";
 my $svn = "/mnt/svn";
+my $codename = "none";
 
 # get command line argument
 # this is the name of the ubuntu iso ima
-our($opt_u, $opt_1, $opt_2, $opt_p, , $opt_d, $opt_s, $opt_h);
+our($opt_u, $opt_1, $opt_2, $opt_p, $opt_l, $opt_d, $opt_s, $opt_h);
 
 # get command line options
-getopts('1:2:p:hud:s:');
+getopts('1:2:p:hul:s:d:');
+
 
 # setup debhome if it has change from the default
-$debhomedev = $opt_d if $opt_d;
+$debhomedev = $opt_l if $opt_l;
 
 # setup subversion if it has changed
 $svn = $opt_s if $opt_s;
 
 usage($debhomedev, $svn) if $opt_h;
 
+# setup code name for distribution
+if ($opt_d) {
+	$codename = $opt_d;
+} else {
+	# no code name given, exit
+	print "A code name of the distribution must be given\n";
+	exit 1;
+}
 # check for existence of svn
 die "Could not find subversion respository at $svn\n" unless -d $svn;
 
@@ -408,10 +444,10 @@ if ($opt_2) {
 }
 # invoke set partition for each iso given
 if ($opt_1) {
-	setpartition($opt_1, $upgrade, $debhomedev, $svn, $packages, 1);
+	setpartition($codename, $opt_1, $upgrade, $debhomedev, $svn, $packages, 1);
 }
 
 # invoke set partition for each iso given
 if ($opt_2) {
-	setpartition($opt_2, $upgrade, $debhomedev, $svn, $packages, 2);
+	setpartition($codename, $opt_2, $upgrade, $debhomedev, $svn, $packages, 2);
 }
