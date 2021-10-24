@@ -100,9 +100,13 @@ sub grubsetup {
 	# export the grub.cfg for mbr and uefi and edit grub only for partition 1
 	##########################################################################################################
 	my ($ubuntuiso, $chroot_dir, $partition_path) = @_;
-	
-	system("svn export --force --depth files file:///mnt/svn/root/my-linux/livescripts/grub/vfat/mbr/ " . $chroot_dir . "/boot/grub/");
-	system("svn export --force --depth files file:///mnt/svn/root/my-linux/livescripts/grub/vfat/efi/ " . $chroot_dir . "/boot/EFI/grub/");
+	my $rc;
+
+	# export grub
+	$rc = system("svn export --force --depth files file:///mnt/svn/root/my-linux/livescripts/grub/vfat/mbr/ " . $chroot_dir . "/boot/grub/");
+	die "Could not export mbr grub\n" unless $rc == 0;
+	$rc = system("svn export --force --depth files file:///mnt/svn/root/my-linux/livescripts/grub/vfat/efi/ " . $chroot_dir . "/boot/EFI/grub/");
+	die "Could not export efi grub\n" unless $rc == 0;
 	
 	# now edit grub.cfg with the new version no.
 	# edit mbr grub and set version
