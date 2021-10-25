@@ -135,12 +135,12 @@ sub setaptsources {
 	print SOURCES "deb http://archive.ubuntu.com/ubuntu $codename main restricted multiverse universe
 deb http://archive.ubuntu.com/ubuntu $codename-security main restricted multiverse universe
 deb http://archive.ubuntu.com/ubuntu $codename-updates  main restricted multiverse universe
-deb http://archive.ubuntu.com/ubuntu $codename-proposed  main restricted multiverse universe";
+deb http://archive.ubuntu.com/ubuntu $codename-proposed  main restricted multiverse universe\n";
 	close SOURCES;
 
 	# create debhome.list
 	open (DEBHOME, ">", "$chroot_dir/etc/apt/sources.list.d/debhome.list");
-	print DEBHOME "deb file:///mnt/debhome home main";
+	print DEBHOME "deb file:///mnt/debhome home main\n";
 	close DEBHOME;
 }
 
@@ -238,11 +238,16 @@ sub setpartition {
 	die "$label cannot be unmounted\n" unless $rc == 0;
 	
 	# unbind chroot and delete chroot dir
+	# before deleting chroot mv it to chroot2
+	# incase /proc is still bound
 	if (-d $chroot_dir){
 		# unbind
 		unbindall $chroot_dir;
+		# move it to chroot2
+		system("mv -f $chroot_dir  /tmp/junk");
+		
 		# remove directory
-		$rc = system("rm -rf " . $chroot_dir);
+		$rc = system("rm -rf /tmp/junk");
 		die "cannot remove $chroot_dir\n" unless $rc == 0;
 	}
 	
@@ -290,18 +295,15 @@ sub setpartition {
 	system("ln -s $debhomedev hdd");
 
 	
-	# copy etc/apt files
-	chdir "/etc/apt";
-
 	# generate chroot_dir/etc/apt/sources.list
 	# and chroot_dir/etc/sources.list.d/debhome.list
 	setaptsources ($codename, $chroot_dir);
-	system("cp -dR trusted.gpg trusted.gpg.d" . $chroot_dir . "/etc/apt/");
+	system("cp -dR /etc/apt/trusted.gpg /etc/apt/trusted.gpg.d " . $chroot_dir . "/etc/apt/");
 	
 	# export livescripts from subversion
 	$rc = system("svn export --force --depth files file://$svn/root/my-linux/livescripts " . $chroot_dir . "/usr/local/bin/");
 	die "Could not export liveinstall.sh from svn\n" unless $rc == 0;
-exit 1;
+
 	#########################################################################################################################
 	# enter the chroot environment
 	#########################################################################################################################
