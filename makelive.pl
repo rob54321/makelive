@@ -20,6 +20,39 @@ use Getopt::Std;
 #######################################################
 
 #######################################################
+# sub to get codename from the cdrom
+# the name is in /mnt/cdrom/dists   impish
+# which is a directory.
+# the cdrom must be mounted
+# and the codename is returned if found
+# else undefined is returned.
+# no parameters are passed to this sub.
+sub getcodename {
+	# open directory for reading
+	opendir DIR, "/mnt/cdrom/dists" or die "Could not open /mnt/cdrom/dists: $!\n";
+        my ($dir, $codename);
+	undef $codename;
+	
+        # search for the correct name, list contains . .. impish stable unstable
+        while ($dir = readdir(DIR)) {
+        	# if dir is a . or .. ignore it
+        	if ($dir =~ /^\./) {
+        		next;
+        	} else {
+        		# check if dir is a link or not
+        		if ( ! -l "/mnt/cdrom/dists/$dir") {
+        			# code name found
+        			$codename = $dir;
+        			last;
+        		}
+        	}
+        }
+        close DIR;
+
+        return $codename;
+}
+
+#######################################################
 # sub to bind sys tmp dev dev/pts proc for chroot
 # environment
 # usage: bindall chroot_dir
@@ -165,7 +198,7 @@ sub grubsetup {
 # codename, ubuntuiso-name, chroot-directory, debhome dev label, svn full path, packages list, part_no)
 ####################################################
 sub setpartition {
-	my ($codename, $ubuntuiso, $upgrade, $debhomedev, $svn, $packages, $part_no)  = @_;
+	my ($ubuntuiso, $upgrade, $debhomedev, $svn, $packages, $part_no)  = @_;
 
 	# set up chroot dirs for partition 1 and 2
 	my $chroot_dir1 = "/tmp/chroot1";
@@ -226,7 +259,12 @@ sub setpartition {
 	}
 	$rc = system("mount " . $ubuntuiso . " /mnt/cdrom -o ro");
 	die "Could not mount $ubuntuiso\n" unless $rc == 0;
-	
+
+	# get codename
+	my $codename = getcodename();
+	die "Could not find codename\n" unless $codename;
+	print "code name is: $codename\n";
+
 	#####################################################################################
 	# copy and edit files to chroot
 	#####################################################################################
@@ -263,7 +301,7 @@ sub setpartition {
 	# export livescripts from subversion
 	$rc = system("svn export --force --depth files file://$svn/root/my-linux/livescripts " . $chroot_dir . "/usr/local/bin/");
 	die "Could not export liveinstall.sh from svn\n" unless $rc == 0;
-
+exit 1;
 	#########################################################################################################################
 	# enter the chroot environment
 	#########################################################################################################################
@@ -375,7 +413,6 @@ sub usage {
 # default for local repository debhome
 my $debhomedev = "ad64";
 my $svn = "/mnt/svn";
-my $codename = "none";
 
 # get command line argument
 # this is the name of the ubuntu iso ima
@@ -393,14 +430,6 @@ $svn = $opt_s if $opt_s;
 
 usage($debhomedev, $svn) if $opt_h;
 
-# setup code name for distribution
-if ($opt_d) {
-	$codename = $opt_d;
-} else {
-	# no code name given, exit
-	print "A code name of the distribution must be given\n";
-	exit 1;
-}
 # check for existence of svn
 die "Could not find subversion respository at $svn\n" unless -d $svn;
 
@@ -444,10 +473,10 @@ if ($opt_2) {
 }
 # invoke set partition for each iso given
 if ($opt_1) {
-	setpartition($codename, $opt_1, $upgrade, $debhomedev, $svn, $packages, 1);
+	setpartition($opt_1, $upgrade, $debhomedev, $svn, $packages, 1);
 }
 
 # invoke set partition for each iso given
 if ($opt_2) {
-	setpartition($codename, $opt_2, $upgrade, $debhomedev, $svn, $packages, 2);
+	setpartition($opt_2, $upgrade, $debhomedev, $svn, $packages, 2);
 }
