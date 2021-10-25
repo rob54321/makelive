@@ -243,26 +243,29 @@ sub setpartition {
 	if (-d $chroot_dir){
 		# unbind
 		unbindall $chroot_dir;
-		# move it to chroot2
+		# move it to /tmp/junk
 		system("mv -f $chroot_dir  /tmp/junk");
 		
 		# remove directory
 		$rc = system("rm -rf /tmp/junk");
 		die "cannot remove $chroot_dir\n" unless $rc == 0;
+		print "removed /tmp/junk\n";
 	}
 	
 	# if /mnt/cdrom exists, unmount iso image if it is mounted
 	# mount ubuntu-mate iso image
 	if (-d "/mnt/cdrom") {
-		$rc = system("findmnt /mnt/cdrom > /dev/null");
-	
+		print "checking if cdrom is mounted\n";
+		$rc = system("findmnt /mnt/cdrom");
+
 		# umount /mnt/cdrom
-		system("umount /mnt/cdrom") if $rc == 0;
+		system("umount -v /mnt/cdrom") if $rc == 0;
 	} else {
 		# /mnt/cdrom does not exist, create it
 		mkdir "/mnt/cdrom";
 	}
-	$rc = system("mount " . $ubuntuiso . " /mnt/cdrom -o ro");
+
+	$rc = system("mount -o ro,loop " . $ubuntuiso . " /mnt/cdrom");
 	die "Could not mount $ubuntuiso\n" unless $rc == 0;
 
 	# get codename
@@ -277,7 +280,8 @@ sub setpartition {
 	# the chroot_dir directory must not exist
 	$rc = system("unsquashfs -d " . $chroot_dir . " /mnt/cdrom/casper/filesystem.squashfs");
 	die "Error unsquashing /mnt/cdrom/casper/filesystem.squashfs\n"unless $rc == 0;
-	
+	print "unsquashed filesystem.squashfs\n";
+		
 	# edit fstab in chroot for debhome which includes debhome
 	chdir $chroot_dir . "/etc";
 	system("sed -i -e '/LABEL=$debhomedev/d' fstab");
@@ -314,8 +318,9 @@ sub setpartition {
 	# parameters must be quoted for Bash
 	$upgrade = "\"" . $upgrade . "\"";
 	$packages = "\"" . $packages . "\"";
+	my $debhomedevice = "\"" . $debhomedev . "\"";
 	# execute liveinstall.sh in the chroot environment
-	$rc = system("chroot $chroot_dir /usr/local/bin/liveinstall.sh $upgrade $packages");
+	$rc = system("chroot $chroot_dir /usr/local/bin/liveinstall.sh $debhomedevice $upgrade $packages");
 
 	# for exiting the chroot environment
 	unbindall $chroot_dir;
@@ -377,13 +382,13 @@ sub setpartition {
 	system("mksquashfs " . $chroot_dir . " /mnt/hdint/filesystem.squashfs -e boot");
 	system("mv -vf filesystem.squashfs " . $casper);
 	
-	# un mount /mnt/cdrom
-	system("umount /mnt/cdrom");
-	
 	# umount chroot boot
 	system("umount " . $chroot_dir . "/boot");
 	$rc = system("findmnt " . $chroot_dir . "/boot");
 	print "count not umount " . $chroot_dir . "/boot\n" if $rc == 0;
+
+	# un mount /mnt/cdrom
+	system("umount -d -v -f /mnt/cdrom");
 }
 
 sub usage {
@@ -394,7 +399,6 @@ sub usage {
 	print "-p list of packages to install in chroot in quotes\n";
 	print "-l disk label for debhome, default is $debhomedev\n";
 	print "-s full path to subversion, default is $svn\n";
-	print "-d code name of distro [hirsute|impish] must be given\n";
 	exit 0;
 }
 ##################
@@ -418,7 +422,7 @@ my $svn = "/mnt/svn";
 
 # get command line argument
 # this is the name of the ubuntu iso ima
-our($opt_u, $opt_1, $opt_2, $opt_p, $opt_l, $opt_d, $opt_s, $opt_h);
+our($opt_u, $opt_1, $opt_2, $opt_p, $opt_l, $opt_s, $opt_h);
 
 # get command line options
 getopts('1:2:p:hul:s:d:');
