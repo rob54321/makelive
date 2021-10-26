@@ -290,15 +290,6 @@ sub setpartition {
 	system("cp /etc/resolv.conf /etc/hosts " . $chroot_dir . "/etc/");
 	system("cp /etc/network/interfaces " . $chroot_dir . "/etc/network/");
 
-	# make directories in chroot
-	chdir $chroot_dir . "/mnt";
-	mkdir "ssd" unless -d "ssd";
-	mkdir "$debhomedev" unless -d "$debhomedev";
-	# make link since sources.list contains hdd
-	unlink "hdd" if -l "hdd";
-	system("ln -s $debhomedev hdd");
-
-	
 	# generate chroot_dir/etc/apt/sources.list
 	# and chroot_dir/etc/sources.list.d/debhome.list
 	setaptsources ($codename, $chroot_dir);
@@ -316,6 +307,7 @@ sub setpartition {
 	bindall $chroot_dir;
 
 	# parameters must be quoted for Bash
+	# liveinstall.sh "debhomedev" "upgrade/noupgrade" "package list"
 	$upgrade = "\"" . $upgrade . "\"";
 	$packages = "\"" . $packages . "\"";
 	my $debhomedevice = "\"" . $debhomedev . "\"";
@@ -324,6 +316,7 @@ sub setpartition {
 
 	# for exiting the chroot environment
 	unbindall $chroot_dir;
+
 	# check if liveinstall exited with error in chroot environment
 	die "liveinstall.sh exited with error" unless $rc == 0;
 
