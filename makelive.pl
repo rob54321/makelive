@@ -66,10 +66,11 @@ sub bindall {
 
 	# bind
 	system("mount --bind /proc proc");
+	system("mount --bind /tmp tmp");
 	system("mount --bind /dev dev");
 	system("mount --bind /dev/pts dev/pts");
 	system("mount --bind /sys sys");
-	system("mount --bind /tmp tmp");
+	system("mount -o ro --bind /etc etchost");
 }
 
 #######################################################
@@ -85,6 +86,7 @@ sub unbindall {
 	chdir $chroot_dir or die "$chroot_dir does not exist, exiting\n";
 
 	# bind
+	system("umount etchost");
 	system("umount proc");
 	system("umount dev/pts");
 	system("umount dev");
@@ -290,6 +292,9 @@ sub setpartition {
 	system("cp /etc/resolv.conf /etc/hosts " . $chroot_dir . "/etc/");
 	system("cp /etc/network/interfaces " . $chroot_dir . "/etc/network/");
 
+	# make dir /etchost in chroot
+	mkdir $chroot_dir . "/etchost";
+	
 	# generate chroot_dir/etc/apt/sources.list
 	# and chroot_dir/etc/sources.list.d/debhome.list
 	setaptsources ($codename, $chroot_dir);
@@ -319,7 +324,7 @@ sub setpartition {
 
 	# check if liveinstall exited with error in chroot environment
 	die "liveinstall.sh exited with error" unless $rc == 0;
-
+exit 1;
 	# delete all files in $chroot_dir / boot
 	system("rm -rf " . $chroot_dir . "/boot");
 	mkdir $chroot_dir . "/boot";
