@@ -351,7 +351,7 @@ sub setpartition {
 
 	# check if liveinstall exited with error in chroot environment
 	die "liveinstall.sh exited with error" unless $rc == 0;
-exit 1;
+
 	# delete all files in $chroot_dir / boot
 	system("rm -rf " . $chroot_dir . "/boot");
 	mkdir $chroot_dir . "/boot";
