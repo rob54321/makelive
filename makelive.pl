@@ -70,7 +70,6 @@ sub bindall {
 	system("mount --bind /dev dev");
 	system("mount --bind /dev/pts dev/pts");
 	system("mount --bind /sys sys");
-	system("mount -o ro --bind /etc etchost");
 }
 
 #######################################################
@@ -83,15 +82,14 @@ sub bindall {
 sub unbindall {
 	# parameters
 	my $chroot_dir = $_[0];
-	chdir $chroot_dir or die "$chroot_dir does not exist, exiting\n";
+	die "$chroot_dir does not exist, exiting\n" unless -d $chroot_dir;
 
 	# bind
-	system("umount etchost");
-	system("umount proc");
-	system("umount dev/pts");
-	system("umount dev");
-	system("umount sys");
-	system("umount tmp");
+	system("umount $chroot_dir/proc");
+	system("umount $chroot_dir/dev/pts");
+	system("umount $chroot_dir/dev");
+	system("umount $chroot_dir/sys");
+	system("umount $chroot_dir/tmp");
 }
 	
 #######################################################
@@ -202,6 +200,9 @@ sub grubsetup {
 sub setpartition {
 	my ($ubuntuiso, $upgrade, $debhomedev, $svn, $packages, $part_no)  = @_;
 
+	# dbhomemount for debhome mount status, ro, rw or not mounted
+	my $dbhomemount;
+	
 	# set up chroot dirs for partition 1 and 2
 	my $chroot_dir1 = "/tmp/chroot1";
 	my $chroot_dir2 = "/tmp/chroot2";
@@ -214,17 +215,38 @@ sub setpartition {
 					      "casper"   => "$chroot_dir2/boot/casper1",
 				          "label"    => "UBUNTU"});
 
-	# some short cuts
+	# some short cuts depending on the parition number
 	my $chroot_dir = $pparam{$part_no}->{"chroot"};
 	my $casper = $pparam{$part_no}->{"casper"};
 	my $label = $pparam{$part_no}->{"label"};
-	print $chroot_dir . " " . $label . " " . $casper . "\n";
 	
 	# check MACRIUM and debhomedev is attached
 	my $rc = system("blkid -L $debhomedev > /dev/null");
 	my $rc1 = system("blkid -L " . $label . " > /dev/null");
 	die "Either $label and/or $debhomedev is not attached\n" unless ($rc == 0 and $rc1 == 0);
 
+	# determine if debhomedev is mounted ro, rw or not mounted
+	$rc = system("grep -q $debhomedev /etc/mtab");
+	if ($rc == 0) {
+		# debhomedev is mounted.
+		# determine if it is ro or rw
+		if (system("grep $debhomedev.*ro /etc/mtab") == 0) {
+			# debhome dev mounted ro
+			$dbhomemount = "ro";
+			print "$debhomedev is mounted ro\n";
+		} elsif ( system("grep $debhomedev.*rw /etc/mtab") == 0) {
+			# debhome dev mount rw
+			$dbhomemount = "rw";
+			print "$debhomedev is mounted rw\n";
+		} else {
+			# debhome dev mount not rw or ro
+			die "Error: $debhomedev is mounted but not rw or ro\n";
+		}
+	} else {
+		# debhomedev is not mounted
+		$dbhomemount = "not mounted";
+	}
+	
 	# get partition_path of partition ex: /dev/sda1
 	my $partition_path = `blkid -L $label`;
 	chomp $partition_path;
@@ -235,10 +257,14 @@ sub setpartition {
 	my $devandmtpt = `grep "$partition_path" /etc/mtab | cut -d " " -f 1-2`;
 	chomp($devandmtpt);
 	my ($dev, $mtpt) = split /\s+/, $devandmtpt;
-	print "$label mounted at: $mtpt\n" if $mtpt;
-	$rc = system("umount $mtpt") if $mtpt;
-	die "$label cannot be unmounted\n" unless $rc == 0;
-	
+
+	# if label is mounted, un mount it
+	if (defined $mtpt) {
+		print "$label mounted at: $mtpt\n";
+		$rc = system("umount $mtpt");
+		die "$label cannot be unmounted\n" unless $rc == 0;
+	}
+
 	# unbind chroot and delete chroot dir
 	# before deleting chroot mv it to chroot2
 	# incase /proc is still bound
@@ -292,32 +318,33 @@ sub setpartition {
 	system("cp /etc/resolv.conf /etc/hosts " . $chroot_dir . "/etc/");
 	system("cp /etc/network/interfaces " . $chroot_dir . "/etc/network/");
 
-	# make dir /etchost in chroot
-	mkdir $chroot_dir . "/etchost";
-	
 	# generate chroot_dir/etc/apt/sources.list
 	# and chroot_dir/etc/sources.list.d/debhome.list
 	setaptsources ($codename, $chroot_dir);
 	system("cp -dR /etc/apt/trusted.gpg /etc/apt/trusted.gpg.d " . $chroot_dir . "/etc/apt/");
-	
+
+	# testing for convenience
+	#system("cp -v /home/robert/my-linux/livescripts/liveinstall.sh $chroot_dir/usr/local/bin/");
+
 	# export livescripts from subversion
 	$rc = system("svn export --force --depth files file://$svn/root/my-linux/livescripts " . $chroot_dir . "/usr/local/bin/");
 	die "Could not export liveinstall.sh from svn\n" unless $rc == 0;
-
+	# testing
+	
 	#########################################################################################################################
 	# enter the chroot environment
 	#########################################################################################################################
 	
 	# install apps in the chroot environment
 	bindall $chroot_dir;
-
+	
 	# parameters must be quoted for Bash
 	# liveinstall.sh "debhomedev" "upgrade/noupgrade" "package list"
 	$upgrade = "\"" . $upgrade . "\"";
 	$packages = "\"" . $packages . "\"";
 	my $debhomedevice = "\"" . $debhomedev . "\"";
 	# execute liveinstall.sh in the chroot environment
-	$rc = system("chroot $chroot_dir /usr/local/bin/liveinstall.sh $debhomedevice $upgrade $packages");
+	$rc = system("chroot $chroot_dir /usr/local/bin/liveinstall.sh $debhomedevice $dbhomemount $upgrade $packages");
 
 	# for exiting the chroot environment
 	unbindall $chroot_dir;
@@ -426,7 +453,7 @@ our($opt_u, $opt_1, $opt_2, $opt_p, $opt_l, $opt_s, $opt_h);
 getopts('1:2:p:hul:s:d:');
 
 
-# setup debhome if it has change from the default
+# setup debhome if it has changed from the default
 $debhomedev = $opt_l if $opt_l;
 
 # setup subversion if it has changed
