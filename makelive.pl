@@ -252,7 +252,7 @@ sub setpartition {
 	chomp $partition_path;
 	print $label . " is: $partition_path\n";
 	
-	# check if the partition is mounted at any location
+	# check if the partition, MACRIUM or UBUNTU is mounted at any location
 	# un mount it if it is mounted
 	my $devandmtpt = `grep "$partition_path" /etc/mtab | cut -d " " -f 1-2`;
 	chomp($devandmtpt);
@@ -324,11 +324,11 @@ sub setpartition {
 	system("cp -dR /etc/apt/trusted.gpg /etc/apt/trusted.gpg.d " . $chroot_dir . "/etc/apt/");
 
 	# testing for convenience
-	#system("cp -v /home/robert/my-linux/livescripts/liveinstall.sh $chroot_dir/usr/local/bin/");
+	system("cp -v /home/robert/my-linux/livescripts/* $chroot_dir/usr/local/bin/");
 
 	# export livescripts from subversion
-	$rc = system("svn export --force --depth files file://$svn/root/my-linux/livescripts " . $chroot_dir . "/usr/local/bin/");
-	die "Could not export liveinstall.sh from svn\n" unless $rc == 0;
+	# $rc = system("svn export --force --depth files file://$svn/root/my-linux/livescripts " . $chroot_dir . "/usr/local/bin/");
+	# die "Could not export liveinstall.sh from svn\n" unless $rc == 0;
 	# testing
 	
 	#########################################################################################################################
@@ -343,6 +343,7 @@ sub setpartition {
 	$upgrade = "\"" . $upgrade . "\"";
 	$packages = "\"" . $packages . "\"";
 	my $debhomedevice = "\"" . $debhomedev . "\"";
+	$dbhomemount = "\"" . $dbhomemount . "\"";
 	# execute liveinstall.sh in the chroot environment
 	$rc = system("chroot $chroot_dir /usr/local/bin/liveinstall.sh $debhomedevice $dbhomemount $upgrade $packages");
 
