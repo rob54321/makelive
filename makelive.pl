@@ -200,8 +200,8 @@ sub grubsetup {
 sub setpartition {
 	my ($ubuntuiso, $upgrade, $debhomedev, $svn, $packages, $part_no)  = @_;
 
-	# dbhomemount for debhome mount status, ro, rw or not mounted
-	my $dbhomemount;
+	# dbhomemountstatus for debhome mount status, ro, rw or not mounted
+	my $dbhomemountstatus;
 	
 	# set up chroot dirs for partition 1 and 2
 	my $chroot_dir1 = "/tmp/chroot1";
@@ -232,11 +232,11 @@ sub setpartition {
 		# determine if it is ro or rw
 		if (system("grep $debhomedev.*ro /etc/mtab") == 0) {
 			# debhome dev mounted ro
-			$dbhomemount = "ro";
+			$dbhomemountstatus = "ro";
 			print "$debhomedev is mounted ro\n";
 		} elsif ( system("grep $debhomedev.*rw /etc/mtab") == 0) {
 			# debhome dev mount rw
-			$dbhomemount = "rw";
+			$dbhomemountstatus = "rw";
 			print "$debhomedev is mounted rw\n";
 		} else {
 			# debhome dev mount not rw or ro
@@ -244,7 +244,7 @@ sub setpartition {
 		}
 	} else {
 		# debhomedev is not mounted
-		$dbhomemount = "not mounted";
+		$dbhomemountstatus = "not mounted";
 	}
 	
 	# get partition_path of partition ex: /dev/sda1
@@ -343,16 +343,16 @@ sub setpartition {
 	$upgrade = "\"" . $upgrade . "\"";
 	$packages = "\"" . $packages . "\"";
 	my $debhomedevice = "\"" . $debhomedev . "\"";
-	$dbhomemount = "\"" . $dbhomemount . "\"";
+	$dbhomemountstatus = "\"" . $dbhomemountstatus . "\"";
 	# execute liveinstall.sh in the chroot environment
-	$rc = system("chroot $chroot_dir /usr/local/bin/liveinstall.sh $debhomedevice $dbhomemount $upgrade $packages");
+	$rc = system("chroot $chroot_dir /usr/local/bin/liveinstall.sh $debhomedevice $dbhomemountstatus $upgrade $packages");
 
 	# for exiting the chroot environment
 	unbindall $chroot_dir;
 
 	# check if liveinstall exited with error in chroot environment
 	die "liveinstall.sh exited with error" unless $rc == 0;
-
+exit 1;
 	# delete all files in $chroot_dir / boot
 	system("rm -rf " . $chroot_dir . "/boot");
 	mkdir $chroot_dir . "/boot";
