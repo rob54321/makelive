@@ -324,11 +324,11 @@ sub setpartition {
 	system("cp -dR /etc/apt/trusted.gpg /etc/apt/trusted.gpg.d " . $chroot_dir . "/etc/apt/");
 
 	# testing for convenience
-	system("cp -v /home/robert/my-linux/livescripts/* $chroot_dir/usr/local/bin/");
+	# system("cp -v /home/robert/my-linux/livescripts/* $chroot_dir/usr/local/bin/");
 
 	# export livescripts from subversion
-	# $rc = system("svn export --force --depth files file://$svn/root/my-linux/livescripts " . $chroot_dir . "/usr/local/bin/");
-	# die "Could not export liveinstall.sh from svn\n" unless $rc == 0;
+	$rc = system("svn export --force --depth files file://$svn/root/my-linux/livescripts " . $chroot_dir . "/usr/local/bin/");
+	die "Could not export liveinstall.sh from svn\n" unless $rc == 0;
 	# testing
 	
 	#########################################################################################################################
@@ -352,11 +352,7 @@ sub setpartition {
 
 	# check if liveinstall exited with error in chroot environment
 	die "liveinstall.sh exited with error" unless $rc == 0;
-exit 1;
-	# delete all files in $chroot_dir / boot
-	system("rm -rf " . $chroot_dir . "/boot");
-	mkdir $chroot_dir . "/boot";
-	
+
 	#########################################################################################################################
 	# copy and edit files to chroot/boot
 	#########################################################################################################################
@@ -374,17 +370,19 @@ exit 1;
 		mkdir $casper;
 	}
 	
-	# copy new vmlinuz and initrd if upgrade option was given
-	if ($upgrade eq "\"upgrade\"") {
-		# copy vmlinuz and initrd.img from host
-		# get host version
-		my $host_version = `uname -r`;
-		chomp $host_version;
-		system("cp -vf /boot/vmlinuz-" . $host_version . " " . $casper . "/vmlinuz");
-		system("cp -vf /boot/initrd.img-" . $host_version . " " . $casper . "/initrd");
-	} else {
-		# for no upgrade use vmlinuz initrd from the iso image
+	# if live system was not upgraded copy vmlinuz and initrd from cdrom image
+	if ($upgrade ne "\"upgrade\"") {
+		# no upgrade, copy vmlinuz and initrd from cdrom image
 		system("cp -vf /mnt/cdrom/casper/vmlinuz /mnt/cdrom/casper/initrd " . $casper);
+	} else {
+		# an upgrade was done. vmlinuz and intird must be copied
+		# from the the chroot1/oldboot directory to casper
+		$rc = system("cp -v $chroot_dir/oldboot/initrd $casper");
+		die "Could not copy initrd\n" unless $rc == 0;
+		$rc = system("cp -v $chroot_dir/oldboot/vmlinuz $casper");
+		die "Could not copy vmlinuz\n" unless $rc == 0;
+		# delete chroot1/oldboot directory
+		system("rm -rf $chroot_dir/oldboot");
 	}
 
 	# delete ubuntu install files in chroot/boot
@@ -482,13 +480,8 @@ my $host_version;
 my $upgrade;
 
 if ($opt_u) {
-	# determine version of modules to be installed.
-	# the hosts initrd and vmlinuz will be copied to casper
-	# of the form 5.11.0-23-generic
+	# set the upgrade flag
 	$upgrade = "upgrade";
-	$host_version = `uname -r`;
-	chomp($host_version);
-	$packages = $packages . " linux-modules-" . $host_version . " linux-modules-extra-" . $host_version;
 } else {
 	# no upgrade
 	$upgrade = "";
