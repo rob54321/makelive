@@ -385,7 +385,7 @@ sub setpartition {
 
 	# delete ubuntu install files in chroot/boot
 	chdir $chroot_dir . "/boot";
-	system("rm -rf dists install pool preseed");
+	system("rm -rf dists install pool preseed grub");
 	
 	# copy pool and install files for ubuntu mate
 	chdir "/mnt/cdrom";
