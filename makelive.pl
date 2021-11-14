@@ -363,12 +363,10 @@ sub setpartition {
 	# make casper dir if it does not exist
 	if ( -d $casper) {
 		# clean directory
-		chdir $casper;
-		unlink glob "*.*";
-	} else {
-		# create directory
-		mkdir $casper;
+		system("rm -rf $casper");
 	}
+	# create directory
+	mkdir $casper;
 	
 	# if live system was not upgraded copy vmlinuz and initrd from cdrom image
 	if ($upgrade ne "\"upgrade\"") {
