@@ -19,6 +19,18 @@ use Getopt::Std;
 #
 #######################################################
 
+# sub to edit grub default and set the theme in the filesystem.squashfs
+sub setgrub {
+	my $chroot_dir = $_[0];
+	
+	# set /etc/default/grub, GRUB-CMDLINE_LINUX_DEFAULT=""
+	system("sed -i -e 's/GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT=\"\"/' $chroot_dir/etc/default/grub");
+	# set colours
+	system("sed -i -e 's/menu_color_normal=.*/menu_color_normal=white\/blue/' $chroot_dir/etc/grub.d/05_debian_theme");
+	system("sed -i -e 's/menu_color_highlight=.*/menu_color_highlight=yellow\/light_gray/' $chroot_dir/etc/grub.d/05_debian_theme");
+	
+}
+
 #######################################################
 # sub to get codename from the cdrom
 # the name is in /mnt/cdrom/dists   impish
@@ -393,6 +405,9 @@ sub setpartition {
 	
 	# setup and install grub if this is the first partition
 	grubsetup($ubuntuiso, $chroot_dir, $partition_path, $svn) if $part_no == 1;
+	
+	# set grub colours
+	setgrub($chroot_dir);
 	
 	# make the persistence file
 	chdir $casper;
