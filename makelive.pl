@@ -211,8 +211,8 @@ sub grubsetup {
 sub setpartition {
 	my ($ubuntuiso, $upgrade, $debhomedev, $svn, $packages, $part_no)  = @_;
 
-	# dbhomemountstatus for debhome mount status, ro, rw or not mounted
-	my $dbhomemountstatus;
+	# debhomemountstatus for debhome mount status, ro, rw or not mounted
+	my $debhomemountstatus;
 	
 	# set up chroot dirs for partition 1 and 2
 	my $chroot_dir1 = "/tmp/chroot1";
@@ -243,11 +243,11 @@ sub setpartition {
 		# determine if it is ro or rw
 		if (system("grep $debhomedev.*ro /etc/mtab") == 0) {
 			# debhome dev mounted ro
-			$dbhomemountstatus = "ro";
+			$debhomemountstatus = "ro";
 			print "$debhomedev is mounted ro\n";
 		} elsif ( system("grep $debhomedev.*rw /etc/mtab") == 0) {
 			# debhome dev mount rw
-			$dbhomemountstatus = "rw";
+			$debhomemountstatus = "rw";
 			print "$debhomedev is mounted rw\n";
 		} else {
 			# debhome dev mount not rw or ro
@@ -255,7 +255,7 @@ sub setpartition {
 		}
 	} else {
 		# debhomedev is not mounted
-		$dbhomemountstatus = "not mounted";
+		$debhomemountstatus = "not mounted";
 	}
 	
 	# get partition_path of partition ex: /dev/sda1
@@ -340,6 +340,10 @@ sub setpartition {
 	# export livescripts from subversion
 	$rc = system("svn export --force --depth files file://$svn/root/my-linux/livescripts " . $chroot_dir . "/usr/local/bin/");
 	die "Could not export liveinstall.sh from svn\n" unless $rc == 0;
+
+	# copy svn link to the chroot environment if it exists
+	$rc = system("cp -dv /mnt/svn $chroot_dir/mnt/");
+	die "Cound not copy link /mnt/svn to $chroot_dir/mnt/svn\n" unless $rc == 0;
 	# testing
 	
 	#############################################################################################
@@ -354,9 +358,9 @@ sub setpartition {
 	$upgrade = "\"" . $upgrade . "\"";
 	$packages = "\"" . $packages . "\"";
 	my $debhomedevice = "\"" . $debhomedev . "\"";
-	$dbhomemountstatus = "\"" . $dbhomemountstatus . "\"";
+	$debhomemountstatus = "\"" . $debhomemountstatus . "\"";
 	# execute liveinstall.sh in the chroot environment
-	$rc = system("chroot $chroot_dir /usr/local/bin/liveinstall.sh $debhomedevice $dbhomemountstatus $upgrade $packages");
+	$rc = system("chroot $chroot_dir /usr/local/bin/liveinstall.sh $debhomedevice $debhomemountstatus $upgrade $packages");
 
 	# for exiting the chroot environment
 	unbindall $chroot_dir;
@@ -454,6 +458,8 @@ sub usage {
 
 # default for local repository debhome
 my $debhomedev = "ad64";
+# /mnt/svn is a link to subversion
+# it must be available for this script
 my $svn = "/mnt/svn";
 
 # get command line argument
