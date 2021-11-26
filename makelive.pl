@@ -418,6 +418,8 @@ sub setpartition {
 	system("mkfs.ext4 -v -j -F writable");
 	
 	# write new filesystem.squashfs to boot directory
+	# delete file otherwise mksquashfs will fail
+	system("rm -f /tmp/filesystem.squashfs");
 	$rc = system("mksquashfs " . $chroot_dir . " /tmp/filesystem.squashfs -e boot");
 	die "mksquashfs returned and error\n" unless $rc == 0;
 	
