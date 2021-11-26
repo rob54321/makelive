@@ -418,9 +418,11 @@ sub setpartition {
 	system("mkfs.ext4 -v -j -F writable");
 	
 	# write new filesystem.squashfs to boot directory
-	chdir "/mnt/hdint";
-	system("mksquashfs " . $chroot_dir . " /mnt/hdint/filesystem.squashfs -e boot");
-	system("mv -vf filesystem.squashfs " . $casper);
+	$rc = system("mksquashfs " . $chroot_dir . " /mnt/tmp/filesystem.squashfs -e boot");
+	die "mksquashfs returned and error\n" unless $rc == 0;
+	
+	$rc = system("mv -vf /tmp/filesystem.squashfs " . $casper);
+	die "Could not move /tmp/filesystem.squashfs to $casper\n" unless $rc == 0;
 	
 	# umount chroot boot
 	system("umount " . $chroot_dir . "/boot");
