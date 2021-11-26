@@ -416,6 +416,9 @@ sub setpartition {
 	chdir $casper;
 	system("dd if=/dev/zero of=writable bs=1M count=3000");
 	system("mkfs.ext4 -v -j -F writable");
+
+	# so chroot1/boot can be unmounted
+	chdir "/root";
 	
 	# write new filesystem.squashfs to boot directory
 	# delete file otherwise mksquashfs will fail
