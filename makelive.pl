@@ -58,7 +58,7 @@ sub getcodename {
         		}
         	}
         }
-        close DIR;
+        closedir DIR;
 
         return $codename;
 }
@@ -530,3 +530,4 @@ if ($opt_1) {
 if ($opt_2) {
 	setpartition($opt_2, $upgrade, $debhomedev, $svn, $packages, 2);
 }
+
