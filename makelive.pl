@@ -290,8 +290,10 @@ sub setpartition {
 	my $casper = $pparam{$part_no}->{"casper"};
 	my $label = $pparam{$part_no}->{"label"};
 	
-	# check if environment exists
-	die "chroot environment $chroot_dir does not exist\n" unless -d $chroot_dir;
+	# if not creating chroot env, check the old one exists
+	if (! defined $chroot) {
+		die "chroot environment $chroot_dir does not exist\n" unless -d $chroot_dir;
+	}
 		
 	# check MACRIUM and debhomedev is attached
 	my $rc = system("blkid -L $debhomedev > /dev/null");
