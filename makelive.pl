@@ -19,6 +19,65 @@ use Getopt::Std;
 #
 #######################################################
 
+# sub to set up new chroot environment.
+# the environment is copied from the cdrom
+# parameters passed: chroot_directory, debhomedevice, svn path
+sub setchroot {
+	# creating new chroot environment
+	my ($chroot_dir, $debhomedev, $svn) = @_;
+	my $rc;
+		
+	# delete chroot environment if it exists
+	if (-d $chroot_dir) {
+		unbindall $chroot_dir;
+		# move it to /tmp/junk
+		system("mv -f $chroot_dir  /tmp/junk");
+		
+		# remove directory
+		$rc = system("rm -rf /tmp/junk");
+		die "cannot remove $chroot_dir\n" unless $rc == 0;
+		print "removed /tmp/junk\n";
+	}
+
+	# get codename
+	my $codename = getcodename();
+	die "Could not find codename\n" unless $codename;
+	print "code name is: $codename\n";
+
+	#####################################################################################
+	# copy and edit files to chroot
+	#####################################################################################
+	# unsquash filesystem.squashfs to the chroot directory
+	# the chroot_dir directory must not exist
+	$rc = system("unsquashfs -d " . $chroot_dir . " /mnt/cdrom/casper/filesystem.squashfs");
+	die "Error unsquashing /mnt/cdrom/casper/filesystem.squashfs\n"unless $rc == 0;
+	print "unsquashed filesystem.squashfs\n";
+		
+	# edit fstab in chroot for debhome which includes debhome
+	chdir $chroot_dir . "/etc";
+	system("sed -i -e '/LABEL=$debhomedev/d' fstab");
+	system("sed -i -e 'a \ LABEL=$debhomedev /mnt/$debhomedev ext4 defaults,noauto 0 0' fstab");
+
+	system("cp /etc/resolv.conf /etc/hosts " . $chroot_dir . "/etc/");
+	system("cp /etc/network/interfaces " . $chroot_dir . "/etc/network/");
+
+	# generate chroot_dir/etc/apt/sources.list
+	# and chroot_dir/etc/sources.list.d/debhome.list
+	setaptsources ($codename, $chroot_dir);
+	system("cp -dR /etc/apt/trusted.gpg /etc/apt/trusted.gpg.d " . $chroot_dir . "/etc/apt/");
+
+	# testing for convenience
+	# system("cp -v /home/robert/my-linux/livescripts/* $chroot_dir/usr/local/bin/");
+
+	# export livescripts from subversion
+	$rc = system("svn export --force --depth files file://$svn/root/my-linux/livescripts " . $chroot_dir . "/usr/local/bin/");
+	die "Could not export liveinstall.sh from svn\n" unless $rc == 0;
+
+	# copy svn link to the chroot environment if it exists
+	$rc = system("cp -dv /mnt/svn $chroot_dir/mnt/");
+	die "Could not copy link /mnt/svn to $chroot_dir/mnt/svn\n" unless $rc == 0;
+}
+
 # sub to edit grub default and set the theme in the filesystem.squashfs
 sub setgrub {
 	my $chroot_dir = $_[0];
@@ -202,21 +261,21 @@ sub grubsetup {
 	system(" grub-install --no-floppy --boot-directory=" . $chroot_dir . "/boot/EFI --efi-directory="  . $chroot_dir . "/boot --removable --target=x86_64-efi " . $device);
 }
 ####################################################
-# sub to setup partition 1. This is the ubuntu-mate
-# partition. Filesystem must be built.
-# ubuntu-mate iso must be mounted
+# sub to setup partition 1|2. This is the ubuntu-mate
+# or ubuntu partition.
+# if -c given create new chroot from scratch or use existing one
 # parameters passed:
 # codename, ubuntuiso-name, chroot-directory, debhome dev label, svn full path, packages list, part_no)
 ####################################################
 sub setpartition {
-	my ($ubuntuiso, $upgrade, $debhomedev, $svn, $packages, $part_no)  = @_;
+	my ($chroot, $ubuntuiso, $upgrade, $debhomedev, $svn, $packages, $part_no)  = @_;
 
 	# debhomemountstatus for debhome mount status, ro, rw or not mounted
 	my $debhomemountstatus;
 	
 	# set up chroot dirs for partition 1 and 2
-	my $chroot_dir1 = "/tmp/chroot1";
-	my $chroot_dir2 = "/tmp/chroot2";
+	my $chroot_dir1 = "/chroot1";
+	my $chroot_dir2 = "/chroot2";
 	
 	# hash part parameters: containing parameters that are partition dependent
 	my %pparam = ("1" => {"chroot"   => "$chroot_dir1",
@@ -231,6 +290,9 @@ sub setpartition {
 	my $casper = $pparam{$part_no}->{"casper"};
 	my $label = $pparam{$part_no}->{"label"};
 	
+	# check if environment exists
+	die "chroot environment $chroot_dir does not exist\n" unless -d $chroot_dir;
+		
 	# check MACRIUM and debhomedev is attached
 	my $rc = system("blkid -L $debhomedev > /dev/null");
 	my $rc1 = system("blkid -L " . $label . " > /dev/null");
@@ -269,28 +331,13 @@ sub setpartition {
 	chomp($devandmtpt);
 	my ($dev, $mtpt) = split /\s+/, $devandmtpt;
 
-	# if label is mounted, un mount it
+	# if label MACRIUM|UBUNTU is mounted, un mount it
 	if (defined $mtpt) {
 		print "$label mounted at: $mtpt\n";
 		$rc = system("umount $mtpt");
 		die "$label cannot be unmounted\n" unless $rc == 0;
 	}
 
-	# unbind chroot and delete chroot dir
-	# before deleting chroot mv it to chroot2
-	# incase /proc is still bound
-	if (-d $chroot_dir){
-		# unbind
-		unbindall $chroot_dir;
-		# move it to /tmp/junk
-		system("mv -f $chroot_dir  /tmp/junk");
-		
-		# remove directory
-		$rc = system("rm -rf /tmp/junk");
-		die "cannot remove $chroot_dir\n" unless $rc == 0;
-		print "removed /tmp/junk\n";
-	}
-	
 	# if /mnt/cdrom exists, unmount iso image if it is mounted
 	# mount ubuntu-mate iso image
 	if (-d "/mnt/cdrom") {
@@ -307,45 +354,10 @@ sub setpartition {
 	$rc = system("mount -o ro,loop " . $ubuntuiso . " /mnt/cdrom");
 	die "Could not mount $ubuntuiso\n" unless $rc == 0;
 
-	# get codename
-	my $codename = getcodename();
-	die "Could not find codename\n" unless $codename;
-	print "code name is: $codename\n";
 
-	#####################################################################################
-	# copy and edit files to chroot
-	#####################################################################################
-	# unsquash filesystem.squashfs to the chroot directory
-	# the chroot_dir directory must not exist
-	$rc = system("unsquashfs -d " . $chroot_dir . " /mnt/cdrom/casper/filesystem.squashfs");
-	die "Error unsquashing /mnt/cdrom/casper/filesystem.squashfs\n"unless $rc == 0;
-	print "unsquashed filesystem.squashfs\n";
-		
-	# edit fstab in chroot for debhome which includes debhome
-	chdir $chroot_dir . "/etc";
-	system("sed -i -e '/LABEL=$debhomedev/d' fstab");
-	system("sed -i -e 'a \ LABEL=$debhomedev /mnt/$debhomedev ext4 defaults,noauto 0 0' fstab");
-
-	system("cp /etc/resolv.conf /etc/hosts " . $chroot_dir . "/etc/");
-	system("cp /etc/network/interfaces " . $chroot_dir . "/etc/network/");
-
-	# generate chroot_dir/etc/apt/sources.list
-	# and chroot_dir/etc/sources.list.d/debhome.list
-	setaptsources ($codename, $chroot_dir);
-	system("cp -dR /etc/apt/trusted.gpg /etc/apt/trusted.gpg.d " . $chroot_dir . "/etc/apt/");
-
-	# testing for convenience
-	# system("cp -v /home/robert/my-linux/livescripts/* $chroot_dir/usr/local/bin/");
-
-	# export livescripts from subversion
-	$rc = system("svn export --force --depth files file://$svn/root/my-linux/livescripts " . $chroot_dir . "/usr/local/bin/");
-	die "Could not export liveinstall.sh from svn\n" unless $rc == 0;
-
-	# copy svn link to the chroot environment if it exists
-	$rc = system("cp -dv /mnt/svn $chroot_dir/mnt/");
-	die "Cound not copy link /mnt/svn to $chroot_dir/mnt/svn\n" unless $rc == 0;
-	# testing
-	
+	# if creating new chroot and
+	setchroot($chroot_dir, $debhomedev, $svn) if $chroot;
+exit 1;	
 	#############################################################################################
 	# enter the chroot environment
 	#############################################################################################
@@ -443,6 +455,7 @@ sub usage {
 	print "-1 full name of ubuntu-mate iso for partition 1\n";
 	print "-2 full name of ubuntu iso for partition 2\n";
 	print "-u do a full-upgrade\n";
+	print "-c create new change root environment for part 1|2\n";
 	print "-p list of packages to install in chroot in quotes\n";
 	print "-l disk label for debhome, default is $debhomedev\n";
 	print "-s full path to subversion, default is $svn\n";
@@ -455,6 +468,7 @@ sub usage {
 # command line parameters
 # -1 ubuntu-mate iso name
 # -2 ubuntu iso name
+# -c use existing /chroot1 or /chroot2, do not create a new one for partition 1|2
 # -p "package list of extra packages
 # -u upgrade or not
 # -l disk label of debhome
@@ -471,11 +485,13 @@ my $svn = "/mnt/svn";
 
 # get command line argument
 # this is the name of the ubuntu iso ima
-our($opt_u, $opt_1, $opt_2, $opt_p, $opt_l, $opt_s, $opt_h);
+our($opt_c, $opt_u, $opt_1, $opt_2, $opt_p, $opt_l, $opt_s, $opt_h);
 
 # get command line options
-getopts('1:2:p:hul:s:d:');
+getopts('c1:2:p:hul:s:d:');
 
+# set $chroot to true if -c was given
+my $chroot = $opt_c if $opt_c;
 
 # setup debhome if it has changed from the default
 $debhomedev = $opt_l if $opt_l;
@@ -523,11 +539,11 @@ if ($opt_2) {
 }
 # invoke set partition for each iso given
 if ($opt_1) {
-	setpartition($opt_1, $upgrade, $debhomedev, $svn, $packages, 1);
+	setpartition($chroot, $opt_1, $upgrade, $debhomedev, $svn, $packages, 1);
 }
 
 # invoke set partition for each iso given
 if ($opt_2) {
-	setpartition($opt_2, $upgrade, $debhomedev, $svn, $packages, 2);
+	setpartition($chroot, $opt_2, $upgrade, $debhomedev, $svn, $packages, 2);
 }
 
