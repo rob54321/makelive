@@ -19,65 +19,6 @@ use Getopt::Std;
 #
 #######################################################
 
-# sub to set up new chroot environment.
-# the environment is copied from the cdrom
-# parameters passed: chroot_directory, debhomedevice, svn path
-sub setchroot {
-	# creating new chroot environment
-	my ($chroot_dir, $debhomedev, $svn) = @_;
-	my $rc;
-		
-	# delete chroot environment if it exists
-	if (-d $chroot_dir) {
-		unbindall $chroot_dir;
-		# move it to /tmp/junk
-		system("mv -f $chroot_dir  /tmp/junk");
-		
-		# remove directory
-		$rc = system("rm -rf /tmp/junk");
-		die "cannot remove $chroot_dir\n" unless $rc == 0;
-		print "removed /tmp/junk\n";
-	}
-
-	# get codename
-	my $codename = getcodename();
-	die "Could not find codename\n" unless $codename;
-	print "code name is: $codename\n";
-
-	#####################################################################################
-	# copy and edit files to chroot
-	#####################################################################################
-	# unsquash filesystem.squashfs to the chroot directory
-	# the chroot_dir directory must not exist
-	$rc = system("unsquashfs -d " . $chroot_dir . " /mnt/cdrom/casper/filesystem.squashfs");
-	die "Error unsquashing /mnt/cdrom/casper/filesystem.squashfs\n"unless $rc == 0;
-	print "unsquashed filesystem.squashfs\n";
-		
-	# edit fstab in chroot for debhome which includes debhome
-	chdir $chroot_dir . "/etc";
-	system("sed -i -e '/LABEL=$debhomedev/d' fstab");
-	system("sed -i -e 'a \ LABEL=$debhomedev /mnt/$debhomedev ext4 defaults,noauto 0 0' fstab");
-
-	system("cp /etc/resolv.conf /etc/hosts " . $chroot_dir . "/etc/");
-	system("cp /etc/network/interfaces " . $chroot_dir . "/etc/network/");
-
-	# generate chroot_dir/etc/apt/sources.list
-	# and chroot_dir/etc/sources.list.d/debhome.list
-	setaptsources ($codename, $chroot_dir);
-	system("cp -dR /etc/apt/trusted.gpg /etc/apt/trusted.gpg.d " . $chroot_dir . "/etc/apt/");
-
-	# testing for convenience
-	# system("cp -v /home/robert/my-linux/livescripts/* $chroot_dir/usr/local/bin/");
-
-	# export livescripts from subversion
-	$rc = system("svn export --force --depth files file://$svn/root/my-linux/livescripts " . $chroot_dir . "/usr/local/bin/");
-	die "Could not export liveinstall.sh from svn\n" unless $rc == 0;
-
-	# copy svn link to the chroot environment if it exists
-	$rc = system("cp -dv /mnt/svn $chroot_dir/mnt/");
-	die "Could not copy link /mnt/svn to $chroot_dir/mnt/svn\n" unless $rc == 0;
-}
-
 # sub to edit grub default and set the theme in the filesystem.squashfs
 sub setgrub {
 	my $chroot_dir = $_[0];
@@ -162,6 +103,65 @@ sub unbindall {
 	system("umount $chroot_dir/tmp");
 }
 	
+# sub to set up new chroot environment.
+# the environment is copied from the cdrom
+# parameters passed: chroot_directory, debhomedevice, svn path
+sub setchroot {
+	# creating new chroot environment
+	my ($chroot_dir, $debhomedev, $svn) = @_;
+	my $rc;
+		
+	# delete chroot environment if it exists
+	if (-d $chroot_dir) {
+		unbindall $chroot_dir;
+		# move it to /tmp/junk
+		system("mv -f $chroot_dir  /tmp/junk");
+		
+		# remove directory
+		$rc = system("rm -rf /tmp/junk");
+		die "cannot remove $chroot_dir\n" unless $rc == 0;
+		print "removed /tmp/junk\n";
+	}
+
+	# get codename
+	my $codename = getcodename();
+	die "Could not find codename\n" unless $codename;
+	print "code name is: $codename\n";
+
+	#####################################################################################
+	# copy and edit files to chroot
+	#####################################################################################
+	# unsquash filesystem.squashfs to the chroot directory
+	# the chroot_dir directory must not exist
+	$rc = system("unsquashfs -d " . $chroot_dir . " /mnt/cdrom/casper/filesystem.squashfs");
+	die "Error unsquashing /mnt/cdrom/casper/filesystem.squashfs\n"unless $rc == 0;
+	print "unsquashed filesystem.squashfs\n";
+		
+	# edit fstab in chroot for debhome which includes debhome
+	chdir $chroot_dir . "/etc";
+	system("sed -i -e '/LABEL=$debhomedev/d' fstab");
+	system("sed -i -e 'a \ LABEL=$debhomedev /mnt/$debhomedev ext4 defaults,noauto 0 0' fstab");
+
+	system("cp /etc/resolv.conf /etc/hosts " . $chroot_dir . "/etc/");
+	system("cp /etc/network/interfaces " . $chroot_dir . "/etc/network/");
+
+	# generate chroot_dir/etc/apt/sources.list
+	# and chroot_dir/etc/sources.list.d/debhome.list
+	setaptsources ($codename, $chroot_dir);
+	system("cp -dR /etc/apt/trusted.gpg /etc/apt/trusted.gpg.d " . $chroot_dir . "/etc/apt/");
+
+	# testing for convenience
+	# system("cp -v /home/robert/my-linux/livescripts/* $chroot_dir/usr/local/bin/");
+
+	# export livescripts from subversion
+	$rc = system("svn export --force --depth files file://$svn/root/my-linux/livescripts " . $chroot_dir . "/usr/local/bin/");
+	die "Could not export liveinstall.sh from svn\n" unless $rc == 0;
+
+	# copy svn link to the chroot environment if it exists
+	$rc = system("cp -dv /mnt/svn $chroot_dir/mnt/");
+	die "Could not copy link /mnt/svn to $chroot_dir/mnt/svn\n" unless $rc == 0;
+}
+
 #######################################################
 # this sub determines the version
 # which will be used for grub
@@ -359,7 +359,7 @@ sub setpartition {
 
 	# if creating new chroot and
 	setchroot($chroot_dir, $debhomedev, $svn) if $chroot;
-exit 1;	
+
 	#############################################################################################
 	# enter the chroot environment
 	#############################################################################################
