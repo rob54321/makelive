@@ -20,7 +20,7 @@ use Getopt::Std;
 #######################################################
 
 # sub to edit grub default and set the theme in the filesystem.squashfs
-sub setgrub {
+sub editgrub {
 	my $chroot_dir = $_[0];
 	
 	# set /etc/default/grub, GRUB-CMDLINE_LINUX_DEFAULT=""
@@ -216,9 +216,9 @@ deb http://archive.ubuntu.com/ubuntu $codename-proposed  main restricted multive
 
 # this sub sets up grub and installs it.
 # this is only necessary for partition 1
-# the call: grubsetup(ubuntu_iso_name, chroot_directory, partition_path, subversion path)
+# the call: installgrub(ubuntu_iso_name, chroot_directory, partition_path, subversion path)
 #################################################
-sub grubsetup {
+sub installgrub {
 	
 	##########################################################################################################
 	# export the grub.cfg for mbr and uefi and edit grub only for partition 1
@@ -265,7 +265,7 @@ sub grubsetup {
 # or ubuntu partition.
 # if -c given create new chroot from scratch or use existing one
 # parameters passed:
-# codename, ubuntuiso-name, chroot-directory, debhome dev label, svn full path, packages list, part_no)
+# createchroot, ubuntuiso-name, upgrade, debhome dev label, svn full path, packages list, part_no)
 ####################################################
 sub setpartition {
 	my ($chroot, $ubuntuiso, $upgrade, $debhomedev, $svn, $packages, $part_no)  = @_;
@@ -421,10 +421,10 @@ sub setpartition {
 	system("cp -dR dists install pool preseed " . $chroot_dir . "/boot/");
 	
 	# setup and install grub if this is the first partition
-	grubsetup($ubuntuiso, $chroot_dir, $partition_path, $svn) if $part_no == 1;
+	installgrub($ubuntuiso, $chroot_dir, $partition_path, $svn) if $part_no == 1;
 	
 	# set grub colours
-	setgrub($chroot_dir);
+	editgrub($chroot_dir);
 	
 	# make the persistence file
 	chdir $casper;
