@@ -408,8 +408,7 @@ sub setpartition {
 		die "Could not copy initrd\n" unless $rc == 0;
 		$rc = system("cp -v $chroot_dir/oldboot/vmlinuz $casper");
 		die "Could not copy vmlinuz\n" unless $rc == 0;
-		# delete chroot1/oldboot directory
-		system("rm -rf $chroot_dir/oldboot");
+		# do not delete oldboot, incase chroot1 is used again
 	}
 
 	# delete ubuntu install files in chroot/boot
@@ -437,7 +436,7 @@ sub setpartition {
 	# write new filesystem.squashfs to boot directory
 	# delete file otherwise mksquashfs will fail
 	system("rm -f /tmp/filesystem.squashfs");
-	$rc = system("mksquashfs " . $chroot_dir . " /tmp/filesystem.squashfs -e boot");
+	$rc = system("mksquashfs " . $chroot_dir . " /tmp/filesystem.squashfs -e oldboot -e boot");
 	die "mksquashfs returned and error\n" unless $rc == 0;
 	
 	$rc = system("mv -vf /tmp/filesystem.squashfs " . $casper);
