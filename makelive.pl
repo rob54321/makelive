@@ -106,12 +106,12 @@ sub unbindall {
 # sub to set up new chroot environment.
 # the environment is copied from the cdrom
 # parameters passed: chroot_directory, debhomedevice, svn path
-sub setchroot {
+sub createchroot {
 	# creating new chroot environment
 	my ($chroot_dir, $debhomedev, $svn) = @_;
 	my $rc;
 		
-	# delete chroot environment if it exists
+	# delete the old chroot environment if it exists
 	if (-d $chroot_dir) {
 		unbindall $chroot_dir;
 		# move it to /tmp/junk
@@ -137,11 +137,12 @@ sub setchroot {
 	die "Error unsquashing /mnt/cdrom/casper/filesystem.squashfs\n"unless $rc == 0;
 	print "unsquashed filesystem.squashfs\n";
 		
-	# edit fstab in chroot for debhome which includes debhome
+	# edit fstab in chroot so debhome can be mounted
 	chdir $chroot_dir . "/etc";
 	system("sed -i -e '/LABEL=$debhomedev/d' fstab");
 	system("sed -i -e 'a \ LABEL=$debhomedev /mnt/$debhomedev ext4 defaults,noauto 0 0' fstab");
 
+	# copy resolv.conf and interfaces so network will work
 	system("cp /etc/resolv.conf /etc/hosts " . $chroot_dir . "/etc/");
 	system("cp /etc/network/interfaces " . $chroot_dir . "/etc/network/");
 
@@ -160,6 +161,60 @@ sub setchroot {
 	# copy svn link to the chroot environment if it exists
 	$rc = system("cp -dv /mnt/svn $chroot_dir/mnt/");
 	die "Could not copy link /mnt/svn to $chroot_dir/mnt/svn\n" unless $rc == 0;
+}
+
+###############################################
+# sub to change root  and run liveinstall.sh
+# parameters: chroot_directory, debhome_device, upgrade, packages_list
+###############################################
+sub dochroot {
+	my ($chroot_dir, $debhomedev, $upgrade, $packages) = @_;
+
+	# debhomemountstatus for debhome mount status, ro, rw or not mounted
+	my ($rc, $debhomemountstatus);
+	
+	# determine if debhomedev is mounted ro, rw or not mounted
+	$rc = system("grep -q $debhomedev /etc/mtab");
+	if ($rc == 0) {
+		# debhomedev is mounted.
+		# determine if it is ro or rw
+		if (system("grep $debhomedev.*ro /etc/mtab") == 0) {
+			# debhome dev mounted ro
+			$debhomemountstatus = "ro";
+			print "$debhomedev is mounted ro\n";
+		} elsif ( system("grep $debhomedev.*rw /etc/mtab") == 0) {
+			# debhome dev mount rw
+			$debhomemountstatus = "rw";
+			print "$debhomedev is mounted rw\n";
+		} else {
+			# debhome dev mount not rw or ro
+			die "Error: $debhomedev is mounted but not rw or ro\n";
+		}
+	} else {
+		# debhomedev is not mounted
+		$debhomemountstatus = "not mounted";
+	}
+	#############################################################################################
+	# enter the chroot environment
+	#############################################################################################
+
+	# install apps in the chroot environment
+	bindall $chroot_dir;
+	
+	# parameters must be quoted for Bash
+	# liveinstall.sh "debhomedev" "upgrade/noupgrade" "package list"
+	$upgrade = "\"" . $upgrade . "\"";
+	$packages = "\"" . $packages . "\"";
+	my $debhomedevice = "\"" . $debhomedev . "\"";
+	$debhomemountstatus = "\"" . $debhomemountstatus . "\"";
+	# execute liveinstall.sh in the chroot environment
+	$rc = system("chroot $chroot_dir /usr/local/bin/liveinstall.sh $debhomedevice $debhomemountstatus $upgrade $packages");
+
+	# for exiting the chroot environment
+	unbindall $chroot_dir;
+
+	# check if liveinstall exited with error in chroot environment
+	die "liveinstall.sh exited with error" unless $rc == 0;
 }
 
 #######################################################
@@ -261,18 +316,15 @@ sub installgrub {
 	system(" grub-install --no-floppy --boot-directory=" . $chroot_dir . "/boot/EFI --efi-directory="  . $chroot_dir . "/boot --removable --target=x86_64-efi " . $device);
 }
 ####################################################
-# sub to setup partition 1|2. This is the ubuntu-mate
+# sub to initialise the setup of partition 1|2. This is the ubuntu-mate
 # or ubuntu partition.
 # if -c given create new chroot from scratch or use existing one
 # parameters passed:
 # createchroot, ubuntuiso-name, upgrade, debhome dev label, svn full path, packages list, part_no)
 ####################################################
-sub setpartition {
+sub initialise {
 	my ($chroot, $ubuntuiso, $upgrade, $debhomedev, $svn, $packages, $part_no)  = @_;
 
-	# debhomemountstatus for debhome mount status, ro, rw or not mounted
-	my $debhomemountstatus;
-	
 	# set up chroot dirs for partition 1 and 2
 	my $chroot_dir1 = "/chroot1";
 	my $chroot_dir2 = "/chroot2";
@@ -300,27 +352,6 @@ sub setpartition {
 	my $rc1 = system("blkid -L " . $label . " > /dev/null");
 	die "Either $label and/or $debhomedev is not attached\n" unless ($rc == 0 and $rc1 == 0);
 
-	# determine if debhomedev is mounted ro, rw or not mounted
-	$rc = system("grep -q $debhomedev /etc/mtab");
-	if ($rc == 0) {
-		# debhomedev is mounted.
-		# determine if it is ro or rw
-		if (system("grep $debhomedev.*ro /etc/mtab") == 0) {
-			# debhome dev mounted ro
-			$debhomemountstatus = "ro";
-			print "$debhomedev is mounted ro\n";
-		} elsif ( system("grep $debhomedev.*rw /etc/mtab") == 0) {
-			# debhome dev mount rw
-			$debhomemountstatus = "rw";
-			print "$debhomedev is mounted rw\n";
-		} else {
-			# debhome dev mount not rw or ro
-			die "Error: $debhomedev is mounted but not rw or ro\n";
-		}
-	} else {
-		# debhomedev is not mounted
-		$debhomemountstatus = "not mounted";
-	}
 	
 	# get partition_path of partition ex: /dev/sda1
 	my $partition_path = `blkid -L $label`;
@@ -358,30 +389,11 @@ sub setpartition {
 
 
 	# if creating new chroot and
-	setchroot($chroot_dir, $debhomedev, $svn) if $chroot;
+	createchroot($chroot_dir, $debhomedev, $svn) if $chroot;
 
-	#############################################################################################
-	# enter the chroot environment
-	#############################################################################################
-
-	# install apps in the chroot environment
-	bindall $chroot_dir;
+	# chroot and run liveinstall.sh
+	dochroot($chroot_dir, $debhomedev, $upgrade, $packages);
 	
-	# parameters must be quoted for Bash
-	# liveinstall.sh "debhomedev" "upgrade/noupgrade" "package list"
-	$upgrade = "\"" . $upgrade . "\"";
-	$packages = "\"" . $packages . "\"";
-	my $debhomedevice = "\"" . $debhomedev . "\"";
-	$debhomemountstatus = "\"" . $debhomemountstatus . "\"";
-	# execute liveinstall.sh in the chroot environment
-	$rc = system("chroot $chroot_dir /usr/local/bin/liveinstall.sh $debhomedevice $debhomemountstatus $upgrade $packages");
-
-	# for exiting the chroot environment
-	unbindall $chroot_dir;
-
-	# check if liveinstall exited with error in chroot environment
-	die "liveinstall.sh exited with error" unless $rc == 0;
-
 	#############################################################################################
 	# copy and edit files to chroot/boot
 	#############################################################################################
@@ -540,11 +552,10 @@ if ($opt_2) {
 }
 # invoke set partition for each iso given
 if ($opt_1) {
-	setpartition($chroot, $opt_1, $upgrade, $debhomedev, $svn, $packages, 1);
+	initialise($chroot, $opt_1, $upgrade, $debhomedev, $svn, $packages, 1);
 }
 
 # invoke set partition for each iso given
 if ($opt_2) {
-	setpartition($chroot, $opt_2, $upgrade, $debhomedev, $svn, $packages, 2);
+	initialise($chroot, $opt_2, $upgrade, $debhomedev, $svn, $packages, 2);
 }
-
