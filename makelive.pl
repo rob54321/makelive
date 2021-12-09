@@ -103,9 +103,38 @@ sub unbindall {
 	system("umount $chroot_dir/tmp");
 }
 	
+############################################################
+# sub to mount cdrom
+# un mounts anything on /mnt/cdrom
+# then mounts cdrom at /mnt/cdrom
+# parameters to pass: iso-name
+############################################################
+sub mountcdrom {
+	my $isoimage = $_[0];
+	my $rc;
+
+	# if /mnt/cdrom exists, unmount iso image if it is mounted
+	# mount ubuntu-mate iso image
+	if (-d "/mnt/cdrom") {
+		print "checking if cdrom is mounted\n";
+		$rc = system("findmnt /mnt/cdrom");
+
+		# umount /mnt/cdrom
+		system("umount -v /mnt/cdrom") if $rc == 0;
+	} else {
+		# /mnt/cdrom does not exist, create it
+		mkdir "/mnt/cdrom";
+	}
+
+	$rc = system("mount -o ro,loop " . $isoimage . " /mnt/cdrom");
+	die "Could not mount $isoimage\n" unless $rc == 0;
+}
+
+####################################################################
 # sub to set up new chroot environment.
 # the environment is copied from the cdrom
 # parameters passed: chroot_directory, debhomedevice, svn path
+####################################################################
 sub createchroot {
 	# creating new chroot environment
 	my ($chroot_dir, $debhomedev, $svn) = @_;
@@ -315,45 +344,23 @@ sub installgrub {
 	
 	system(" grub-install --no-floppy --boot-directory=" . $chroot_dir . "/boot/EFI --efi-directory="  . $chroot_dir . "/boot --removable --target=x86_64-efi " . $device);
 }
+
 ####################################################
-# sub to initialise the setup of partition 1|2. This is the ubuntu-mate
-# or ubuntu partition.
-# if -c given create new chroot from scratch or use existing one
-# parameters passed:
-# createchroot, ubuntuiso-name, upgrade, debhome dev label, svn full path, packages list, part_no)
+# sub to build filesystem.squashfs, copy dists, install
+# pool preseed to /boot on drive.
+# install and edit grub
+# create the writable file for persistence
+# and copy to casper
 ####################################################
-sub initialise {
-	my ($chroot, $ubuntuiso, $upgrade, $debhomedev, $svn, $packages, $part_no)  = @_;
-
-	# set up chroot dirs for partition 1 and 2
-	my $chroot_dir1 = "/chroot1";
-	my $chroot_dir2 = "/chroot2";
+sub installfs {
+	# parameters
+	my ($label, $ubuntuiso, $casper, $svn, $upgrade, $chroot_dir, $part_no) = @_;
 	
-	# hash part parameters: containing parameters that are partition dependent
-	my %pparam = ("1" => {"chroot"   => "$chroot_dir1",
-		                  "casper"   => "$chroot_dir1/boot/casper",
-	                      "label"    => "MACRIUM"},
-	              "2" => {"chroot"   => "$chroot_dir2",
-					      "casper"   => "$chroot_dir2/boot/casper1",
-				          "label"    => "UBUNTU"});
-
-	# some short cuts depending on the parition number
-	my $chroot_dir = $pparam{$part_no}->{"chroot"};
-	my $casper = $pparam{$part_no}->{"casper"};
-	my $label = $pparam{$part_no}->{"label"};
+	# check MACRIUM/UBUNTU is attached
+	my $rc = system("blkid -L " . $label . " > /dev/null");
+	die "$label is not attached\n" unless $rc == 0;
 	
-	# if not creating chroot env, check the old one exists
-	if (! defined $chroot) {
-		die "chroot environment $chroot_dir does not exist\n" unless -d $chroot_dir;
-	}
-		
-	# check MACRIUM and debhomedev is attached
-	my $rc = system("blkid -L $debhomedev > /dev/null");
-	my $rc1 = system("blkid -L " . $label . " > /dev/null");
-	die "Either $label and/or $debhomedev is not attached\n" unless ($rc == 0 and $rc1 == 0);
-
-	
-	# get partition_path of partition ex: /dev/sda1
+	# get partition_path of partition MACRIUM/UBUNTU ex: /dev/sda1
 	my $partition_path = `blkid -L $label`;
 	chomp $partition_path;
 	print $label . " is: $partition_path\n";
@@ -371,33 +378,11 @@ sub initialise {
 		die "$label cannot be unmounted\n" unless $rc == 0;
 	}
 
-	# if /mnt/cdrom exists, unmount iso image if it is mounted
-	# mount ubuntu-mate iso image
-	if (-d "/mnt/cdrom") {
-		print "checking if cdrom is mounted\n";
-		$rc = system("findmnt /mnt/cdrom");
-
-		# umount /mnt/cdrom
-		system("umount -v /mnt/cdrom") if $rc == 0;
-	} else {
-		# /mnt/cdrom does not exist, create it
-		mkdir "/mnt/cdrom";
-	}
-
-	$rc = system("mount -o ro,loop " . $ubuntuiso . " /mnt/cdrom");
-	die "Could not mount $ubuntuiso\n" unless $rc == 0;
-
-
-	# if creating new chroot and
-	createchroot($chroot_dir, $debhomedev, $svn) if $chroot;
-
-	# chroot and run liveinstall.sh
-	dochroot($chroot_dir, $debhomedev, $upgrade, $packages);
-	
 	#############################################################################################
 	# copy and edit files to chroot/boot
 	#############################################################################################
-	# mount the partition under chroot/boot, it was unmounted before chroot
+	# mount the partition MACRIUM/UBUNTU under 
+	# chroot/boot, it was unmounted before chroot
 	$rc = system("mount -L " . $label . " " . $chroot_dir . "/boot");
 	die "Could not mount $label at $chroot_dir/boot\n" unless $rc == 0;
 	
@@ -459,6 +444,60 @@ sub initialise {
 	$rc = system("findmnt " . $chroot_dir . "/boot");
 	print "count not umount " . $chroot_dir . "/boot\n" if $rc == 0;
 
+}
+
+####################################################
+# sub to initialise the setup of partition 1|2. This is the ubuntu-mate
+# or ubuntu partition.
+# if -c given create new chroot from scratch or use existing one
+# parameters passed:
+# createchroot, ubuntuiso-name, upgrade, debhome dev label, svn full path, packages list, part_no)
+####################################################
+sub initialise {
+	my ($chroot, $doinstall, $ubuntuiso, $upgrade, $debhomedev, $svn, $packages, $part_no)  = @_;
+
+	# set up chroot dirs for partition 1 and 2
+	my $chroot_dir1 = "/chroot1";
+	my $chroot_dir2 = "/chroot2";
+	
+	# hash part parameters: containing parameters that are partition dependent
+	my %pparam = ("1" => {"chroot"   => "$chroot_dir1",
+		                  "casper"   => "$chroot_dir1/boot/casper",
+	                      "label"    => "MACRIUM"},
+	              "2" => {"chroot"   => "$chroot_dir2",
+					      "casper"   => "$chroot_dir2/boot/casper1",
+				          "label"    => "UBUNTU"});
+
+	# some short cuts depending on the parition number
+	my $chroot_dir = $pparam{$part_no}->{"chroot"};
+	my $casper = $pparam{$part_no}->{"casper"};
+	my $label = $pparam{$part_no}->{"label"};
+	
+	# if not creating chroot env, check the old one exists
+	if ($chroot == "use") {
+		die "chroot environment $chroot_dir does not exist\n" unless -d $chroot_dir;
+	}
+		
+	# check debhomedev is attached
+	# only install does not need debhomedev mounted
+	# it must be attached $chroot defined, upgrade or packages to install
+	if ($upgrade == "upgrade" or $packages != "" or $chroot) {
+		my $rc = system("blkid -L $debhomedev > /dev/null");
+		die "$debhomedev is not attached\n" unless $rc == 0;
+	}
+	
+	# mount the cdrom
+	mountcdrom $ubuntuiso;
+	
+	# if creating new chroot and
+	createchroot($chroot_dir, $debhomedev, $svn) if $chroot == "new";
+
+	# chroot and run liveinstall.sh
+	dochroot($chroot_dir, $debhomedev, $upgrade, $packages) if $chroot == "use";
+	
+	# install in MACRIUM/UBUNTU
+	installfs($label, $ubuntuiso, $casper, $svn, $upgrade, $chroot_dir, $part_no) if $doinstall;
+
 	# un mount /mnt/cdrom
 	system("umount -d -v -f /mnt/cdrom");
 }
@@ -468,10 +507,12 @@ sub usage {
 	print "-1 full name of ubuntu-mate iso for partition 1\n";
 	print "-2 full name of ubuntu iso for partition 2\n";
 	print "-u do a full-upgrade\n";
-	print "-c create new change root environment for part 1|2\n";
+	print "-b create new change root environment for part 1|2\n";
+	print "-c use existing changeroot -- takes precedence over -b\n";
 	print "-p list of packages to install in chroot in quotes\n";
 	print "-l disk label for debhome, default is $debhomedev\n";
 	print "-s full path to subversion, default is $svn\n";
+	print "-i install the image to MACRIUM/UBUNTU\n";
 	exit 0;
 }
 ##################
@@ -498,13 +539,24 @@ my $svn = "/mnt/svn";
 
 # get command line argument
 # this is the name of the ubuntu iso ima
-our($opt_c, $opt_u, $opt_1, $opt_2, $opt_p, $opt_l, $opt_s, $opt_h);
+our($opt_i, $opt_b, $opt_c, $opt_u, $opt_1, $opt_2, $opt_p, $opt_l, $opt_s, $opt_h);
 
 # get command line options
-getopts('c1:2:p:hul:s:d:');
+getopts('ibc1:2:p:hul:s:d:');
 
-# set $chroot to true if -c was given
-my $chroot = $opt_c if $opt_c;
+# set $chroot to new if -b given
+# set $chroot to use if -c given
+# -c use takes precedence over -b new
+my $chroot;
+if ($opt_c) {
+	$chroot = "use";
+} elsif ($opt_b) {
+	$chroot = "new";
+}
+
+# if install option was given
+# set option
+my $doinstall = $opt_i if $opt_i;
 
 # setup debhome if it has changed from the default
 $debhomedev = $opt_l if $opt_l;
@@ -552,10 +604,10 @@ if ($opt_2) {
 }
 # invoke set partition for each iso given
 if ($opt_1) {
-	initialise($chroot, $opt_1, $upgrade, $debhomedev, $svn, $packages, 1);
+	initialise($chroot, $doinstall, $opt_1, $upgrade, $debhomedev, $svn, $packages, 1);
 }
 
 # invoke set partition for each iso given
 if ($opt_2) {
-	initialise($chroot, $opt_2, $upgrade, $debhomedev, $svn, $packages, 2);
+	initialise($chroot, $doinstall, $opt_2, $upgrade, $debhomedev, $svn, $packages, 2);
 }
