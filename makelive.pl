@@ -499,7 +499,7 @@ sub initialise {
 	print "chroot: $chroot; chrootuse: $chrootuse\n";
 	 
 	# if not creating chroot env, check the old one exists
-	if ($chrootuse eq "use") {
+	if ($chrootuse eq "use" and $chroot ne "new") {
 		die "chroot environment $chroot_dir does not exist\n" unless -d $chroot_dir;
 	}
 
