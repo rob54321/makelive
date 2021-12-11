@@ -133,6 +133,7 @@ sub mountcdrom {
 ####################################################################
 # sub to set up new chroot environment.
 # the environment is copied from the cdrom
+# requires svn and mountcdrom to be mounted
 # parameters passed: chroot_directory, debhomedevice, svn path
 ####################################################################
 sub createchroot {
@@ -194,6 +195,8 @@ sub createchroot {
 
 ###############################################
 # sub to change root  and run liveinstall.sh
+# requires debhomedev to be mounted
+# also requires svn if packages and or upgrade are done.
 # parameters: chroot_directory, debhome_device, upgrade, packages_list
 ###############################################
 sub dochroot {
@@ -246,7 +249,7 @@ sub dochroot {
 	die "liveinstall.sh exited with error" unless $rc == 0;
 
 	# mkdir dochroot so installfs can determine dochroot was run
-	mkdir "$chroot_dir/dochroot";
+	mkdir "$chroot_dir/dochroot" unless -d "$chroot_dir/dochroot";
 }
 
 #######################################################
@@ -354,6 +357,7 @@ sub installgrub {
 # install and edit grub
 # create the writable file for persistence
 # and copy to casper
+# requires MACRIUM/UBUNTU , cdrom and svn to be mounted
 ####################################################
 sub installfs {
 	# parameters
@@ -482,6 +486,18 @@ sub initialise {
 	my $casper = $pparam{$part_no}->{"casper"};
 	my $label = $pparam{$part_no}->{"label"};
 	
+	# if p or u given then set chrootuse
+	# if chroot does not exist then set chroot
+	print "packages: $packages ; upgrade: $upgrade\n";
+	
+	if ($packages ne "" or $upgrade eq "upgrade") {
+		# dochroot must be done
+		print "setting chrootuse to use\n";
+		$chrootuse = "use";
+		$chroot = "new" unless -d $chroot_dir;
+	}
+	print "chroot: $chroot; chrootuse: $chrootuse\n";
+	 
 	# if not creating chroot env, check the old one exists
 	if ($chrootuse eq "use") {
 		die "chroot environment $chroot_dir does not exist\n" unless -d $chroot_dir;
@@ -490,7 +506,7 @@ sub initialise {
 	# check debhomedev is attached
 	# only install does not need debhomedev mounted
 	# it must be attached $chroot defined, upgrade or packages to install
-	if ($upgrade eq "upgrade" or $packages ne "" or $chroot eq "use") {
+	if ($upgrade eq "upgrade" or $packages ne "" or $chrootuse eq "use") {
 		my $rc = system("blkid -L $debhomedev > /dev/null");
 		die "$debhomedev is not attached\n" unless $rc == 0;
 	}
@@ -499,12 +515,15 @@ sub initialise {
 	mountcdrom $ubuntuiso;
 	
 	# if creating new chroot and
+#	print "createchroot $chroot_dir $debhomedev $svn\n" if $chroot eq "new";
 	createchroot($chroot_dir, $debhomedev, $svn) if $chroot eq "new";
 
 	# chroot and run liveinstall.sh
+#	print "dochroot $chroot_dir $debhomedev $upgrade $packages\n" if $chrootuse eq "use";
 	dochroot($chroot_dir, $debhomedev, $upgrade, $packages) if $chrootuse eq "use";
 	
 	# install in MACRIUM/UBUNTU
+#	print "installfs $label $ubuntuiso $casper $svn $upgrade $chroot_dir $part_no\n" if $doinstall;
 	installfs($label, $ubuntuiso, $casper, $svn, $upgrade, $chroot_dir, $part_no) if $doinstall;
 
 	# un mount /mnt/cdrom
@@ -558,14 +577,6 @@ getopts('ice1:2:p:hul:s:d:');
 # set option
 my ($doinstall, $chroot, $chrootuse);
 
-$doinstall = $opt_i if $opt_i;
-
-# set changeroot usechageroot
-$chroot = "";
-$chrootuse = "";
-$chroot = "new" if $opt_c;
-$chrootuse = "use" if $opt_e;
-
 # setup debhome if it has changed from the default
 $debhomedev = $opt_l if $opt_l;
 
@@ -574,36 +585,24 @@ $svn = $opt_s if $opt_s;
 
 usage($debhomedev, $svn) if $opt_h;
 
+# setup doinstall
+$doinstall = $opt_i if $opt_i;
+
+# set changeroot usechageroot
+$chroot = "";
+$chrootuse = "";
+$chroot = "new" if $opt_c;
+$chrootuse = "use" if $opt_e;
+
+
 # check for existence of svn
 die "Could not find subversion respository at $svn\n" unless -d $svn;
 
-# packages may or may not have a value
-my $packages;
-
-if ($opt_p) {
-	# make a list between quotes
-	$packages = $opt_p;
-	# if no -e or -c given set $chrootuse to use
-	$chrootuse = "use" unless $opt_c or $opt_e;
-} else {
-	$packages = "";
-}
-
-# if and upgrade is selected
-# the modules version matching vmlinuz must be installed
-# in the chroot environment	
-my $host_version;
-my $upgrade;
-
-if ($opt_u) {
-	# set the upgrade flag
-	$upgrade = "upgrade";
-	# if no -e or -c given set $chrootuse to use
-	$chrootuse = "use" unless $opt_c or $opt_e;
-} else {
-	# no upgrade
-	$upgrade = "";
-}
+# check for packages and upgrade
+my $packages = "";
+$packages = $opt_p if $opt_p;
+my $upgrade = "";
+$upgrade = "upgrade" if $opt_u;
 
 # check if iso 1 exists
 if ($opt_1){
