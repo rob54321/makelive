@@ -250,6 +250,10 @@ sub dochroot {
 
 	# mkdir dochroot so installfs can determine dochroot was run
 	mkdir "$chroot_dir/dochroot" unless -d "$chroot_dir/dochroot";
+
+	# make a directory upgrade in chroot1 so install
+	# can install the correct vmlinuz, initrd
+	mkdir "$chroot_dir/upgrade" unless -d "$chroot_dir/upgrade";
 }
 
 #######################################################
@@ -361,7 +365,7 @@ sub installgrub {
 ####################################################
 sub installfs {
 	# parameters
-	my ($label, $ubuntuiso, $casper, $svn, $upgrade, $chroot_dir, $part_no) = @_;
+	my ($label, $ubuntuiso, $casper, $svn, $chroot_dir, $part_no) = @_;
 	
 	# check if chroot environment exists
 	die "$chroot_dir does not exist\n" unless -d $chroot_dir;
@@ -407,8 +411,10 @@ sub installfs {
 	# create directory
 	mkdir $casper;
 	
-	# if live system was not upgraded copy vmlinuz and initrd from cdrom image
-	if ($upgrade ne "\"upgrade\"") {
+	# check if chroot was upgraded by checking existence of /chroot1/upgrade
+	# if not upgraded use vmlinuz, initrd from cdrom
+	# else use vmlinuz, initrd from /chroot1/oldboot.
+	if (! -d "$chroot_dir/upgrade") {
 		# no upgrade, copy vmlinuz and initrd from cdrom image
 		system("cp -vf /mnt/cdrom/casper/vmlinuz /mnt/cdrom/casper/initrd " . $casper);
 	} else {
@@ -446,7 +452,7 @@ sub installfs {
 	# write new filesystem.squashfs to boot directory
 	# delete file otherwise mksquashfs will fail
 	system("rm -f /tmp/filesystem.squashfs");
-	$rc = system("mksquashfs " . $chroot_dir . " /tmp/filesystem.squashfs -e oldboot -e boot -e dochroot");
+	$rc = system("mksquashfs " . $chroot_dir . " /tmp/filesystem.squashfs -e oldboot -e boot -e dochroot -e upgrade");
 	die "mksquashfs returned and error\n" unless $rc == 0;
 	
 	$rc = system("mv -vf /tmp/filesystem.squashfs " . $casper);
@@ -492,7 +498,6 @@ sub initialise {
 	
 	if ($packages ne "" or $upgrade eq "upgrade") {
 		# dochroot must be done
-		print "setting chrootuse to use\n";
 		$chrootuse = "use";
 		$chroot = "new" unless -d $chroot_dir;
 	}
@@ -524,7 +529,7 @@ sub initialise {
 	
 	# install in MACRIUM/UBUNTU
 #	print "installfs $label $ubuntuiso $casper $svn $upgrade $chroot_dir $part_no\n" if $doinstall;
-	installfs($label, $ubuntuiso, $casper, $svn, $upgrade, $chroot_dir, $part_no) if $doinstall;
+	installfs($label, $ubuntuiso, $casper, $svn, $chroot_dir, $part_no) if $doinstall;
 
 	# un mount /mnt/cdrom
 	system("umount -d -v -f /mnt/cdrom");
