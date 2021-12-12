@@ -195,6 +195,10 @@ sub createchroot {
 
 ###############################################
 # sub to change root  and run liveinstall.sh
+# makes a dir dochroot to indicate dochroot was run
+# also deletes filesystem.squashfs in docchroot
+# since it will now change.
+# installfs will use filesystem.squashfs if it exists
 # requires debhomedev to be mounted
 # also requires svn if packages and or upgrade are done.
 # parameters: chroot_directory, debhome_device, upgrade, packages_list
@@ -249,8 +253,17 @@ sub dochroot {
 	die "liveinstall.sh exited with error" unless $rc == 0;
 
 	# mkdir dochroot so installfs can determine dochroot was run
-	mkdir "$chroot_dir/dochroot" unless -d "$chroot_dir/dochroot";
-
+	# installfs inserts filesystem.squashfs into this directory
+	# if dochroot is run filesystem.squashfs must be deleted
+	# since it may have changed.
+	if (-d "$chroot_dir/dochroot") {
+		# remove filesystem.squashfs because it will have changed
+		unlink "$chroot_dir/dochroot/filesystem.squashfs";
+	} else {
+		# make the directory to indicate
+		mkdir "$chroot_dir/dochroot";
+	}
+	
 	# make a directory upgrade in chroot1 so install
 	# can install the correct vmlinuz, initrd
 	mkdir "$chroot_dir/upgrade" unless -d "$chroot_dir/upgrade";
@@ -361,6 +374,9 @@ sub installgrub {
 # install and edit grub
 # create the writable file for persistence
 # and copy to casper
+# uses filesystem.squashfs if it exists in dochroot
+# else it builds if from scratch.
+# this speeds up the process of install if filesystem.squashfs has not changed
 # requires MACRIUM/UBUNTU , cdrom and svn to be mounted
 ####################################################
 sub installfs {
@@ -449,13 +465,14 @@ sub installfs {
 	# so chroot1/boot can be unmounted
 	chdir "/root";
 	
-	# write new filesystem.squashfs to boot directory
-	# delete file otherwise mksquashfs will fail
-	system("rm -f /tmp/filesystem.squashfs");
-	$rc = system("mksquashfs " . $chroot_dir . " /tmp/filesystem.squashfs -e oldboot -e boot -e dochroot -e upgrade");
+	# if there is a filesystem.squashfs in dochroot
+	# use it. If it does not exist it must be created
+	# sub dochroot deletes it since filesystem.squashfs
+	# would change if dochroot is invoked.
+	$rc = system("mksquashfs " . $chroot_dir . " $chroot_dir/dochroot/filesystem.squashfs -e oldboot -e boot -e dochroot -e upgrade") unless -f "$chroot_dir/dochroot/filesystem.squashfs";
 	die "mksquashfs returned and error\n" unless $rc == 0;
 	
-	$rc = system("mv -vf /tmp/filesystem.squashfs " . $casper);
+	$rc = system("cp -vf $chroot_dir/dochroot/filesystem.squashfs " . $casper);
 	die "Could not move /tmp/filesystem.squashfs to $casper\n" unless $rc == 0;
 	
 	# umount chroot boot
