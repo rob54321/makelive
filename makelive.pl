@@ -167,19 +167,18 @@ sub createchroot {
 		# need to protect the live drive
 		# incase the binds are still active
 		$rc = system("findmnt $chroot_dir/boot");
-print "$rc\n";
 		if ($rc == 0) {
 			# un mount drive
-			$rc = system("umount $chroot_dir/boot");
+			$rc = system("umount -v -f $chroot_dir/boot");
 			die "Could not umount $chroot_dir/boot\n" unless $rc == 0;
 		}
 
 		# check if debhomedev is mounted
-		$rc = system("findmnt /mnt/$chroot_dir/$debhomedev");
+		$rc = system("findmnt $chroot_dir/mnt/$debhomedev");
 		if ($rc == 0) {
 			# un mount debhomedev
-			$rc = system("umount /mnt/$chroot_dir/$debhomedev");
-			die "Could not umount /mnt/$chroot_dir/$debhomedev" unless $rc == 0;
+			$rc = system("umount -v -f $chroot_dir/mnt/$debhomedev");
+			die "Could not umount $chroot_dir/mnt/$debhomedev" unless $rc == 0;
 		}
 
 		# move it to /tmp/junk
