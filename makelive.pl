@@ -19,6 +19,25 @@ use Getopt::Std;
 #
 #######################################################
 
+# sub to make filesystem.squashfs.
+# dochroot must have been done
+# filesystem.squashfs is written to chroot1/dochroot
+# parameters: chroot directory
+sub makefs {
+	my $chroot_dir = $_[0];
+	
+	# check that dochroot has been executed previously
+	die "dochroot has not been executed\n" unless -d "$chroot_dir/dochroot";
+
+	# if the file exists, delete it
+	# or mksquashfs will fail.
+	unlink "$chroot_dir/dochroot/filesystem.squashfs";
+	
+	# make the file system.
+	my $rc = system("mksquashfs " . $chroot_dir . " $chroot_dir/dochroot/filesystem.squashfs -e oldboot -e boot -e dochroot -e upgrade");
+	die "mksquashfs returned and error\n" unless $rc == 0;
+}
+
 # sub to edit grub default and set the theme in the filesystem.squashfs
 sub editgrub {
 	my $chroot_dir = $_[0];
@@ -144,8 +163,28 @@ sub createchroot {
 	# delete the old chroot environment if it exists
 	if (-d $chroot_dir) {
 		unbindall $chroot_dir;
+		# check if $chroot_dir/boot is mounted
+		# need to protect the live drive
+		# incase the binds are still active
+		$rc = system("findmnt $chroot_dir/boot");
+print "$rc\n";
+		if ($rc == 0) {
+			# un mount drive
+			$rc = system("umount $chroot_dir/boot");
+			die "Could not umount $chroot_dir/boot\n" unless $rc == 0;
+		}
+
+		# check if debhomedev is mounted
+		$rc = system("findmnt /mnt/$chroot_dir/$debhomedev");
+		if ($rc == 0) {
+			# un mount debhomedev
+			$rc = system("umount /mnt/$chroot_dir/$debhomedev");
+			die "Could not umount /mnt/$chroot_dir/$debhomedev" unless $rc == 0;
+		}
+
 		# move it to /tmp/junk
-		system("mv -f $chroot_dir  /tmp/junk");
+		$rc = system("mv -f $chroot_dir  /tmp/junk");
+		die "Could not move $chroot_dir to /tmp/junk" unless $rc == 0;
 		
 		# remove directory
 		$rc = system("rm -rf /tmp/junk");
@@ -238,13 +277,17 @@ sub dochroot {
 	bindall $chroot_dir;
 	
 	# parameters must be quoted for Bash
-	# liveinstall.sh "debhomedev" "upgrade/noupgrade" "package list"
-	$upgrade = "\"" . $upgrade . "\"";
-	$packages = "\"" . $packages . "\"";
-	my $debhomedevice = "\"" . $debhomedev . "\"";
-	$debhomemountstatus = "\"" . $debhomemountstatus . "\"";
+	# liveinstall.sh "debhomedev" "debhomemountstatus" "upgrade/noupgrade" "package list"
+	# make parameters list for liveinstall.sh
+	my $parameters = "";
+	$parameters = "-u " if $upgrade;
+	$parameters = "-p $packages " . $parameters if $packages;
+	
+	$parameters = "-d $debhomedev -s $debhomemountstatus " . $parameters;
+	
 	# execute liveinstall.sh in the chroot environment
-	$rc = system("chroot $chroot_dir /usr/local/bin/liveinstall.sh $debhomedevice $debhomemountstatus $upgrade $packages");
+	print "parameters: $parameters\n";
+	$rc = system("chroot $chroot_dir /usr/local/bin/liveinstall.sh $parameters");
 
 	# for exiting the chroot environment
 	unbindall $chroot_dir;
@@ -490,7 +533,7 @@ sub installfs {
 # createchroot, ubuntuiso-name, upgrade, debhome dev label, svn full path, packages list, part_no)
 ####################################################
 sub initialise {
-	my ($chroot, $chrootuse, $doinstall, $ubuntuiso, $upgrade, $debhomedev, $svn, $packages, $part_no)  = @_;
+	my ($chroot, $chrootuse, $doinstall, $makefs, $ubuntuiso, $upgrade, $debhomedev, $svn, $packages, $part_no)  = @_;
 
 	# set up chroot dirs for partition 1 and 2
 	my $chroot_dir1 = "/chroot1";
@@ -511,45 +554,54 @@ sub initialise {
 	
 	# if p or u given then set chrootuse
 	# if chroot does not exist then set chroot
-	print "packages: $packages ; upgrade: $upgrade\n";
+	print "packages: $packages\n" if $packages;
+	print "upgrade: $upgrade\n" if $upgrade;
 	
-	if ($packages ne "" or $upgrade eq "upgrade") {
+	# if packages or upgrade defined, chrootuse must be set
+	if ($packages or $upgrade) {
 		# dochroot must be done
 		$chrootuse = "use";
 		$chroot = "new" unless -d $chroot_dir;
 	}
-	print "chroot: $chroot; chrootuse: $chrootuse\n";
+	print "chroot: $chroot\n" if $chroot;
+	print "chrootuse: $chrootuse\n" if $chrootuse;
 	 
 	# if not creating chroot env, check the old one exists
-	if ($chrootuse eq "use" and $chroot ne "new") {
+	if ($chrootuse and ! $chroot) {
 		die "chroot environment $chroot_dir does not exist\n" unless -d $chroot_dir;
 	}
 
 	# check debhomedev is attached
 	# only install does not need debhomedev mounted
 	# it must be attached $chroot defined, upgrade or packages to install
-	if ($upgrade eq "upgrade" or $packages ne "" or $chrootuse eq "use") {
+	if ($upgrade or $packages or $chrootuse) {
 		my $rc = system("blkid -L $debhomedev > /dev/null");
 		die "$debhomedev is not attached\n" unless $rc == 0;
 	}
 	
-	# mount the cdrom
-	mountcdrom $ubuntuiso;
+	# mount the cdrom for create chroot or install
+	if ($chroot or $doinstall) {
+		mountcdrom $ubuntuiso;
+	}
 	
 	# if creating new chroot and
 #	print "createchroot $chroot_dir $debhomedev $svn\n" if $chroot eq "new";
-	createchroot($chroot_dir, $debhomedev, $svn) if $chroot eq "new";
+	createchroot($chroot_dir, $debhomedev, $svn) if $chroot;
 
 	# chroot and run liveinstall.sh
 #	print "dochroot $chroot_dir $debhomedev $upgrade $packages\n" if $chrootuse eq "use";
-	dochroot($chroot_dir, $debhomedev, $upgrade, $packages) if $chrootuse eq "use";
+	dochroot($chroot_dir, $debhomedev, $upgrade, $packages) if $chrootuse;
+	
+	# make filesystem.squashfs if not installing
+	makefs($chroot_dir) if $makefs;
 	
 	# install in MACRIUM/UBUNTU
 #	print "installfs $label $ubuntuiso $casper $svn $upgrade $chroot_dir $part_no\n" if $doinstall;
 	installfs($label, $ubuntuiso, $casper, $svn, $chroot_dir, $part_no) if $doinstall;
 
-	# un mount /mnt/cdrom
-	system("umount -d -v -f /mnt/cdrom");
+	# un mount /mnt/cdrom if it is mounted
+	my $rc = system("findmnt /mnt/cdrom");
+	system("umount -d -v -f /mnt/cdrom") if $rc == 0;
 }
 
 sub usage {
@@ -559,6 +611,7 @@ sub usage {
 	print "-u do a full-upgrade\n";
 	print "-c create changeroot\n";
 	print "-e use existing changeroot -- takes precedence over -c\n";
+	print "-m make filesystem.squashfs, dochroot must be complete\n";
 	print "-p list of packages to install in chroot in quotes\n";
 	print "-l disk label for debhome, default is $debhomedev\n";
 	print "-s full path to subversion, default is $svn\n";
@@ -589,15 +642,11 @@ my $svn = "/mnt/svn";
 
 # get command line argument
 # this is the name of the ubuntu iso ima
-our($opt_i, $opt_c, $opt_e, $opt_u, $opt_1, $opt_2, $opt_p, $opt_l, $opt_s, $opt_h);
+our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_1, $opt_2, $opt_p, $opt_l, $opt_s, $opt_h);
 
 # if -u or -p is given but not -c then chroot = use should be used.
 # get command line options
-getopts('ice1:2:p:hul:s:d:');
-
-# if install option was given
-# set option
-my ($doinstall, $chroot, $chrootuse);
+getopts('mice1:2:p:hul:s:d:');
 
 # setup debhome if it has changed from the default
 $debhomedev = $opt_l if $opt_l;
@@ -607,23 +656,37 @@ $svn = $opt_s if $opt_s;
 
 usage($debhomedev, $svn) if $opt_h;
 
+# if install option was given
 # setup doinstall
-$doinstall = $opt_i if $opt_i;
+# if install and makefs are given
+# then makefs has no effect
+my $makefs;
+$makefs = $opt_m if $opt_m;
+
+my $doinstall;
+if ($opt_i) {
+	$doinstall = $opt_i;
+	# makefs has no effect
+	undef $makefs;
+}
 
 # set changeroot usechageroot
-$chroot = "";
-$chrootuse = "";
+my ($chroot, $chrootuse);
 $chroot = "new" if $opt_c;
 $chrootuse = "use" if $opt_e;
 
 
 # check for existence of svn
-die "Could not find subversion respository at $svn\n" unless -d $svn;
+# svn is not needed for makefs only, but for create chroot, dochroot, installfs
+if ($chroot or $chrootuse or $doinstall) {
+	die "Could not find subversion respository at $svn\n" unless -d $svn;
+}
 
 # check for packages and upgrade
-my $packages = "";
-$packages = $opt_p if $opt_p;
-my $upgrade = "";
+my $packages;
+$packages = "\"" . $opt_p . "\"" if $opt_p;
+
+my $upgrade;
 $upgrade = "upgrade" if $opt_u;
 
 # check if iso 1 exists
@@ -637,10 +700,10 @@ if ($opt_2) {
 }
 # invoke set partition for each iso given
 if ($opt_1) {
-	initialise($chroot, $chrootuse, $doinstall, $opt_1, $upgrade, $debhomedev, $svn, $packages, 1);
+	initialise($chroot, $chrootuse, $doinstall, $makefs, $opt_1, $upgrade, $debhomedev, $svn, $packages, 1);
 }
 
 # invoke set partition for each iso given
 if ($opt_2) {
-	initialise($chroot, $chrootuse, $doinstall, $opt_2, $upgrade, $debhomedev, $svn, $packages, 2);
+	initialise($chroot, $chrootuse, $doinstall, $makefs, $opt_2, $upgrade, $debhomedev, $svn, $packages, 2);
 }
