@@ -294,22 +294,10 @@ sub dochroot {
 
 	# check if liveinstall exited with error in chroot environment
 	die "liveinstall.sh exited with error" unless $rc == 0;
-
-	# mkdir dochroot so installfs can determine dochroot was run
-	# installfs inserts filesystem.squashfs into this directory
-	# if dochroot is run filesystem.squashfs must be deleted
-	# since it may have changed.
-	if (-d "$chroot_dir/dochroot") {
-		# remove filesystem.squashfs because it will have changed
-		unlink "$chroot_dir/dochroot/filesystem.squashfs";
-	} else {
-		# make the directory to indicate
-		mkdir "$chroot_dir/dochroot";
-	}
-	
-	# make a directory upgrade in chroot1 so install
-	# can install the correct vmlinuz, initrd
-	mkdir "$chroot_dir/upgrade" unless -d "$chroot_dir/upgrade";
+	# liveinstall.sh will create directory dochroot
+	# to indicate chroot was done.
+	# filesystem.squashfs must be deleted in /dochroot
+	# because the filesystem will have changed.
 }
 
 #######################################################
