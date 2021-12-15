@@ -254,11 +254,11 @@ sub dochroot {
 		# determine if it is ro or rw
 		if (system("grep $debhomedev.*ro /etc/mtab") == 0) {
 			# debhome dev mounted ro
-			$debhomemountstatus = "ro";
+			$debhomemountstatus = "\"ro\"";
 			print "$debhomedev is mounted ro\n";
 		} elsif ( system("grep $debhomedev.*rw /etc/mtab") == 0) {
 			# debhome dev mount rw
-			$debhomemountstatus = "rw";
+			$debhomemountstatus = "\"rw\"";
 			print "$debhomedev is mounted rw\n";
 		} else {
 			# debhome dev mount not rw or ro
@@ -266,7 +266,7 @@ sub dochroot {
 		}
 	} else {
 		# debhomedev is not mounted
-		$debhomemountstatus = "not mounted";
+		$debhomemountstatus = "\"not mounted\"";
 	}
 	#############################################################################################
 	# enter the chroot environment
@@ -279,13 +279,14 @@ sub dochroot {
 	# liveinstall.sh "debhomedev" "debhomemountstatus" "upgrade/noupgrade" "package list"
 	# make parameters list for liveinstall.sh
 	my $parameters = "";
-	$parameters = "-u " if $upgrade;
-	$parameters = "-p $packages " . $parameters if $packages;
+	$parameters = " -u" if $upgrade;
+	$parameters = "-p " . $packages  . $parameters if $packages;
 	
 	$parameters = "-d $debhomedev -s $debhomemountstatus " . $parameters;
 	
 	# execute liveinstall.sh in the chroot environment
 	print "parameters: $parameters\n";
+
 	$rc = system("chroot $chroot_dir /usr/local/bin/liveinstall.sh $parameters");
 
 	# for exiting the chroot environment
