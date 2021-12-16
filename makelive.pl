@@ -19,6 +19,51 @@ use Getopt::Std;
 #
 #######################################################
 
+# this sub operates on the list @ARGV
+# all the switches in the ARGV list are checked to see if they have arguments
+# if they do not have arguments, the default arguments are inserted into ARGV
+# so that getopts will not fail.
+# no parameters are passed and none are returned.
+
+sub defaultparameter {
+
+	# hash supplying default arguments to switches
+	# -b is for mounting bit locker drives
+	# -v is for mounting vera containers
+	# -u is for unmounting any drive
+	# the default argument, if not given on the command line is all drives
+	my %defparam = ( -1 => "none",
+			 -2 => "none");
+
+	# for each switch in the defparam hash find it's index and insert default arguments if necessary
+	foreach my $switch (keys(%defparam)) {
+		# find index of position of -*
+		my $i = 0;
+		foreach my $param (@ARGV) {
+			# check for a -b and that it is not the last parameter
+			if ($param eq $switch) {
+				if ($i < $#ARGV) {
+					# -* has been found at $ARGV[$i] and it is not the last parameter
+					# if the next parameter is a switch -something
+					# then -* has no arguments
+					# check if next parameter is a switch
+					if ($ARGV[$i+1] =~ /^-/) {
+						# -* is followed by a switch and is not the last switch
+						# insert the 2 default filenames as a string at index $i+1
+						my $index = $i + 1;
+						splice @ARGV, $index, 0, $defparam{$switch};
+					}
+				} else {
+					# the switch is the last in the list so def arguments must be appended
+					my $index = $i + 1;
+					splice @ARGV, $index, 0, $defparam{$switch}; 
+				}
+			}
+			# increment index counter
+			$i++;
+		}
+	}
+} 
 # sub to make filesystem.squashfs.
 # dochroot must have been done
 # filesystem.squashfs is written to chroot1/dochroot
@@ -569,7 +614,12 @@ sub initialise {
 	
 	# mount the cdrom for create chroot or install
 	if ($chroot or $doinstall) {
-		mountcdrom $ubuntuiso;
+		# check ubuntuiso
+		if ($ubuntuiso ne "none") {
+			mountcdrom $ubuntuiso;
+		} else {
+			print "cdrom image $ubuntuiso: cannot be mounted\n";
+		}
 	}
 	
 	# if creating new chroot and
@@ -634,6 +684,11 @@ our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_1, $opt_2, $opt_p, $opt_l, $opt
 
 # if -u or -p is given but not -c then chroot = use should be used.
 # get command line options
+
+# if -1 or -2 is given without parameters, then no cdrom should be use
+# makefs, dochroot do not need a cdrom image
+defaultparameter();
+
 getopts('mice1:2:p:hul:s:d:');
 
 # setup debhome if it has changed from the default
@@ -679,13 +734,22 @@ $upgrade = "upgrade" if $opt_u;
 
 # check if iso 1 exists
 if ($opt_1){
-	die "$opt_1 does not exist\n" unless -f $opt_1;
+	# if opt_1 is a cdrom image, check it exists
+	die "$opt_1 does not exist\n" unless -f $opt_1 or $opt_1 eq "none";
 }
 
 # check if iso 2 exists
 if ($opt_2) {
-	die "$opt_2 does not exist\n" unless -f $opt_2
+	# if opt_2 is a cdrom image, check it exists
+	die "$opt_2 does not exist\n" unless -f $opt_2 or $opt_2 eq "none";
 }
+
+# if cdrom and image is set to none
+# then chroot and doinstall cannot be invoked
+if ($chroot or $doinstall) {
+	die "create chroot and install need a cdrom image\n" if $opt_1 eq "none" or $opt_2 eq "none";
+}
+
 # invoke set partition for each iso given
 if ($opt_1) {
 	initialise($chroot, $chrootuse, $doinstall, $makefs, $opt_1, $upgrade, $debhomedev, $svn, $packages, 1);
