@@ -79,7 +79,7 @@ sub makefs {
 	unlink "$chroot_dir/dochroot/filesystem.squashfs";
 	
 	# make the file system.
-	my $rc = system("mksquashfs " . $chroot_dir . " $chroot_dir/dochroot/filesystem.squashfs -e oldboot -e boot -e dochroot -e upgrade");
+	my $rc = system("mksquashfs " . $chroot_dir . " $chroot_dir/dochroot/filesystem.squashfs -e oldboot -e boot -e dochroot -e upgrade -e packages");
 	die "mksquashfs returned and error\n" unless $rc == 0;
 }
 
@@ -545,7 +545,7 @@ sub installfs {
 	# use it. If it does not exist it must be created
 	# sub dochroot deletes it since filesystem.squashfs
 	# would change if dochroot is invoked.
-	$rc = system("mksquashfs " . $chroot_dir . " $chroot_dir/dochroot/filesystem.squashfs -e oldboot -e boot -e dochroot -e upgrade") unless -f "$chroot_dir/dochroot/filesystem.squashfs";
+	$rc = system("mksquashfs " . $chroot_dir . " $chroot_dir/dochroot/filesystem.squashfs -e oldboot -e boot -e dochroot -e upgrade -e packages") unless -f "$chroot_dir/dochroot/filesystem.squashfs";
 	die "mksquashfs returned and error\n" unless $rc == 0;
 	
 	$rc = system("cp -vf $chroot_dir/dochroot/filesystem.squashfs " . $casper);
