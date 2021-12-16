@@ -736,19 +736,26 @@ $upgrade = "upgrade" if $opt_u;
 if ($opt_1){
 	# if opt_1 is a cdrom image, check it exists
 	die "$opt_1 does not exist\n" unless -f $opt_1 or $opt_1 eq "none";
+
+	# if cdrom and image is set to none
+	# then chroot and doinstall cannot be invoked
+	if (($chroot or $doinstall) and $opt_1 eq "none") {
+		die "create chroot and install need a cdrom image\n";
+	}
 }
 
 # check if iso 2 exists
 if ($opt_2) {
 	# if opt_2 is a cdrom image, check it exists
 	die "$opt_2 does not exist\n" unless -f $opt_2 or $opt_2 eq "none";
+
+	# if cdrom and image is set to none
+	# then chroot and doinstall cannot be invoked
+	if (($chroot or $doinstall) and $opt_2 eq "none") {
+		die "create chroot and install need a cdrom image\n";
+	}
 }
 
-# if cdrom and image is set to none
-# then chroot and doinstall cannot be invoked
-if ($chroot or $doinstall) {
-	die "create chroot and install need a cdrom image\n" if $opt_1 eq "none" or $opt_2 eq "none";
-}
 
 # invoke set partition for each iso given
 if ($opt_1) {
