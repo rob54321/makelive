@@ -1,0 +1,8 @@
+Package: makelive
+Version: 1.00
+Architecture: all
+Maintainer: Robert Key robkey@mighty.co.za
+Depends: subversion
+Section: myown
+Priority: optional
+Description: makelive.pl builds a live ubuntu system 1st and second parition of a disk drive.
