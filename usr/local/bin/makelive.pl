@@ -261,7 +261,7 @@ sub createchroot {
 
 	# generate chroot_dir/etc/apt/sources.list
 	# and chroot_dir/etc/sources.list.d/debhome.list
-	setaptsources ($codename, $chroot_dir);
+	setaptsources ($codename, $chroot_dir, $svn);
 	system("cp -dR /etc/apt/trusted.gpg /etc/apt/trusted.gpg.d " . $chroot_dir . "/etc/apt/");
 
 	# testing for convenience
@@ -382,7 +382,8 @@ sub getversion {
 # The call setaptsources (codename, chroot_dir)
 #################################################
 sub setaptsources {
-	my ($rc, $codename, $chroot_dir) = @_;
+	my ($codename, $chroot_dir, $svn) = @_;
+	my $rc;
 	# create sources.list
 	open (SOURCES, ">", "$chroot_dir/etc/apt/sources.list");
 	print SOURCES "deb http://archive.ubuntu.com/ubuntu $codename main restricted multiverse universe
