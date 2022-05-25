@@ -261,7 +261,7 @@ sub createchroot {
 
 	# generate chroot_dir/etc/apt/sources.list
 	# and chroot_dir/etc/sources.list.d/debhome.list
-	setaptsources ($codename, $chroot_dir);
+	setaptsources ($codename, $chroot_dir, $svn);
 	system("cp -dR /etc/apt/trusted.gpg /etc/apt/trusted.gpg.d " . $chroot_dir . "/etc/apt/");
 
 	# testing for convenience
@@ -382,7 +382,8 @@ sub getversion {
 # The call setaptsources (codename, chroot_dir)
 #################################################
 sub setaptsources {
-	my ($codename, $chroot_dir) = @_;
+	my ($codename, $chroot_dir, $svn) = @_;
+	my $rc;
 	# create sources.list
 	open (SOURCES, ">", "$chroot_dir/etc/apt/sources.list");
 	print SOURCES "deb http://archive.ubuntu.com/ubuntu $codename main restricted multiverse universe
@@ -391,10 +392,17 @@ deb http://archive.ubuntu.com/ubuntu $codename-updates  main restricted multiver
 deb http://archive.ubuntu.com/ubuntu $codename-proposed  main restricted multiverse universe\n";
 	close SOURCES;
 
-	# create debhome.list
-	open (DEBHOME, ">", "$chroot_dir/etc/apt/sources.list.d/debhome.list");
-	print DEBHOME "deb file:///mnt/debhome home main\n";
-	close DEBHOME;
+	# extract debhome.sources from  subversion to /etc/apt/sources.list.d/debhome.sources
+	$rc = system("svn export --force file://$svn/root/my-linux/sources/amd64/debhome.sources  " . $chroot_dir . "/etc/apt/sources.list.d/");
+	die "Could not export debhome.sources from svn\n" unless $rc == 0;
+
+	# get the public key for debhome
+	# make the /etc/apt/keyrings directory if it does not exist
+	mkdir "/etc/apt/keyrings" unless -d "/etc/apt/keyrings";
+	
+	$rc = system("svn export --force file://$svn/root/my-linux/sources/gpg/debhomepubkey.asc  " . $chroot_dir . "/etc/apt/keyrings/");
+	die "Could not export debhome.sources from svn\n" unless $rc == 0;
+
 }
 
 # this sub sets up grub and installs it.
