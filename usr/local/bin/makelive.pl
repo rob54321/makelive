@@ -277,15 +277,15 @@ sub createchroot {
 
 	# copy xwindows themes and icons to /usr/share
 	# if themes.tar.xz and icons.tar.xz are found
-	if (-f "/mnt/$debhomedev/xconfig/themes.tar.xz") {
-		$rc = system("tar --xz -xf /mnt/$debhomedev/xconfig/themes.tar.xz -C $chroot_dir/usr/share");
-		die "Could not extract themes from /mnt$debhomedev/xconfig/themes.tar.xz" unless $rc == 0;
+	if (-f "/mnt/$debhomedev/debhome/xconfig/themes.tar.xz") {
+		$rc = system("tar --xz -xf /mnt/$debhomedev/debhome/xconfig/themes.tar.xz -C $chroot_dir/usr/share");
+		die "Could not extract themes from /mnt$debhomedev/debhome/xconfig/themes.tar.xz" unless $rc == 0;
 	}
 
 	# if themes.tar.xz and icons.tar.xz are found
-	if (-f "/mnt/$debhomedev/xconfig/icons.tar.xz") {
-		$rc = system("tar --xz -xf /mnt/$debhomedev/xconfig/icons.tar.xz -C $chroot_dir/usr/share");
-		die "Could not extract themes from /mnt$debhomedev/xconfig/icons.tar.xz" unless $rc == 0;
+	if (-f "/mnt/$debhomedev/debhome/xconfig/icons.tar.xz") {
+		$rc = system("tar --xz -xf /mnt/$debhomedev/debhome/xconfig/icons.tar.xz -C $chroot_dir/usr/share");
+		die "Could not extract themes from /mnt$debhomedev/debhome/xconfig/icons.tar.xz" unless $rc == 0;
 	}
 	
 	
