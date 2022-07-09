@@ -274,6 +274,21 @@ sub createchroot {
 	# copy svn link to the chroot environment if it exists
 	$rc = system("cp -dv /mnt/svn $chroot_dir/mnt/");
 	die "Could not copy link /mnt/svn to $chroot_dir/mnt/svn\n" unless $rc == 0;
+
+	# copy xwindows themes and icons to /usr/share
+	# if themes.tar.xz and icons.tar.xz are found
+	if (-f "/mnt/$debhomedev/xconfig/themes.tar.xz") {
+		$rc = system("tar --xz -xf /mnt/$debhomedev/xconfig/themes.tar.xz -C $chroot_dir/usr/share");
+		die "Could not extract themes from /mnt$debhomedev/xconfig/themes.tar.xz" unless $rc == 0;
+	}
+
+	# if themes.tar.xz and icons.tar.xz are found
+	if (-f "/mnt/$debhomedev/xconfig/icons.tar.xz") {
+		$rc = system("tar --xz -xf /mnt/$debhomedev/xconfig/icons.tar.xz -C $chroot_dir/usr/share");
+		die "Could not extract themes from /mnt$debhomedev/xconfig/icons.tar.xz" unless $rc == 0;
+	}
+	
+	
 }
 
 ###############################################
@@ -654,14 +669,14 @@ sub usage {
 	my ($debhomedev, $svn) = @_;
 	print "-1 full name of ubuntu-mate iso for partition 1\n";
 	print "-2 full name of ubuntu iso for partition 2\n";
-	print "-u do a full-upgrade\n";
-	print "-c create changeroot\n";
-	print "-e use existing changeroot -- takes precedence over -c\n";
-	print "-m make filesystem.squashfs, dochroot must be complete\n";
-	print "-p list of packages to install in chroot in quotes\n";
+	print "-u do a full-upgrade -- needs partition number\n";
+	print "-c create changeroot -- needs iso image\n";
+	print "-e use existing changeroot -- takes precedence over -c needs -- parition number\n";
+	print "-m make filesystem.squashfs, dochroot must be complete -- needs parition number\n";
+	print "-p list of packages to install in chroot in quotes -- needs parition number\n";
 	print "-l disk label for debhome, default is $debhomedev\n";
 	print "-s full path to subversion, default is $svn\n";
-	print "-i install the image to MACRIUM/UBUNTU\n";
+	print "-i install the image to MACRIUM/UBUNTU -- needs iso image\n";
 	exit 0;
 }
 ##################
