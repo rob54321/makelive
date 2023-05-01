@@ -526,10 +526,10 @@ sub installfs {
 	# create directory
 	mkdir $casper;
 	
-	# check if chroot was upgraded by checking existence of /chroot1/upgrade
+	# check if the kernel in chroot was upgraded by checking existence of /chroot1/oldboot
 	# if not upgraded use vmlinuz, initrd from cdrom
 	# else use vmlinuz, initrd from /chroot1/oldboot.
-	if (! -d "$chroot_dir/upgrade") {
+	if (! -d "$chroot_dir/oldboot") {
 		# no upgrade, copy vmlinuz and initrd from cdrom image
 		system("cp -vf /mnt/cdrom/casper/vmlinuz /mnt/cdrom/casper/initrd " . $casper);
 	} else {
