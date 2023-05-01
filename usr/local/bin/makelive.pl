@@ -526,7 +526,7 @@ sub installfs {
 	# create directory
 	mkdir $casper;
 	
-	# check if the kernel in chroot was upgraded by checking existence of /chroot1/oldboot
+	# check if the kernel in chroot was upgraded by liveinstall.sh by checking existence of /chroot1/oldboot
 	# if not upgraded use vmlinuz, initrd from cdrom
 	# else use vmlinuz, initrd from /chroot1/oldboot.
 	if (! -d "$chroot_dir/oldboot") {
