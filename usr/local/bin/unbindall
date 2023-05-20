@@ -1,0 +1,21 @@
+#!/bin/bash
+
+if [ $# != 1 ]
+then
+	echo "chroot directory required"
+	exit 1;
+fi
+
+CHROOT=$1
+
+if [ ! -d ${CHROOT} ]
+then
+	echo "${CHROOT} does not exist"
+	exit 1
+fi
+cd ${CHROOT}
+umount proc
+umount dev/pts
+umount dev
+umount sys
+umount tmp

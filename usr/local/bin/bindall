@@ -1,0 +1,23 @@
+#!/bin/bash
+# this script changes to the directory where the chroot is
+# and binds all necessary directories for a chroot
+# first parameter is distribution
+# second parameter is architecture
+if [ $# != 1 ]
+then
+	echo "chroot directory required"
+	exit 1;
+fi
+
+CHROOT=$1
+if [ ! -d ${CHROOT} ]
+then
+	echo "${CHROOT} does not exist"
+	exit 1
+fi
+cd ${CHROOT}
+mount --bind /proc proc
+mount --bind /dev dev
+mount --bind /dev/pts dev/pts
+mount --bind /sys sys
+mount --bind /tmp tmp
