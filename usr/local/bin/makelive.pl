@@ -69,18 +69,23 @@ sub defaultparameter {
 # filesystem.squashfs is written to chroot1/dochroot
 # parameters: chroot directory
 sub makefs {
-	my $chroot_dir = $_[0];
+	my ($chroot_dir, $casper) = @_;
 	
 	# check that dochroot has been executed previously
 	die "dochroot has not been executed\n" unless -d "$chroot_dir/dochroot";
 
+	# make the casper directory
+	system("mkdir $casper") unless -d $casper;
+	
 	# if the file exists, delete it
 	# or mksquashfs will fail.
-	unlink "$chroot_dir/dochroot/filesystem.squashfs";
+	unlink "$casper/filesystem.squashfs";
 	
 	# make the file system.
-	my $rc = system("mksquashfs " . $chroot_dir . " $chroot_dir/dochroot/filesystem.squashfs -e oldboot -e boot -e dochroot -e upgrade -e packages");
+	my $rc = system("mksquashfs " . $casper . "/filesystem.squashfs -e oldboot -e boot -e dochroot -e upgrade -e packages");
 	die "mksquashfs returned and error\n" unless $rc == 0;
+	print "casper = $casper : rc = $rc\n";
+	exit 0;
 }
 
 # sub to edit grub default and set the theme in the filesystem.squashfs
@@ -518,14 +523,6 @@ sub installfs {
 	$rc = system("mount -L " . $label . " " . $chroot_dir . "/boot");
 	die "Could not mount $label at $chroot_dir/boot\n" unless $rc == 0;
 	
-	# make casper dir if it does not exist
-	if ( -d $casper) {
-		# clean directory
-		system("rm -rf $casper");
-	}
-	# create directory
-	mkdir $casper;
-	
 	# check if the kernel in chroot was upgraded by liveinstall.sh by checking existence of /chroot1/oldboot
 	# if not upgraded use vmlinuz, initrd from cdrom
 	# else use vmlinuz, initrd from /chroot1/oldboot.
@@ -556,6 +553,12 @@ sub installfs {
 	# set grub colours
 	editgrub($chroot_dir);
 	
+	# if there is a filesystem.squashfs in dochroot
+	# use it. If it does not exist it must be created
+	# sub dochroot deletes it since filesystem.squashfs
+	# would change if dochroot is invoked.
+	makefs($chroot_dir, $casper) unless -f "$casper/filesystem.squashfs";
+
 	# make the persistence file
 	chdir $casper;
 	system("dd if=/dev/zero of=writable bs=1M count=3000");
@@ -564,15 +567,6 @@ sub installfs {
 	# so chroot1/boot can be unmounted
 	chdir "/root";
 	
-	# if there is a filesystem.squashfs in dochroot
-	# use it. If it does not exist it must be created
-	# sub dochroot deletes it since filesystem.squashfs
-	# would change if dochroot is invoked.
-	$rc = system("mksquashfs " . $chroot_dir . " $chroot_dir/dochroot/filesystem.squashfs -e oldboot -e boot -e dochroot -e upgrade -e packages") unless -f "$chroot_dir/dochroot/filesystem.squashfs";
-	die "mksquashfs returned and error\n" unless $rc == 0;
-	
-	$rc = system("cp -vf $chroot_dir/dochroot/filesystem.squashfs " . $casper);
-	die "Could not move /tmp/filesystem.squashfs to $casper\n" unless $rc == 0;
 	
 	# umount chroot boot
 	system("umount " . $chroot_dir . "/boot");
@@ -654,7 +648,7 @@ sub initialise {
 	dochroot($chroot_dir, $debhomedev, $upgrade, $packages) if $chrootuse;
 	
 	# make filesystem.squashfs if not installing
-	makefs($chroot_dir) if $makefs;
+	makefs($chroot_dir, $casper) if $makefs;
 	
 	# install in MACRIUM/UBUNTU
 #	print "installfs $label $ubuntuiso $casper $svn $upgrade $chroot_dir $part_no\n" if $doinstall;
