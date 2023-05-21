@@ -82,7 +82,7 @@ sub makefs {
 	unlink "$casper/filesystem.squashfs";
 	
 	# make the file system.
-	my $rc = system("mksquashfs " . $casper . "/filesystem.squashfs -e oldboot -e boot -e dochroot -e upgrade -e packages");
+	my $rc = system("mksquashfs " . $chroot_dir . " " . $casper . "/filesystem.squashfs -e oldboot -e boot -e dochroot -e upgrade -e packages");
 	die "mksquashfs returned and error\n" unless $rc == 0;
 	print "casper = $casper : rc = $rc\n";
 	exit 0;
