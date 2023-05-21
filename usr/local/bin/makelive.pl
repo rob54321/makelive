@@ -3,6 +3,7 @@
 use strict;
 use warnings;
 use Getopt::Std;
+use File::Path qw(make_path remove_tree);
 
 #######################################################
 # this script makes a live system on MACRIUM and UBUNTU paritions
@@ -74,9 +75,6 @@ sub makefs {
 	# check that dochroot has been executed previously
 	die "dochroot has not been executed\n" unless -d "$chroot_dir/dochroot";
 
-	# make the casper directory
-	system("mkdir $casper") unless -d $casper;
-	
 	# if the file exists, delete it
 	# or mksquashfs will fail.
 	unlink "$casper/filesystem.squashfs";
@@ -207,7 +205,7 @@ sub mountcdrom {
 ####################################################################
 sub createchroot {
 	# creating new chroot environment
-	my ($chroot_dir, $debhomedev, $svn) = @_;
+	my ($chroot_dir, $casper, $debhomedev, $svn) = @_;
 	my $rc;
 		
 	# delete the old chroot environment if it exists
@@ -246,6 +244,7 @@ sub createchroot {
 	die "Could not find codename\n" unless $codename;
 	print "code name is: $codename\n";
 
+
 	#####################################################################################
 	# copy and edit files to chroot
 	#####################################################################################
@@ -255,6 +254,9 @@ sub createchroot {
 	die "Error unsquashing /mnt/cdrom/casper/filesystem.squashfs\n"unless $rc == 0;
 	print "unsquashed filesystem.squashfs\n";
 		
+	# make the chroot_dir/casper
+	make_path("$casper") unless -d $casper;
+
 	# edit fstab in chroot so debhome can be mounted
 	chdir $chroot_dir . "/etc";
 	system("sed -i -e '/LABEL=$debhomedev/d' fstab");
@@ -516,8 +518,9 @@ sub installfs {
 	}
 
 	#############################################################################################
-	# copy and edit files to chroot/boot
+	# copy and edit files to chroot/boot and casper
 	#############################################################################################
+	
 	# mount the partition MACRIUM/UBUNTU under 
 	# chroot/boot, it was unmounted before chroot
 	$rc = system("mount -L " . $label . " " . $chroot_dir . "/boot");
@@ -641,7 +644,7 @@ sub initialise {
 	
 	# if creating new chroot and
 #	print "createchroot $chroot_dir $debhomedev $svn\n" if $chroot eq "new";
-	createchroot($chroot_dir, $debhomedev, $svn) if $chroot;
+	createchroot($chroot_dir, $casper, $debhomedev, $svn) if $chroot;
 
 	# chroot and run liveinstall.sh
 #	print "dochroot $chroot_dir $debhomedev $upgrade $packages\n" if $chrootuse eq "use";
