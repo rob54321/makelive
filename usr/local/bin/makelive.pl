@@ -79,7 +79,7 @@ sub makefs {
 	unlink "$chroot_dir/dochroot/filesystem.squashfs";
 	
 	# make the file system.
-	my $rc = system("mksquashfs " . $chroot_dir . " $chroot_dir/dochroot/filesystem.squashfs -e oldboot -e boot -e dochroot -e upgrade -e packages");
+	my $rc = system("mksquashfs " . $chroot_dir . " $chroot_dir/dochroot/filesystem.squashfs -e oldboot -e dochroot -e upgrade -e packages");
 	die "mksquashfs returned and error\n" unless $rc == 0;
 }
 
@@ -262,7 +262,8 @@ sub createchroot {
 	# generate chroot_dir/etc/apt/sources.list
 	# and chroot_dir/etc/sources.list.d/debhome.list
 	setaptsources ($codename, $chroot_dir, $svn);
-	system("cp -dR /etc/apt/trusted.gpg /etc/apt/trusted.gpg.d " . $chroot_dir . "/etc/apt/");
+	system("cp -dR /etc/apt/trusted.gpg.d " . $chroot_dir . "/etc/apt/");
+	system("cp -a /etc/apt/trusted.gpg " . $chroot_dir . "/etc/apt/") if -f "/etc/apt/trusted.gpg";
 
 	# testing for convenience
 	# system("cp -v /home/robert/my-linux/livescripts/* $chroot_dir/usr/local/bin/");
@@ -513,6 +514,16 @@ sub installfs {
 	#############################################################################################
 	# copy and edit files to chroot/boot
 	#############################################################################################
+	# if there is a filesystem.squashfs in dochroot
+	# use it. If it does not exist it must be created
+	# sub dochroot deletes it since filesystem.squashfs
+	# would change if dochroot is invoked.
+	makefs($chroot_dir) unless -f "$chroot_dir/dochroot/filesystem.squashfs";
+
+	# empty /chroot1/boot
+	chdir $chroot_dir . "/boot";
+	system ("rm -rf *");
+
 	# mount the partition MACRIUM/UBUNTU under 
 	# chroot/boot, it was unmounted before chroot
 	$rc = system("mount -L " . $label . " " . $chroot_dir . "/boot");
@@ -564,12 +575,6 @@ sub installfs {
 	# so chroot1/boot can be unmounted
 	chdir "/root";
 	
-	# if there is a filesystem.squashfs in dochroot
-	# use it. If it does not exist it must be created
-	# sub dochroot deletes it since filesystem.squashfs
-	# would change if dochroot is invoked.
-	$rc = system("mksquashfs " . $chroot_dir . " $chroot_dir/dochroot/filesystem.squashfs -e oldboot -e boot -e dochroot -e upgrade -e packages") unless -f "$chroot_dir/dochroot/filesystem.squashfs";
-	die "mksquashfs returned and error\n" unless $rc == 0;
 	
 	$rc = system("cp -vf $chroot_dir/dochroot/filesystem.squashfs " . $casper);
 	die "Could not move /tmp/filesystem.squashfs to $casper\n" unless $rc == 0;
@@ -655,7 +660,7 @@ sub initialise {
 	
 	# make filesystem.squashfs if not installing
 	makefs($chroot_dir) if $makefs;
-	
+
 	# install in MACRIUM/UBUNTU
 #	print "installfs $label $ubuntuiso $casper $svn $upgrade $chroot_dir $part_no\n" if $doinstall;
 	installfs($label, $ubuntuiso, $casper, $svn, $chroot_dir, $part_no) if $doinstall;
