@@ -6,6 +6,7 @@ use Getopt::Std;
 
 #######################################################
 # this script makes a live system on MACRIUM and UBUNTU paritions
+# although UBUNTU is not often used
 # Macrium Reflect 7 must have been installed into partition 1.
 #
 #
@@ -13,9 +14,9 @@ use Getopt::Std;
 # makelive.pl -1 ubuntu-mate iso name | -2 ubuntu iso name and -u for upgrade and -p package list
 #
 # the disk
-# partition 1 [MACRIUM] fat32   contains macrium and ubuntu-mate, boots from grub
-# partition 2 [UBUNTU]  fat32   contains ubuntu
-# partition 3 [ssd]     ntfs    contains backup files
+# partition 1 8G    [MACRIUM] fat32   contains macrium and ubuntu-mate, boots from grub uuid = AED6-434E
+# partition 2 2G    [RECOVERALL]  fat32   contains windows recovery for lenovo and desktop
+# partition 3 rest  [ele]     ntfs    contains backup files and sources for windows recovery, Lenovo and desktop
 #
 #######################################################
 
@@ -78,7 +79,7 @@ sub makefs {
 	# or mksquashfs will fail.
 	unlink "$chroot_dir/dochroot/filesystem.squashfs";
 	
-	# make the file system.
+	# make the file system the boot directory must be included, config-xxxx file is needed by initramfs during install
 	my $rc = system("mksquashfs " . $chroot_dir . " $chroot_dir/dochroot/filesystem.squashfs -e oldboot -e dochroot -e upgrade -e packages");
 	die "mksquashfs returned and error\n" unless $rc == 0;
 }
