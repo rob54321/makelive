@@ -1,5 +1,5 @@
 Package: makelive
-Version: 1.36
+Version: 1.37
 Architecture: all
 Maintainer: Robert Key robkey@mighty.co.za
 Depends: subversion
