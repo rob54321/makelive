@@ -142,7 +142,7 @@ sub bindall {
 
 	# bind
 	system("mount --bind /proc proc");
-#	system("mount --bind /tmp tmp");
+	system("mount --bind /tmp tmp");
 	system("mount --bind /dev dev");
 	system("mount --bind /dev/pts dev/pts");
 	system("mount --bind /sys sys");
@@ -165,7 +165,7 @@ sub unbindall {
 	system("umount $chroot_dir/dev/pts");
 	system("umount $chroot_dir/dev");
 	system("umount $chroot_dir/sys");
-#	system("umount $chroot_dir/tmp");
+	system("umount $chroot_dir/tmp");
 }
 	
 ############################################################
