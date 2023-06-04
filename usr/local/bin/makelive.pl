@@ -522,6 +522,9 @@ sub installfs {
 	makefs($chroot_dir) unless -f "$chroot_dir/dochroot/filesystem.squashfs";
 
 	# empty /chroot1/boot
+	# this must be done after makefs, the config-xxxx-generic file
+	# must be in the filesystem.squashfs for initramfs to work
+	# during linux installation
 	chdir $chroot_dir . "/boot";
 	system ("rm -rf *");
 
