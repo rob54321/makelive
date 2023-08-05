@@ -276,9 +276,10 @@ sub createchroot {
 	# testing for convenience
 	# system("cp -v /home/robert/my-linux/livescripts/* $chroot_dir/usr/local/bin/");
 
+	# liveinstall is now installed from a package
 	# export livescripts from subversion
-	$rc = system("svn export --force --depth files file://$svn/root/my-linux/livescripts " . $chroot_dir . "/usr/local/bin/");
-	die "Could not export liveinstall.sh from svn\n" unless $rc == 0;
+	# $rc = system("svn export --force --depth files file://$svn/root/my-linux/livescripts " . $chroot_dir . "/usr/local/bin/");
+	# die "Could not export liveinstall.sh from svn\n" unless $rc == 0;
 
 	# copy svn link to the chroot environment if it exists
 	$rc = system("cp -dv /mnt/svn $chroot_dir/mnt/");
