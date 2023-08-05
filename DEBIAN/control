@@ -1,8 +1,8 @@
 Package: makelive
-Version: 1.38
+Version: 1.40
 Architecture: all
 Maintainer: Robert Key robkey@mighty.co.za
-Depends: subversion
+Depends: subversion, git, initialise-linux, editfstab
 Section: myown
 Priority: optional
 Description: makelive.pl builds a live ubuntu system 1st and second parition of a disk drive.
