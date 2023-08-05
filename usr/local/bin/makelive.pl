@@ -256,6 +256,13 @@ sub createchroot {
 	system("sed -i -e '/LABEL=$debhomedev/d' fstab");
 	system("sed -i -e 'a \ LABEL=$debhomedev /mnt/$debhomedev ext4 defaults,noauto 0 0' fstab");
 
+	# make directory for debhomedev to be mounted in the chroot environment
+	mkdir "$chroot_dir/mnt/$debhomedev" unless -d "$chroot_dir/mnt/$debhomedev";
+
+	# make the link for /mnt/debhome -> /chroot_dir/mnt/$debhomedev in the chroot environment
+	$rc = symlink "$chroot_dir/mnt/$debhomedev", "$chroot_dir/mnt/debhome";
+	die "Error making debhome link: $!" unless $rc == 1;
+	
 	# copy resolv.conf and interfaces so network will work
 	system("cp /etc/resolv.conf /etc/hosts " . $chroot_dir . "/etc/");
 	system("cp /etc/network/interfaces " . $chroot_dir . "/etc/network/");
@@ -409,16 +416,17 @@ sub setaptsources {
 	deb http://archive.ubuntu.com/ubuntu $codename-proposed  main restricted multiverse universe\n";
 	close SOURCES;
 
+	# debhome.sources and debhomepubkey.asc are installed from liveinstall package now.
 	# extract debhome.sources from  subversion to /etc/apt/sources.list.d/debhome.sources
-	$rc = system("svn export --force file://$svn/root/my-linux/sources/amd64/debhome.sources  " . $chroot_dir . "/etc/apt/sources.list.d/");
-	die "Could not export debhome.sources from svn\n" unless $rc == 0;
+	# $rc = system("svn export --force file://$svn/root/my-linux/sources/amd64/debhome.sources  " . $chroot_dir . "/etc/apt/sources.list.d/");
+	# die "Could not export debhome.sources from svn\n" unless $rc == 0;
 
 	# get the public key for debhome
 	# make the /etc/apt/keyrings directory if it does not exist
-	mkdir "/etc/apt/keyrings" unless -d "/etc/apt/keyrings";
+	#mkdir "/etc/apt/keyrings" unless -d "/etc/apt/keyrings";
 	
-	$rc = system("svn export --force file://$svn/root/my-linux/sources/gpg/debhomepubkey.asc  " . $chroot_dir . "/etc/apt/keyrings/");
-	die "Could not export debhome.sources from svn\n" unless $rc == 0;
+	# $rc = system("svn export --force file://$svn/root/my-linux/sources/gpg/debhomepubkey.asc  " . $chroot_dir . "/etc/apt/keyrings/");
+	#die "Could not export debhome.sources from svn\n" unless $rc == 0;
 
 }
 
@@ -605,12 +613,12 @@ sub initialise {
 	my $chroot_dir2 = "/chroot2";
 	
 	# hash part parameters: containing parameters that are partition dependent
-	my %pparam = ("1" => {"chroot"   => "$chroot_dir1",
-		                  "casper"   => "$chroot_dir1/boot/casper",
-	                      "label"    => "MACRIUM"},
-	              "2" => {"chroot"   => "$chroot_dir2",
-					      "casper"   => "$chroot_dir2/boot/casper1",
-				          "label"    => "UBUNTU"});
+	my %pparam = ("1" 		=> {"chroot"	=> "$chroot_dir1",
+					    "casper"	=> "$chroot_dir1/boot/casper",
+					    "label"	=> "MACRIUM"},
+	              "2" 		=> {"chroot"  	=> "$chroot_dir2",
+					      "casper"  => "$chroot_dir2/boot/casper1",
+				          "label"    	=> "UBUNTU"});
 
 	# some short cuts depending on the parition number
 	my $chroot_dir = $pparam{$part_no}->{"chroot"};
