@@ -357,6 +357,18 @@ sub dochroot {
 	# execute liveinstall.sh in the chroot environment
 	print "parameters: $parameters\n";
 
+	#################=============================#######################
+	# to be done.
+	# liveinstall is now a package and must be installed first
+	# in chroot environment
+	# apt update
+	# apt install -y liveinstall
+	# liveinstall depends on
+	#	subversion
+	#	git
+	#	editfstab
+	#	initialise-linux
+	#####################################################################
 	$rc = system("chroot $chroot_dir /usr/local/bin/liveinstall.sh $parameters");
 
 	# for exiting the chroot environment
