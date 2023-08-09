@@ -172,6 +172,9 @@ sub unbindall {
 # sub to mount cdrom
 # un mounts anything on /mnt/cdrom
 # then mounts cdrom at /mnt/cdrom
+# fstab edited so debhomedev can be mounted
+# debhomedev directory made
+# links /mnt/debhome and /mnt/svn are made
 # parameters to pass: iso-name
 ############################################################
 sub mountcdrom {
@@ -260,7 +263,7 @@ sub createchroot {
 	mkdir "$chroot_dir/mnt/$debhomedev" unless -d "$chroot_dir/mnt/$debhomedev";
 
 	# make the link for /mnt/debhome -> /chroot_dir/mnt/$debhomedev in the chroot environment
-	$rc = symlink "$chroot_dir/mnt/$debhomedev", "$chroot_dir/mnt/debhome";
+	$rc = system("chroot $chroot_dir ln -s /mnt/$debhomedev/debhome /mnt/debhome");
 	die "Error making debhome link: $!" unless $rc == 1;
 	
 	# copy resolv.conf and interfaces so network will work
@@ -280,10 +283,6 @@ sub createchroot {
 	# export livescripts from subversion
 	# $rc = system("svn export --force --depth files file://$svn/root/my-linux/livescripts " . $chroot_dir . "/usr/local/bin/");
 	# die "Could not export liveinstall.sh from svn\n" unless $rc == 0;
-
-	# copy svn link to the chroot environment if it exists
-	$rc = system("cp -dv /mnt/svn $chroot_dir/mnt/");
-	die "Could not copy link /mnt/svn to $chroot_dir/mnt/svn\n" unless $rc == 0;
 
 	# copy xwindows themes and icons to /usr/share
 	# if themes.tar.xz and icons.tar.xz are found
@@ -369,7 +368,7 @@ sub dochroot {
 	#	editfstab
 	#	initialise-linux
 	#####################################################################
-	$rc = system("chroot $chroot_dir /usr/local/bin/liveinstall.sh $parameters");
+	# $rc = system("chroot $chroot_dir /usr/local/bin/liveinstall.sh $parameters");
 
 	# for exiting the chroot environment
 	unbindall $chroot_dir;
@@ -696,7 +695,7 @@ sub initialise {
 }
 
 sub usage {
-	my ($debhomedev, $svn) = @_;
+	my ($debhomedev, $svnpath) = @_;
 	print "-1 full name of ubuntu-mate iso for partition 1\n";
 	print "-2 full name of ubuntu iso for partition 2\n";
 	print "-u do a full-upgrade -- needs partition number\n";
@@ -705,7 +704,7 @@ sub usage {
 	print "-m make filesystem.squashfs, dochroot must be complete -- needs parition number\n";
 	print "-p list of packages to install in chroot in quotes -- needs parition number\n";
 	print "-l disk label for debhome, default is $debhomedev\n";
-	print "-s full path to subversion, default is $svn\n";
+	print "-s full path to subversion, default is $svnpath\n";
 	print "-i install the image to MACRIUM/UBUNTU -- needs iso image\n";
 	exit 0;
 }
@@ -725,10 +724,15 @@ sub usage {
 # One or both iso's can be given.
 # package list in quotes, if given
 
-# default for local repository debhome
+# default device for local repository debhome
 my $debhomedev = "ad64";
+
+# default path for local subversion
+my $svnpath = "/mnt/ad64/svn";
+
 # /mnt/svn is a link to subversion
 # it must be available for this script
+# the link never changes
 my $svn = "/mnt/svn";
 
 # get command line argument
@@ -742,15 +746,48 @@ our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_1, $opt_2, $opt_p, $opt_l, $opt
 # makefs, dochroot do not need a cdrom image
 defaultparameter();
 
-getopts('mice1:2:p:hul:s:d:');
+getopts('mice1:2:p:hul:s:');
 
 # setup debhome if it has changed from the default
 $debhomedev = $opt_l if $opt_l;
 
-# setup subversion if it has changed
-$svn = $opt_s if $opt_s;
+# setup svn path if it has changed
+# done here for usage sub
+$svnpath = $opt_s if $opt_s;
 
-usage($debhomedev, $svn) if $opt_h;
+usage($debhomedev, $svnpath) if $opt_h;
+# return code from functions
+my $rc;
+
+# setup subversion full path if it is changed
+if ($opt_s) {
+	# if it exists make a link
+	# else exit
+	if (-d $svnpath) {
+		# directory exists, make a link to /mnt/svn
+		unlink "$svn";
+		$rc = symlink "$svnpath", "$svn";
+		die "Could not link $svn -> $svnpath: $!\n" unless $rc;
+	} else {
+		# subversion does not exist
+		die "Could not find subversion at $svnpath\n";
+	}
+
+} else {
+	# subversion path was not changed
+	# check it exists and set link
+	die "Could not find subversion at $svnpath\n" unless -d $svnpath;
+	# remove link incase it is stale
+	if (-l "$svn") {
+		# remove link
+		$rc = unlink "$svn";
+		die "Could not remove link $svn: $!\n" unless $rc;
+	}
+	# make the link
+	$rc = symlink "$svnpath", "$svn";
+	die "Could not link $svn -> $svnpath: $!\n" unless $rc;
+}
+
 
 # if install option was given
 # setup doinstall
@@ -771,12 +808,6 @@ my ($chroot, $chrootuse);
 $chroot = "new" if $opt_c;
 $chrootuse = "use" if $opt_e;
 
-
-# check for existence of svn
-# svn is not needed for makefs only, but for create chroot, dochroot, installfs
-if ($chroot or $chrootuse or $doinstall) {
-	die "Could not find subversion respository at $svn\n" unless -d $svn;
-}
 
 # check for packages and upgrade
 my $packages;
