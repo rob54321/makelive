@@ -408,6 +408,12 @@ sub dochroot {
 	$rc = system("chroot $chroot_dir apt install -y liveinstall");
 	die "Could not install liveinstall in chroot environment $!\n" unless $rc == 0;
 
+	# now execute liveinstall and check the return
+	my $lirc = system("chroot $chroot_dir liveinstall.sh $parameters");
+	
+	#*********************** TBD ************************
+	#####################################################
+	
 	# umount debhome device
 	$rc = system("chroot $chroot_dir umount /mnt/$debhomedev");
 	die "Could not umount $debhomedev in the chroot environment: $!\n" unless $rc == 0;
@@ -416,7 +422,7 @@ sub dochroot {
 	unbindall $chroot_dir;
 
 	# check if liveinstall exited with error in chroot environment
-	die "liveinstall.sh exited with error" unless $rc == 0;
+	die "liveinstall.sh exited with error" unless $lirc == 0;
 	# liveinstall.sh will create directory dochroot
 	# to indicate chroot was done.
 	# filesystem.squashfs must be deleted in /dochroot
