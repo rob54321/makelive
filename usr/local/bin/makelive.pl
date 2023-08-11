@@ -403,9 +403,11 @@ sub dochroot {
 	# $rc = system("chroot $chroot_dir /usr/local/bin/liveinstall.sh $parameters");
 
 	# do an update and install liveinstall
-	$rc = system("chroot $chroot_dir apt-update && apt -y install liveinstall");
-	
-exit 0;
+	$rc = system("chroot $chroot_dir apt update");
+	die "Could not apt update in chroot environment $!\n" unless $rc == 0;
+	$rc = system("chroot $chroot_dir apt install -y liveinstall");
+	die "Could not install liveinstall in chroot environment $!\n" unless $rc == 0;
+
 	# umount debhome device
 	$rc = system("chroot $chroot_dir umount /mnt/$debhomedev");
 	die "Could not umount $debhomedev in the chroot environment: $!\n" unless $rc == 0;
