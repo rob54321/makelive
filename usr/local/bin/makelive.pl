@@ -168,6 +168,36 @@ sub unbindall {
 	system("umount $chroot_dir/tmp");
 }
 	
+#################################################
+# this sub sets up sources.list and debhome.list
+# in chroot_dir/etc/apt and chroot_dir/etc/apt/sources.list.d
+# The call setaptsources (codename, chroot_dir)
+#################################################
+sub setaptsources {
+	my ($codename, $chroot_dir, $svn) = @_;
+	my $rc;
+	# create sources.list
+	open (SOURCES, ">", "$chroot_dir/etc/apt/sources.list");
+	print SOURCES "deb http://archive.ubuntu.com/ubuntu $codename main restricted multiverse universe
+	deb http://archive.ubuntu.com/ubuntu $codename-security main restricted multiverse universe
+	deb http://archive.ubuntu.com/ubuntu $codename-updates  main restricted multiverse universe
+	deb http://archive.ubuntu.com/ubuntu $codename-proposed  main restricted multiverse universe\n";
+	close SOURCES;
+
+	# debhome.sources and debhomepubkey.asc are installed from liveinstall package now.
+	# extract debhome.sources from  subversion to /etc/apt/sources.list.d/debhome.sources
+	$rc = system("svn export --force file://$svn/root/my-linux/sources/amd64/debhome.sources  " . $chroot_dir . "/etc/apt/sources.list.d/");
+	die "Could not export debhome.sources from svn\n" unless $rc == 0;
+
+	# get the public key for debhome
+	# make the /etc/apt/keyrings directory if it does not exist
+	mkdir "/etc/apt/keyrings" unless -d "/etc/apt/keyrings";
+	
+	$rc = system("svn export --force file://$svn/root/my-linux/sources/gpg/debhomepubkey.asc  " . $chroot_dir . "/etc/apt/keyrings/");
+	die "Could not export debhome.sources from svn\n" unless $rc == 0;
+
+}
+
 ############################################################
 # sub to mount cdrom
 # un mounts anything on /mnt/cdrom
@@ -264,8 +294,8 @@ sub createchroot {
 
 	# make the link for /mnt/debhome -> /chroot_dir/mnt/$debhomedev in the chroot environment
 	$rc = system("chroot $chroot_dir ln -s /mnt/$debhomedev/debhome /mnt/debhome");
-	die "Error making debhome link: $!" unless $rc == 1;
-	
+	die "Error making debhome link: $!" unless $rc == 0;
+
 	# copy resolv.conf and interfaces so network will work
 	system("cp /etc/resolv.conf /etc/hosts " . $chroot_dir . "/etc/");
 	system("cp /etc/network/interfaces " . $chroot_dir . "/etc/network/");
@@ -322,20 +352,20 @@ sub dochroot {
 		# debhomedev is mounted.
 		# determine if it is ro or rw
 		if (system("grep $debhomedev.*ro /etc/mtab") == 0) {
-			# debhome dev mounted ro
-			$debhomemountstatus = "\"ro\"";
+			# debhome dev mounted ro with -r option
+			$debhomemountstatus = "-r";
 			print "$debhomedev is mounted ro\n";
 		} elsif ( system("grep $debhomedev.*rw /etc/mtab") == 0) {
 			# debhome dev mount rw
-			$debhomemountstatus = "\"rw\"";
+			$debhomemountstatus = "-w";
 			print "$debhomedev is mounted rw\n";
 		} else {
 			# debhome dev mount not rw or ro
 			die "Error: $debhomedev is mounted but not rw or ro\n";
 		}
 	} else {
-		# debhomedev is not mounted
-		$debhomemountstatus = "\"not mounted\"";
+		# debhomedev is not mounted mount ro with -r option
+		$debhomemountstatus = "-r";
 	}
 	#############################################################################################
 	# enter the chroot environment
@@ -344,14 +374,16 @@ sub dochroot {
 	# install apps in the chroot environment
 	bindall $chroot_dir;
 	
+	# mount debhome in the chroot environment
+	$rc = system("chroot $chroot_dir mount $debhomemountstatus -L $debhomedev /mnt/$debhomedev");
+	die "Could not mount $debhomedev in chroot environment: $!\n" unless $rc == 0;
+	
 	# parameters must be quoted for Bash
 	# liveinstall.sh "debhomedev" "debhomemountstatus" "upgrade/noupgrade" "package list"
 	# make parameters list for liveinstall.sh
 	my $parameters = "";
 	$parameters = " -u" if $upgrade;
 	$parameters = "-p " . $packages  . $parameters if $packages;
-	
-	$parameters = "-d $debhomedev -s $debhomemountstatus " . $parameters;
 	
 	# execute liveinstall.sh in the chroot environment
 	print "parameters: $parameters\n";
@@ -370,6 +402,14 @@ sub dochroot {
 	#####################################################################
 	# $rc = system("chroot $chroot_dir /usr/local/bin/liveinstall.sh $parameters");
 
+	# do an update and install liveinstall
+	$rc = system("chroot $chroot_dir apt-update && apt -y install liveinstall");
+	
+exit 0;
+	# umount debhome device
+	$rc = system("chroot $chroot_dir umount /mnt/$debhomedev");
+	die "Could not umount $debhomedev in the chroot environment: $!\n" unless $rc == 0;
+	
 	# for exiting the chroot environment
 	unbindall $chroot_dir;
 
@@ -412,36 +452,6 @@ sub getversion {
 	}
 	return $version;
 }
-#################################################
-# this sub sets up sources.list and debhome.list
-# in chroot_dir/etc/apt and chroot_dir/etc/apt/sources.list.d
-# The call setaptsources (codename, chroot_dir)
-#################################################
-sub setaptsources {
-	my ($codename, $chroot_dir, $svn) = @_;
-	my $rc;
-	# create sources.list
-	open (SOURCES, ">", "$chroot_dir/etc/apt/sources.list");
-	print SOURCES "deb http://archive.ubuntu.com/ubuntu $codename main restricted multiverse universe
-	deb http://archive.ubuntu.com/ubuntu $codename-security main restricted multiverse universe
-	deb http://archive.ubuntu.com/ubuntu $codename-updates  main restricted multiverse universe
-	deb http://archive.ubuntu.com/ubuntu $codename-proposed  main restricted multiverse universe\n";
-	close SOURCES;
-
-	# debhome.sources and debhomepubkey.asc are installed from liveinstall package now.
-	# extract debhome.sources from  subversion to /etc/apt/sources.list.d/debhome.sources
-	# $rc = system("svn export --force file://$svn/root/my-linux/sources/amd64/debhome.sources  " . $chroot_dir . "/etc/apt/sources.list.d/");
-	# die "Could not export debhome.sources from svn\n" unless $rc == 0;
-
-	# get the public key for debhome
-	# make the /etc/apt/keyrings directory if it does not exist
-	#mkdir "/etc/apt/keyrings" unless -d "/etc/apt/keyrings";
-	
-	# $rc = system("svn export --force file://$svn/root/my-linux/sources/gpg/debhomepubkey.asc  " . $chroot_dir . "/etc/apt/keyrings/");
-	#die "Could not export debhome.sources from svn\n" unless $rc == 0;
-
-}
-
 # this sub sets up grub and installs it.
 # this is only necessary for partition 1
 # the call: installgrub(ubuntu_iso_name, chroot_directory, partition_path, subversion path)
