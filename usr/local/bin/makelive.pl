@@ -239,10 +239,23 @@ sub createchroot {
 	my ($chroot_dir, $debhomedev, $svn) = @_;
 	my $rc;
 		
+	# unmount debhomedev if debhomedev is mounted
+	#@mntlist = ("title ...", "mntpt dev fsystem rw,realtime")
+	my @mntlist = `findmnt --source LABEL=$debhomedev`;
+	# split element $mntlist[1] on white space
+	# to find mnt point of debhome dev
+	my ($mntpt) = split /\s+/, $mntlist[1];
+	if ($mntpt) {
+		# un mount debhomedev
+		print "unmounting $debhomedev\n";
+		$rc = system("umount -v -f $mntpt");
+		die "$debhomedev is mounted Could not umount from $mntpt" unless $rc == 0;
+	}
+
 	# delete the old chroot environment if it exists
 	if (-d $chroot_dir) {
 		unbindall $chroot_dir;
-		# check if $chroot_dir/boot is mounted
+		# check if $chroot_dir/boot is mounted in chroot environment
 		# need to protect the live drive
 		# incase the binds are still active
 		$rc = system("findmnt $chroot_dir/boot");
@@ -252,13 +265,14 @@ sub createchroot {
 			die "Could not umount $chroot_dir/boot\n" unless $rc == 0;
 		}
 
-		# check if debhomedev is mounted
+		# check if debhomedev is mounted in chroot environment
 		$rc = system("findmnt $chroot_dir/mnt/$debhomedev");
 		if ($rc == 0) {
 			# un mount debhomedev
 			$rc = system("umount -v -f $chroot_dir/mnt/$debhomedev");
 			die "Could not umount $chroot_dir/mnt/$debhomedev" unless $rc == 0;
 		}
+
 
 		# move it to /tmp/junk
 		$rc = system("mv -f $chroot_dir  /tmp/junk");
