@@ -390,15 +390,15 @@ sub dochroot {
 	die "Could not mount $debhomedev in chroot environment: $!\n" unless $rc == 0;
 	
 	# parameters must be quoted for Bash
-	# liveinstall.sh "debhomedev" "debhomemountstatus" "upgrade/noupgrade" "package list"
+	# liveinstall.sh "-d debhomedev" -u "upgrade/noupgrade" -p "package list"
 	# make parameters list for liveinstall.sh
-	my $parameters = "";
-	$parameters = " -u" if $upgrade;
-	$parameters = "-p " . $packages  . $parameters if $packages;
+	my $parameters = "-d $debhomedev ";
+	$parameters = $parameters . "-u " if $upgrade;
+	$parameters = $parameters . "-p " . $packages if $packages;
 	
 	# execute liveinstall.sh in the chroot environment
 	print "parameters: $parameters\n";
-
+exit 0;
 	#################=============================#######################
 	# to be done.
 	# liveinstall is now a package and must be installed first
