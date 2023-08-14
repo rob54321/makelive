@@ -228,7 +228,41 @@ sub mountcdrom {
 	die "Could not mount $isoimage\n" unless $rc == 0;
 }
 
-####################################################################
+##################################################################
+# unmount debhome dev no matter where it is mounted
+# it may be mounted in chroot as well.
+# debhomdev can then be mounted in ro mode for safety
+# parameters passed: $debhomedev
+# return: nothing
+##################################################################
+sub umountdevice {
+	my $device = $_[0];
+	
+	# unmount debhomedev if debhomedev is mounted
+	#@mntlist = ("title ...", "mntpt dev fsystem rw,realtime")
+	my @mntlist = `findmnt --source LABEL=$device`;
+
+	# @mntlist is of form..
+	# element 0 : title ....
+	# element 1 : mntpt ....
+	# element 2 : mntpt ....
+	# etc
+	# if debhomedev is not mounted return list is undefined
+	my $mntpt;
+	if (@mntlist) {
+		# for each element from index 1, 2  .. unmount
+		for (my $i = 1; $i <= $#mntlist; $i++) {
+			($mntpt) = split /\s+/, $mntlist[$i];
+			if ($mntpt) {
+				# un mount each device
+				my $rc = system("umount -v -f $mntpt");
+				die "$device is mounted Could not umount from $mntpt" unless $rc == 0;
+			}
+		}
+	}
+
+}
+##################################################################
 # sub to set up new chroot environment.
 # the environment is copied from the cdrom
 # requires svn and mountcdrom to be mounted
@@ -239,19 +273,9 @@ sub createchroot {
 	my ($chroot_dir, $debhomedev, $svn) = @_;
 	my $rc;
 		
-	# unmount debhomedev if debhomedev is mounted
-	#@mntlist = ("title ...", "mntpt dev fsystem rw,realtime")
-	my @mntlist = `findmnt --source LABEL=$debhomedev`;
-	# split element $mntlist[1] on white space
-	# to find mnt point of debhome dev
-	my ($mntpt) = split /\s+/, $mntlist[1];
-	if ($mntpt) {
-		# un mount debhomedev
-		print "unmounting $debhomedev\n";
-		$rc = system("umount -v -f $mntpt");
-		die "$debhomedev is mounted Could not umount from $mntpt" unless $rc == 0;
-	}
-
+	# umount debhomedev from all mount points
+	umountdevice($debhomedev);
+	
 	# delete the old chroot environment if it exists
 	if (-d $chroot_dir) {
 		unbindall $chroot_dir;
@@ -272,7 +296,6 @@ sub createchroot {
 			$rc = system("umount -v -f $chroot_dir/mnt/$debhomedev");
 			die "Could not umount $chroot_dir/mnt/$debhomedev" unless $rc == 0;
 		}
-
 
 		# move it to /tmp/junk
 		$rc = system("mv -f $chroot_dir  /tmp/junk");
@@ -320,14 +343,28 @@ sub createchroot {
 	system("cp -dR /etc/apt/trusted.gpg.d " . $chroot_dir . "/etc/apt/");
 	system("cp -a /etc/apt/trusted.gpg " . $chroot_dir . "/etc/apt/") if -f "/etc/apt/trusted.gpg";
 
-	# testing for convenience
-	# system("cp -v /home/robert/my-linux/livescripts/* $chroot_dir/usr/local/bin/");
+	
+}
 
-	# liveinstall is now installed from a package
-	# export livescripts from subversion
-	# $rc = system("svn export --force --depth files file://$svn/root/my-linux/livescripts " . $chroot_dir . "/usr/local/bin/");
-	# die "Could not export liveinstall.sh from svn\n" unless $rc == 0;
+###############################################
+# sub to change root  and run liveinstall.sh
+# makes a dir dochroot to indicate dochroot was run
+# also deletes filesystem.squashfs in docchroot
+# since it will now change.
+# debhomedev was unmounted in createchroot
+# debhomedev must be mounted ro for safety
+# installfs will use filesystem.squashfs if it exists
+# requires debhomedev to be mounted
+# also requires svn if packages and or upgrade are done.
+# parameters: chroot_directory, debhome_device, upgrade, packages_list
+###############################################
+sub dochroot {
+	my ($chroot_dir, $debhomedev, $upgrade, $packages) = @_;
 
+	# mount debhomedev ro
+	my $rc = system("mount -r -L $debhomedev /mnt/$debhomedev");
+	die "Could not mount $debhomedev at /mnt/$debhomedev: $!\n";
+	
 	# copy xwindows themes and icons to /usr/share
 	# if themes.tar.xz and icons.tar.xz are found
 	if (-f "/mnt/$debhomedev/debhome/xconfig/themes.tar.xz") {
@@ -341,46 +378,6 @@ sub createchroot {
 		die "Could not extract themes from /mnt$debhomedev/debhome/xconfig/icons.tar.xz" unless $rc == 0;
 	}
 	
-	
-}
-
-###############################################
-# sub to change root  and run liveinstall.sh
-# makes a dir dochroot to indicate dochroot was run
-# also deletes filesystem.squashfs in docchroot
-# since it will now change.
-# installfs will use filesystem.squashfs if it exists
-# requires debhomedev to be mounted
-# also requires svn if packages and or upgrade are done.
-# parameters: chroot_directory, debhome_device, upgrade, packages_list
-###############################################
-sub dochroot {
-	my ($chroot_dir, $debhomedev, $upgrade, $packages) = @_;
-
-	# debhomemountstatus for debhome mount status, ro, rw or not mounted
-	my ($rc, $debhomemountstatus);
-	
-	# determine if debhomedev is mounted ro, rw or not mounted
-	$rc = system("grep -q $debhomedev /etc/mtab");
-	if ($rc == 0) {
-		# debhomedev is mounted.
-		# determine if it is ro or rw
-		if (system("grep $debhomedev.*ro /etc/mtab") == 0) {
-			# debhome dev mounted ro with -r option
-			$debhomemountstatus = "-r";
-			print "$debhomedev is mounted ro\n";
-		} elsif ( system("grep $debhomedev.*rw /etc/mtab") == 0) {
-			# debhome dev mount rw
-			$debhomemountstatus = "-w";
-			print "$debhomedev is mounted rw\n";
-		} else {
-			# debhome dev mount not rw or ro
-			die "Error: $debhomedev is mounted but not rw or ro\n";
-		}
-	} else {
-		# debhomedev is not mounted mount ro with -r option
-		$debhomemountstatus = "-r";
-	}
 	#############################################################################################
 	# enter the chroot environment
 	#############################################################################################
@@ -389,7 +386,7 @@ sub dochroot {
 	bindall $chroot_dir;
 	
 	# mount debhome in the chroot environment
-	$rc = system("chroot $chroot_dir mount $debhomemountstatus -L $debhomedev /mnt/$debhomedev");
+	$rc = system("chroot $chroot_dir mount -r -L $debhomedev /mnt/$debhomedev");
 	die "Could not mount $debhomedev in chroot environment: $!\n" unless $rc == 0;
 	
 	# parameters must be quoted for Bash
@@ -428,10 +425,6 @@ sub dochroot {
 	#*********************** TBD ************************
 	#####################################################
 	
-	# umount debhome device
-	$rc = system("chroot $chroot_dir umount /mnt/$debhomedev");
-	die "Could not umount $debhomedev in the chroot environment: $!\n" unless $rc == 0;
-	
 	# for exiting the chroot environment
 	unbindall $chroot_dir;
 
@@ -441,6 +434,9 @@ sub dochroot {
 	# to indicate chroot was done.
 	# filesystem.squashfs must be deleted in /dochroot
 	# because the filesystem will have changed.
+
+	# un mount debhome dev from all mount points
+	umountdevice $debhomedev;
 }
 
 #######################################################
