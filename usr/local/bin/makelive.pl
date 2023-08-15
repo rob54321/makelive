@@ -370,14 +370,14 @@ sub dochroot {
 	# copy xwindows themes and icons to /usr/share
 	# if themes.tar.xz and icons.tar.xz are found
 	my $rc;
-	if (-f "/mnt/$debhomedev/debhome/xconfig/themes.tar.xz") {
-		$rc = system("tar --xz -xf /mnt/$debhomedev/debhome/xconfig/themes.tar.xz -C $chroot_dir/usr/share");
-		die "Could not extract themes from /mnt$debhomedev/debhome/xconfig/themes.tar.xz" unless $rc == 0;
+	if (-f "$debhome/xconfig/themes.tar.xz") {
+		$rc = system("tar --xz -xf $debhome/xconfig/themes.tar.xz -C $chroot_dir/usr/share");
+		die "Could not extract themes from /mnt/$debhomedev/debhome/xconfig/themes.tar.xz" unless $rc == 0;
 	}
 
 	# if themes.tar.xz and icons.tar.xz are found
-	if (-f "/mnt/$debhomedev/debhome/xconfig/icons.tar.xz") {
-		$rc = system("tar --xz -xf /mnt/$debhomedev/debhome/xconfig/icons.tar.xz -C $chroot_dir/usr/share");
+	if (-f "$debhome/debhome/xconfig/icons.tar.xz") {
+		$rc = system("tar --xz -xf $debhome/xconfig/icons.tar.xz -C $chroot_dir/usr/share");
 		die "Could not extract themes from /mnt$debhomedev/debhome/xconfig/icons.tar.xz" unless $rc == 0;
 	}
 	
@@ -402,20 +402,9 @@ sub dochroot {
 	# execute liveinstall.sh in the chroot environment
 	print "parameters: $parameters\n";
 
-	#################=============================#######################
-	# to be done.
-	# liveinstall is now a package and must be installed first
-	# in chroot environment
-	# apt update
-	# apt install -y liveinstall
-	# liveinstall depends on
-	#	subversion
-	#	git
-	#	editfstab
-	#	initialise-linux
-	#####################################################################
-	# $rc = system("chroot $chroot_dir /usr/local/bin/liveinstall.sh $parameters");
-
+	# liveinstall is a package in the dehome distribution
+	# so debhome must be setup for liveinstall to be
+	# installed
 	# do an update and install liveinstall
 	$rc = system("chroot $chroot_dir apt update");
 	die "Could not apt update in chroot environment $!\n" unless $rc == 0;
