@@ -436,14 +436,23 @@ sub dochroot {
 #######################################################
 # this sub determines the version
 # which will be used for grub
-# parameters passed: getversion(full-path-to-iso)
+# the full iso name is in $chroot_dir/isoimage/isomage.txt
+# parameter passed: $chroot_dir
 ######################################################
 sub getversion {
+	my $chroot_dir = $_[0];
+	
 	################################
 	# determine the version for grub
+	# get the iso name from $chroot_dir/isoimage/isoimage.txt
 	################################
-	my $ubuntuiso = shift;
 
+	# read the file 
+	open ISO, "<", "$chroot_dir/isoimage/isoimage.txt" or die "could not open $chroot_dir/isoimage/isoimage.txt: $!\n";
+	my $ubuntuiso = <ISO>;
+	chomp($ubuntuiso);
+	close ISO;
+	
 	# get version
 	# names could be ubuntu-21.04-desktop-amd64.iso
 	# or             ubuntu-mate-21.04-desktop-amd64.iso
@@ -474,7 +483,7 @@ sub installgrub {
 	##########################################################################################################
 	# export the grub.cfg for mbr and uefi and edit grub only for partition 1
 	##########################################################################################################
-	my ($ubuntuiso, $chroot_dir, $partition_path, $svn) = @_;
+	my ($chroot_dir, $partition_path, $svn) = @_;
 	my $rc;
 
 	# export grub
@@ -486,7 +495,7 @@ sub installgrub {
 	# now edit grub.cfg with the new version no.
 	# edit mbr grub and set version
 	# get version
-	my $version = getversion($ubuntuiso);
+	my $version = getversion($chroot_dir);
     
 	chdir $chroot_dir . "/boot/grub";
 	system("sed -i -e 's/ubuntu-version/$version/' grub.cfg");
@@ -525,7 +534,7 @@ sub installgrub {
 ####################################################
 sub installfs {
 	# parameters
-	my ($label, $ubuntuiso, $casper, $chroot_dir, $part_no) = @_;
+	my ($label, $casper, $chroot_dir, $part_no) = @_;
 	
 	# check if chroot environment exists
 	die "$chroot_dir does not exist\n" unless -d $chroot_dir;
@@ -609,7 +618,7 @@ sub installfs {
 	system("cp -dR dists install pool preseed " . $chroot_dir . "/boot/");
 	
 	# setup and install grub if this is the first partition
-	installgrub($ubuntuiso, $chroot_dir, $partition_path, $svn) if $part_no == 1;
+	installgrub($chroot_dir, $partition_path, $svn) if $part_no == 1;
 	
 	# set grub colours
 	editgrub($chroot_dir);
@@ -730,8 +739,8 @@ sub initialise {
 	makefs($chroot_dir) if $makefs;
 
 	# install in MACRIUM/UBUNTU
-#	print "installfs $label $ubuntuiso $casper $svn $upgrade $chroot_dir $part_no\n" if $doinstall;
-	installfs($label, $ubuntuiso, $casper, $chroot_dir, $part_no) if $doinstall;
+#	print "installfs $label $casper $svn $upgrade $chroot_dir $part_no\n" if $doinstall;
+	installfs($label, $casper, $chroot_dir, $part_no) if $doinstall;
 
 	# un mount /mnt/cdrom if it is mounted
 	$rc = system("findmnt /mnt/cdrom");
@@ -746,13 +755,13 @@ sub usage {
 	print "-1 full name of ubuntu-mate iso for partition 1\n";
 	print "-2 full name of ubuntu iso for partition 2\n";
 	print "-u do a full-upgrade -- needs partition number\n";
-	print "-c create changeroot -- needs iso image\n";
+	print "-c create changeroot -- only create needs iso image\n";
 	print "-e use existing changeroot -- takes precedence over -c needs -- parition number\n";
 	print "-m make filesystem.squashfs, dochroot must be complete -- needs parition number\n";
 	print "-p list of packages to install in chroot in quotes -- needs parition number\n";
 	print "-l disk label for debhome, default is $debhomedev\n";
 	print "-s full path to subversion, default is $svnpath\n";
-	print "-i install the image to MACRIUM/UBUNTU -- needs iso image\n";
+	print "-i install the image to MACRIUM/UBUNTU -- needs partition number\n";
 	exit 0;
 }
 ##################
