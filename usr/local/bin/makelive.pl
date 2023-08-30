@@ -845,8 +845,8 @@ if ($opt_1){
 
 	# if cdrom and image is set to none
 	# then chroot and doinstall cannot be invoked
-	if (($chroot or $doinstall) and $opt_1 eq "none") {
-		die "create chroot and install need a cdrom image\n";
+	if ($chroot and $opt_1 eq "none") {
+		die "create chroot needs a cdrom image\n";
 	}
 }
 
@@ -857,8 +857,8 @@ if ($opt_2) {
 
 	# if cdrom and image is set to none
 	# then chroot and doinstall cannot be invoked
-	if (($chroot or $doinstall) and $opt_2 eq "none") {
-		die "create chroot and install need a cdrom image\n";
+	if ($chroot and $opt_2 eq "none") {
+		die "create chroot needs a cdrom image\n";
 	}
 }
 
