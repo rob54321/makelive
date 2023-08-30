@@ -460,6 +460,7 @@ sub getversion {
 			# still not a digit, prompt
 			print "Can't determine version, enter version\n";
 			$version = <STDIN>;
+			chomp($version);
 		}
 	}
 	return $version;
