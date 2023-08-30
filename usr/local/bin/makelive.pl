@@ -345,6 +345,13 @@ sub createchroot {
 	print ISO "$ubuntuiso";
 	close ISO;
 
+	# get the code name
+	my $codename = getcodename();
+	# write it to a file $chroot_dir/isoimage/codename.txt
+	open CDN, ">", "$chroot_dir/isoimage/codename.txt" or die "could not write code name to $chroot_dir/isoimage/codename.txt: $!\n";
+	print CDN "$codename";
+	close CDN;
+
 }
 
 ###############################################
@@ -363,8 +370,10 @@ sub dochroot {
 	my ($chroot_dir, $debhomedev, $upgrade, $packages) = @_;
 
 	# get codename
-	my $codename = getcodename();
-	die "Could not find codename\n" unless $codename;
+	open CDN, "<", "$chroot_dir/isoimage/codename.txt" or die "could not open $chroot_dir/isoimage/codename.txt: $!\n";
+	my $codename = <CDN>;
+	chomp($codename);
+	close CDN;
 	print "code name is: $codename\n";
 
 
