@@ -84,7 +84,7 @@ sub makefs {
 	unlink "$chroot_dir/dochroot/filesystem.squashfs";
 	
 	# make the file system the boot directory must be included, config-xxxx file is needed by initramfs during install
-	my $rc = system("mksquashfs " . $chroot_dir . " $chroot_dir/dochroot/filesystem.squashfs -e oldboot -e dochroot -e upgrade -e packages");
+	my $rc = system("mksquashfs " . $chroot_dir . " $chroot_dir/dochroot/filesystem.squashfs -e oldboot -e dochroot -e upgrade -e packages -e isoimage");
 	die "mksquashfs returned and error\n" unless $rc == 0;
 }
 
@@ -281,7 +281,7 @@ sub umountdevice {
 ####################################################################
 sub createchroot {
 	# creating new chroot environment
-	my ($chroot_dir, $debhomedev, $svnpath) = @_;
+	my ($chroot_dir, $debhomedev, $svnpath, $ubuntuiso) = @_;
 	my $rc;
 		
 	# delete the old chroot environment if it exists
@@ -339,7 +339,12 @@ sub createchroot {
 	system("cp -dR /etc/apt/trusted.gpg.d " . $chroot_dir . "/etc/apt/");
 	system("cp -a /etc/apt/trusted.gpg " . $chroot_dir . "/etc/apt/") if -f "/etc/apt/trusted.gpg";
 
-	
+	# save the name of the iso in $chroot_dir/isoimage/isoimage.txt
+	mkdir "$chroot_dir/isoimage";
+	open ISO, ">", "$chroot_dir/isoimage/isoimage.txt" or die "could not save iso image name: $!\n";
+	print ISO "$ubuntuiso";
+	close ISO;
+
 }
 
 ###############################################
@@ -696,7 +701,7 @@ sub initialise {
 #	print "createchroot $chroot_dir $debhomedev $svn\n" if $chroot eq "new";
 	# un mount debhomedev
 	umountdevice $debhomedev;
-	createchroot($chroot_dir, $debhomedev, $svnpath) if $chroot;
+	createchroot($chroot_dir, $debhomedev, $svnpath, $ubuntuiso) if $chroot;
 
 	# chroot and run liveinstall.sh
 	# print "dochroot $chroot_dir $debhomedev $upgrade $packages\n" if $chrootuse eq "use";
