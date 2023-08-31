@@ -84,7 +84,7 @@ sub makefs {
 	unlink "$chroot_dir/dochroot/filesystem.squashfs";
 	
 	# make the file system the boot directory must be included, config-xxxx file is needed by initramfs during install
-	my $rc = system("mksquashfs " . $chroot_dir . " $chroot_dir/dochroot/filesystem.squashfs -e oldboot -e dochroot -e upgrade -e packages -e isoimage");
+	my $rc = system("mksquashfs " . $chroot_dir . " $chroot_dir/dochroot/filesystem.squashfs -e oldboot -e dochroot -e upgrade -e packages -e isoimage -e cdrom");
 	die "mksquashfs returned and error\n" unless $rc == 0;
 }
 
@@ -310,6 +310,9 @@ sub createchroot {
 	#####################################################################################
 	# copy and edit files to chroot
 	#####################################################################################
+	# mount the cdrom
+	mountcdrom $ubuntuiso;
+	
 	# unsquash filesystem.squashfs to the chroot directory
 	# the chroot_dir directory must not exist
 	$rc = system("unsquashfs -d " . $chroot_dir . " /mnt/cdrom/casper/filesystem.squashfs");
@@ -352,6 +355,24 @@ sub createchroot {
 	print CDN "$codename";
 	close CDN;
 
+	# copy vmlinuz and initrd from cdrom to
+	# $chroot_dir/oldboot incase there is no
+	# upgrade for the kernel. If there was 
+	# an upgrade by liveinstall the new
+	# vmlinuz and initrd will be copied over
+	# the original ones.
+	mkdir "$chroot_dir/oldboot" unless -d "$chroot_dir/oldboot";
+	system("cp -vf /mnt/cdrom/casper/vmlinuz /mnt/cdrom/casper/initrd $chroot_dir/oldboot");
+	
+	# copy pool and install files for ubuntu mate
+	# to a temp directory $chroot_dir/cdrom
+	mkdir "$chroot_dir/cdrom" unless "$chroot_dir/cdrom";
+	chdir "/mnt/cdrom";
+	system("cp -dR dists install pool preseed " . $chroot_dir . "/cdrom/");
+
+	# un mount /mnt/cdrom
+	$rc = system("findmnt /mnt/cdrom");
+	system("umount -d -v -f /mnt/cdrom") if $rc == 0;
 }
 
 ###############################################
@@ -602,28 +623,24 @@ sub installfs {
 	# create directory
 	mkdir $casper;
 	
-	# check if the kernel in chroot was upgraded by liveinstall.sh by checking existence of /chroot1/oldboot
-	# if not upgraded use vmlinuz, initrd from cdrom
-	# else use vmlinuz, initrd from /chroot1/oldboot.
-	if (! -d "$chroot_dir/oldboot") {
-		# no upgrade, copy vmlinuz and initrd from cdrom image
-		system("cp -vf /mnt/cdrom/casper/vmlinuz /mnt/cdrom/casper/initrd " . $casper);
-	} else {
-		# an upgrade was done. vmlinuz and intird must be copied
-		# from the the chroot1/oldboot directory to casper
-		$rc = system("cp -v $chroot_dir/oldboot/initrd $casper");
-		die "Could not copy initrd\n" unless $rc == 0;
-		$rc = system("cp -v $chroot_dir/oldboot/vmlinuz $casper");
-		die "Could not copy vmlinuz\n" unless $rc == 0;
-		# do not delete oldboot, incase chroot1 is used again
-	}
+	# createchroot now makes $chroot_dir/oldboot and
+	# copies vmlinuz and initrd from the cdrom to oldboot.
+	# if an upgrade of the kernel was done liveinstall
+	# will have copied the newer vmlinuz and initrd to oldboot
+	# should have done this originally.
+	# vmlinuz and initrd must be copied to casper
+	$rc = system("cp -fv $chroot_dir/oldboot/initrd $casper");
+	die "Could not copy initrd\n" unless $rc == 0;
+	$rc = system("cp -fv $chroot_dir/oldboot/vmlinuz $casper");
+	die "Could not copy vmlinuz\n" unless $rc == 0;
+	# do not delete oldboot, incase chroot1 is used again
 
 	# delete ubuntu install files in chroot/boot
 	chdir $chroot_dir . "/boot";
 	system("rm -rf dists install pool preseed grub");
 	
 	# copy pool and install files for ubuntu mate
-	chdir "/mnt/cdrom";
+	chdir "$chroot_dir/cdrom";
 	system("cp -dR dists install pool preseed " . $chroot_dir . "/boot/");
 	
 	# setup and install grub if this is the first partition
@@ -706,16 +723,6 @@ sub initialise {
 		die "$debhomedev is not attached\n" unless $rc == 0;
 	}
 	
-	# mount the cdrom for create chroot or install
-	if ($chroot or $doinstall or $chrootuse) {
-		# check ubuntuiso
-		if ($ubuntuiso ne "none") {
-			mountcdrom $ubuntuiso;
-		} else {
-			print "cdrom image $ubuntuiso: cannot be mounted\n";
-		}
-	}
-	
 	# if creating new chroot and
 #	print "createchroot $chroot_dir $debhomedev $svn\n" if $chroot eq "new";
 	# un mount debhomedev
@@ -750,10 +757,6 @@ sub initialise {
 	# install in MACRIUM/UBUNTU
 #	print "installfs $label $casper $svn $upgrade $chroot_dir $part_no\n" if $doinstall;
 	installfs($label, $casper, $chroot_dir, $part_no) if $doinstall;
-
-	# un mount /mnt/cdrom if it is mounted
-	$rc = system("findmnt /mnt/cdrom");
-	system("umount -d -v -f /mnt/cdrom") if $rc == 0;
 
 	# un mount debhomedev
 	umountdevice $debhomedev;
