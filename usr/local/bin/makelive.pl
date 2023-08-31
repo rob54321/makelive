@@ -381,6 +381,7 @@ sub createchroot {
 	die "could not copy dists install pool preseed to $chroot_dir/isoimage: $!\n" unless $rc == 0;
 
 	# umount cdrom
+	chdir "/root";
 	umountcdrom;
 }
 
@@ -893,7 +894,3 @@ if ($opt_1) {
 if ($opt_2) {
 	initialise($chroot, $chrootuse, $doinstall, $makefs, $opt_2, $upgrade, $debhomedev, $svnpath, $packages, 2);
 }
-
-# umount cdrom
-# it needs a settling time
-umountcdrom;
