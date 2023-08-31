@@ -207,6 +207,16 @@ sub setaptsources {
 	} unless (-f $chroot_dir . "/etc/apt/keyrings/debhomepubkey.asc");	
 
 }
+############################################################
+# umount the cdrom.
+# sometimes it is still busy.
+# needs some time ater use to umount
+############################################################
+sub umountcdrom {
+	# un mount /mnt/cdrom
+	my $rc = system("findmnt /mnt/cdrom");
+	system("umount -d -v -f /mnt/cdrom") if $rc == 0;
+}
 
 ############################################################
 # sub to mount cdrom
@@ -370,9 +380,8 @@ sub createchroot {
 	$rc = system("cp -dR dists install pool preseed " . $chroot_dir . "/isoimage/");
 	die "could not copy dists install pool preseed to $chroot_dir/isoimage: $!\n" unless $rc == 0;
 
-	# un mount /mnt/cdrom
-	$rc = system("findmnt /mnt/cdrom");
-	system("umount -d -v -f /mnt/cdrom") if $rc == 0;
+	# umount cdrom
+	umountcdrom;
 }
 
 ###############################################
@@ -884,3 +893,7 @@ if ($opt_1) {
 if ($opt_2) {
 	initialise($chroot, $chrootuse, $doinstall, $makefs, $opt_2, $upgrade, $debhomedev, $svnpath, $packages, 2);
 }
+
+# umount cdrom
+# it needs a settling time
+umountcdrom;
