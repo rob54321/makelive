@@ -84,7 +84,7 @@ sub makefs {
 	unlink "$chroot_dir/dochroot/filesystem.squashfs";
 	
 	# make the file system the boot directory must be included, config-xxxx file is needed by initramfs during install
-	my $rc = system("mksquashfs " . $chroot_dir . " $chroot_dir/dochroot/filesystem.squashfs -e oldboot -e dochroot -e upgrade -e packages -e isoimage -e cdrom");
+	my $rc = system("mksquashfs " . $chroot_dir . " $chroot_dir/dochroot/filesystem.squashfs -e oldboot -e dochroot -e upgrade -e packages -e isoimage");
 	die "mksquashfs returned and error\n" unless $rc == 0;
 }
 
@@ -361,14 +361,14 @@ sub createchroot {
 	# an upgrade by liveinstall the new
 	# vmlinuz and initrd will be copied over
 	# the original ones.
-	mkdir "$chroot_dir/oldboot" unless -d "$chroot_dir/oldboot";
+	mkdir "$chroot_dir/oldboot" or die "could not make $chroot_dir/oldboot: $!\n";
 	system("cp -vf /mnt/cdrom/casper/vmlinuz /mnt/cdrom/casper/initrd $chroot_dir/oldboot");
 	
 	# copy pool and install files for ubuntu mate
-	# to a temp directory $chroot_dir/cdrom
-	mkdir "$chroot_dir/cdrom" unless "$chroot_dir/cdrom";
+	# to a temp directory $chroot_dir/isoimage
 	chdir "/mnt/cdrom";
-	system("cp -dR dists install pool preseed " . $chroot_dir . "/cdrom/");
+	$rc = system("cp -dR dists install pool preseed " . $chroot_dir . "/isoimage/");
+	die "could not copy dists install pool preseed to $chroot_dir/isoimage: $!\n" unless $rc == 0;
 
 	# un mount /mnt/cdrom
 	$rc = system("findmnt /mnt/cdrom");
@@ -640,7 +640,7 @@ sub installfs {
 	system("rm -rf dists install pool preseed grub");
 	
 	# copy pool and install files for ubuntu mate
-	chdir "$chroot_dir/cdrom";
+	chdir "$chroot_dir/isoimage";
 	system("cp -dR dists install pool preseed " . $chroot_dir . "/boot/");
 	
 	# setup and install grub if this is the first partition
