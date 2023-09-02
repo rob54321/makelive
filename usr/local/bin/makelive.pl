@@ -24,6 +24,63 @@ my $debhome = "/mnt/debhome";
 #
 #######################################################
 
+
+
+######################################################
+# sub to delete all partitions and make an 8G
+# fat32 partition MACRIUM part uuid AED6-434E
+# for a live system and the rest of the disk
+# is used for an ntfs system with label ele
+# all data on the disk is deleted.
+# the partitions are also formatted.
+# no parameters passed
+# sub aborts on any error
+######################################################
+sub diskpartition {
+	# show devices attached
+	print "######################################################\n";
+	my $rc = system("lsblk -o PATH,TYPE,MODEL,LABEL,MOUNTPOINT");
+	die "aborting: error from lsblk\n" unless $rc == 0;
+	print "######################################################\n";
+
+	# get the device
+	print "\n\nenter device to be formatted: form /dev/sdX\n";
+
+	my $device = <STDIN>;
+	chomp($device);
+
+	# show the device to check
+	print "\n######################################################\n";
+	$rc = system("parted -s $device print");
+	die "aborting: error from parted\n" unless $rc == 0;
+	print "######################################################\n";
+
+	print "\n\nAll data on $device will be deleted: is this correct (yes|no)?\n";
+	my $answer = <STDIN>;
+	chomp($answer);
+
+	if ($answer =~ /^yes$/i) {
+		print "partitioning $device\n";
+		# delete all partitions and make new ones
+		$rc = system ("parted -s --align optimal $device mktable msdos mkpart primary fat32 0GB 8GB mkpart primary ntfs 8GB 100% set 1 boot on");
+		die "aborting: error partitioning $device\n" unless $rc == 0;
+
+		# format the first partition
+		print "formatting partition " . $device . "1\n";
+		$rc = system( "mkfs.vfat -v -n MACRIUM -i AED6434E " . $device . "1");
+		die "aborting: error formatting " . $device . "1\n" unless $rc == 0;
+
+		# format second partition
+		print "formatting partition " . $device . "2\n";
+		$rc = system("mkfs.ntfs -v -Q -L ele " . $device . "2");
+		die "aborting: error formatting " . $device . "2\n" unless $rc == 0;
+	} else {
+		print "$device was not partitioned\n";
+	}
+}
+
+
+
 # this sub operates on the list @ARGV
 # all the switches in the ARGV list are checked to see if they have arguments
 # if they do not have arguments, the default arguments are inserted into ARGV
@@ -686,7 +743,7 @@ sub installfs {
 # createchroot, ubuntuiso-name, upgrade, debhome dev label, svn full path, packages list, part_no)
 ####################################################
 sub initialise {
-	my ($chroot, $chrootuse, $doinstall, $makefs, $ubuntuiso, $upgrade, $debhomedev, $svnpath, $packages, $part_no)  = @_;
+	my ($chroot, $chrootuse, $doinstall, $makefs, $ubuntuiso, $upgrade, $debhomedev, $svnpath, $packages, $diskpartition, $part_no)  = @_;
 
 	# set up chroot dirs for partition 1 and 2
 	my $chroot_dir1 = "/chroot1";
@@ -764,8 +821,11 @@ sub initialise {
 	# make filesystem.squashfs if not installing
 	makefs($chroot_dir) if $makefs;
 
+	# if the -d option is given then the disk must
+	# be partitioned and formated before install is done.
+	diskpartition() if $diskpartition;
+	
 	# install in MACRIUM/UBUNTU
-#	print "installfs $label $casper $svn $upgrade $chroot_dir $part_no\n" if $doinstall;
 	installfs($label, $casper, $chroot_dir, $part_no) if $doinstall;
 
 	# un mount debhomedev
@@ -783,6 +843,7 @@ sub usage {
 	print "-p list of packages to install in chroot in quotes -- needs parition number\n";
 	print "-l disk label for debhome, default is $debhomedev\n";
 	print "-s full path to subversion, default is $svnpath\n";
+	print "-d partition the disk into an 8G fat32 MACRIUM plus the reset ntfs ele\n";
 	print "-i install the image to MACRIUM/UBUNTU -- needs partition number\n";
 	exit 0;
 }
@@ -810,7 +871,7 @@ my $svnpath = "/mnt/ad64/svn";
 
 # get command line argument
 # this is the name of the ubuntu iso ima
-our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_1, $opt_2, $opt_p, $opt_l, $opt_s, $opt_h);
+our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_1, $opt_2, $opt_p, $opt_l, $opt_s, $opt_h, $opt_d);
 
 # if -u or -p is given but not -c then chroot = use should be used.
 # get command line options
@@ -819,7 +880,7 @@ our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_1, $opt_2, $opt_p, $opt_l, $opt
 # makefs, dochroot do not need a cdrom image
 defaultparameter();
 
-getopts('mice1:2:p:hul:s:');
+getopts('mice1:2:p:hul:s:d');
 
 # setup debhome if it has changed from the default
 $debhomedev = $opt_l if $opt_l;
@@ -887,10 +948,10 @@ if ($opt_2) {
 
 # invoke set partition for each iso given
 if ($opt_1) {
-	initialise($chroot, $chrootuse, $doinstall, $makefs, $opt_1, $upgrade, $debhomedev, $svnpath, $packages, 1);
+	initialise($chroot, $chrootuse, $doinstall, $makefs, $opt_1, $upgrade, $debhomedev, $svnpath, $packages, $opt_d, 1);
 }
 
 # invoke set partition for each iso given
 if ($opt_2) {
-	initialise($chroot, $chrootuse, $doinstall, $makefs, $opt_2, $upgrade, $debhomedev, $svnpath, $packages, 2);
+	initialise($chroot, $chrootuse, $doinstall, $makefs, $opt_2, $upgrade, $debhomedev, $svnpath, $packages, $opt_d, 2);
 }
