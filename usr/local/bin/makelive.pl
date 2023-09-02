@@ -36,7 +36,7 @@ my $debhome = "/mnt/debhome";
 # no parameters passed
 # sub aborts on any error
 ######################################################
-sub diskpartition {
+sub partitiondisk {
 	# show devices attached
 	print "######################################################\n";
 	my $rc = system("lsblk -o PATH,TYPE,MODEL,LABEL,MOUNTPOINT");
@@ -743,7 +743,7 @@ sub installfs {
 # createchroot, ubuntuiso-name, upgrade, debhome dev label, svn full path, packages list, part_no)
 ####################################################
 sub initialise {
-	my ($chroot, $chrootuse, $doinstall, $makefs, $ubuntuiso, $upgrade, $debhomedev, $svnpath, $packages, $diskpartition, $part_no)  = @_;
+	my ($chroot, $chrootuse, $doinstall, $makefs, $ubuntuiso, $upgrade, $debhomedev, $svnpath, $packages, $partitiondisk, $part_no)  = @_;
 
 	# set up chroot dirs for partition 1 and 2
 	my $chroot_dir1 = "/chroot1";
@@ -823,7 +823,7 @@ sub initialise {
 
 	# if the -d option is given then the disk must
 	# be partitioned and formated before install is done.
-	diskpartition() if $diskpartition;
+	partitiondisk() if $partitiondisk;
 	
 	# install in MACRIUM/UBUNTU
 	installfs($label, $casper, $chroot_dir, $part_no) if $doinstall;
@@ -945,6 +945,12 @@ if ($opt_2) {
 	}
 }
 
+
+# if no partition number is given and only -d then
+# partition disk only
+if (! $opt_1 and ! $opt_2 and $opt_d) {
+	partitiondisk();
+}
 
 # invoke set partition for each iso given
 if ($opt_1) {
