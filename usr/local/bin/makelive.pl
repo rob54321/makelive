@@ -131,8 +131,6 @@ sub defaultparameter {
 # filesystem.squashfs is written to chroot1/dochroot
 # parameters: chroot directory
 sub makefs {
-print "makefs\n";
-return;
 	my $chroot_dir = $_[0];
 	
 	# check that dochroot has been executed previously
@@ -457,8 +455,6 @@ sub createchroot {
 # parameters: chroot_directory, debhome_device, upgrade, packages_list
 ###############################################
 sub dochroot {
-print "dochroot\n";
-return;
 	my ($chroot_dir, $debhomedev, $upgrade, $packages) = @_;
 
 	# get codename
@@ -634,8 +630,6 @@ sub installgrub {
 # requires MACRIUM/UBUNTU , cdrom and svn to be mounted
 ####################################################
 sub installfs {
-print "installfs\n";
-return;
 	# parameters
 	my ($label, $casper, $chroot_dir, $part_no) = @_;
 	
