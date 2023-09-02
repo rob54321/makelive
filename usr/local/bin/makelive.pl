@@ -902,16 +902,17 @@ my $rc;
 
 # if install option was given
 # setup doinstall
-# if install and makefs are given
-# then makefs has no effect
+# makefs will overwrite filesystem.squasfs 
+# if it exists
 my $makefs;
 $makefs = $opt_m if $opt_m;
 
+# if install is given, filesystem.squashfs
+# will be used if it exists.
+# if it does not exist it will be made.
 my $doinstall;
 if ($opt_i) {
 	$doinstall = $opt_i;
-	# makefs has no effect
-	undef $makefs;
 }
 
 # set changeroot usechageroot
