@@ -753,7 +753,7 @@ sub installfs {
 # createchroot, ubuntuiso-name, upgrade, debhome dev label, svn full path, packages list, part_no)
 ####################################################
 sub initialise {
-	my ($chroot, $chrootuse, $doinstall, $makefs, $ubuntuiso, $upgrade, $debhomedev, $svnpath, $packages, $partitiondisk, $part_no)  = @_;
+	my ($chroot, $chrootuse, $doinstall, $makefs, $ubuntuiso, $upgrade, $debhomedev, $svnpath, $packages, $part_no)  = @_;
 
 	# set up chroot dirs for partition 1 and 2
 	my $chroot_dir1 = "/chroot1";
@@ -831,10 +831,6 @@ sub initialise {
 	# make filesystem.squashfs if not installing
 	makefs($chroot_dir) if $makefs;
 
-	# if the -d option is given then the disk must
-	# be partitioned and formated before install is done.
-	partitiondisk() if $partitiondisk;
-	
 	# install in MACRIUM/UBUNTU
 	installfs($label, $casper, $chroot_dir, $part_no) if $doinstall;
 
@@ -956,19 +952,18 @@ if ($opt_2) {
 	}
 }
 
-
-# if no partition number is given and only -d then
-# partition disk only
-if (! $opt_1 and ! $opt_2 and $opt_d) {
-	partitiondisk();
-}
+# if the -d option is given
+# partition the disk imediately
+# so the questions can be answered
+# at the begining
+partitiondisk() if $opt_d;
 
 # invoke set partition for each iso given
 if ($opt_1) {
-	initialise($chroot, $chrootuse, $doinstall, $makefs, $opt_1, $upgrade, $debhomedev, $svnpath, $packages, $opt_d, 1);
+	initialise($chroot, $chrootuse, $doinstall, $makefs, $opt_1, $upgrade, $debhomedev, $svnpath, $packages, 1);
 }
 
 # invoke set partition for each iso given
 if ($opt_2) {
-	initialise($chroot, $chrootuse, $doinstall, $makefs, $opt_2, $upgrade, $debhomedev, $svnpath, $packages, $opt_d, 2);
+	initialise($chroot, $chrootuse, $doinstall, $makefs, $opt_2, $upgrade, $debhomedev, $svnpath, $packages, 2);
 }
