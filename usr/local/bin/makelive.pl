@@ -523,6 +523,10 @@ sub dochroot {
 	#*********************** TBD ************************
 	#####################################################
 	
+	# umount debhome in the chroot environment
+	$rc = system("chroot $chroot_dir umount /mnt/$debhomedev");
+	die "Could not umount $debhomedev in chroot environment: $!\n" unless $rc == 0;
+	
 	# for exiting the chroot environment
 	unbindall $chroot_dir;
 
