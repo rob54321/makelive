@@ -33,10 +33,13 @@ my $debhome = "/mnt/debhome";
 # is used for an ntfs system with label ele
 # all data on the disk is deleted.
 # the partitions are also formatted.
-# no parameters passed
+# parameters passed: partition size in GB
 # sub aborts on any error
 ######################################################
 sub partitiondisk {
+	# get size of first partition
+	my $partsize = $_[0];
+
 	# show devices attached
 	print "######################################################\n";
 	my $rc = system("lsblk -o PATH,TYPE,MODEL,LABEL,MOUNTPOINT");
@@ -62,10 +65,14 @@ sub partitiondisk {
 	if ($answer =~ /^yes$/i) {
 		print "partitioning $device\n";
 		# delete all partitions and make new ones
-		$rc = system ("parted -s --align optimal $device mktable msdos mkpart primary fat32 0GB 8GB mkpart primary ntfs 8GB 100% set 1 boot on");
+		$rc = system("parted -s --align optimal $device mktable msdos mkpart primary fat32 0GB " . $partsize . "GB mkpart primary ntfs " . $partsize . "GB 100% set 1 boot on");
 		die "aborting: error partitioning $device\n" unless $rc == 0;
 
 		# format the first partition
+		# the sleep is needed to let the disk settle
+		# after partitioning. With no sleep formatting fails
+		# if partition size is bigger than 12GB
+		sleep 2;
 		print "formatting partition " . $device . "1\n";
 		$rc = system( "mkfs.vfat -v -n MACRIUM -i AED6434E " . $device . "1");
 		die "aborting: error formatting " . $device . "1\n" unless $rc == 0;
@@ -95,7 +102,8 @@ sub defaultparameter {
 	# -u is for unmounting any drive
 	# the default argument, if not given on the command line is all drives
 	my %defparam = ( -1 => "none",
-			 -2 => "none");
+			 -2 => "none",
+			 -d => 8);
 
 	# for each switch in the defparam hash find it's index and insert default arguments if necessary
 	foreach my $switch (keys(%defparam)) {
@@ -849,7 +857,7 @@ sub usage {
 	print "-p list of packages to install in chroot in quotes -- needs parition number\n";
 	print "-l disk label for debhome, default is $debhomedev\n";
 	print "-s full path to subversion, default is $svnpath\n";
-	print "-d partition the disk into an 8G fat32 MACRIUM plus the reset ntfs ele\n";
+	print "-d size of partition in GB the disk into an 8G(default) fat32 MACRIUM plus the reset ntfs ele\n";
 	print "-i install the image to MACRIUM/UBUNTU -- needs partition number\n";
 	exit 0;
 }
@@ -886,7 +894,7 @@ our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_1, $opt_2, $opt_p, $opt_l, $opt
 # makefs, dochroot do not need a cdrom image
 defaultparameter();
 
-getopts('mice1:2:p:hul:s:d');
+getopts('mice1:2:p:hul:s:d:');
 
 # setup debhome if it has changed from the default
 $debhomedev = $opt_l if $opt_l;
@@ -956,7 +964,9 @@ if ($opt_2) {
 # partition the disk imediately
 # so the questions can be answered
 # at the begining
-partitiondisk() if $opt_d;
+# $opt_d is the size of GB of the partition
+
+partitiondisk($opt_d) if $opt_d;
 
 # invoke set partition for each iso given
 if ($opt_1) {
