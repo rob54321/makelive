@@ -126,10 +126,14 @@ sub defaultparameter {
 		}
 	}
 } 
+####################################################
 # sub to make filesystem.squashfs.
 # dochroot must have been done
 # filesystem.squashfs is written to chroot1/dochroot
+# not All directories under /mnt must be empty
+# no devices should be mounted
 # parameters: chroot directory
+####################################################
 sub makefs {
 	my $chroot_dir = $_[0];
 	
@@ -571,8 +575,10 @@ sub getversion {
 	}
 	return $version;
 }
+#################################################
 # this sub sets up grub and installs it.
 # this is only necessary for partition 1
+# svn is needed
 # the call: installgrub(ubuntu_iso_name, chroot_directory, partition_path, subversion path)
 #################################################
 sub installgrub {
