@@ -9,26 +9,28 @@ my $svn = "/mnt/svn";
 my $debhome = "/mnt/debhome";
 
 #######################################################
-# this script makes a live system on MACRIUM and UBUNTU paritions
-# although UBUNTU is not often used
-# Macrium Reflect 7 must have been installed into partition 1.
+# this script makes a live system on a partition
+# called MACRIUM. This script will also partition
+# and format a disk for the live system.
+# partition 1: 8G default MACRIUM fat32
+# partition 2: rest of disk for ntfs label ele
 #
-#
+# MACRIUM reflect can be installed on  partition 1
+# before the live system is installed.
 # command line parameters:
-# makelive.pl -1 ubuntu-mate iso name | -2 ubuntu iso name and -u for upgrade and -p package list
+# makelive.pl -c ubuntu-mate iso nameand -u for upgrade and -p package list -d for partitioning disk -e for do chroot
 #
 # the disk
 # partition 1 8G    [MACRIUM] fat32   contains macrium and ubuntu-mate, boots from grub uuid = AED6-434E
-# partition 2 2G    [RECOVERALL]  fat32   contains windows recovery for lenovo and desktop
-# partition 3 rest  [ele]     ntfs    contains backup files and sources for windows recovery, Lenovo and desktop
+# partition 2 rest  [ele]     ntfs    contains backup files and sources for windows recovery, Lenovo and desktop
 #
 #######################################################
 
 
 
 ######################################################
-# sub to delete all partitions and make an 8G
-# fat32 partition MACRIUM part uuid AED6-434E
+# sub to delete all partitions and make an 8G (default)
+# or a selected size, fat32 partition MACRIUM part uuid AED6-434E
 # for a live system and the rest of the disk
 # is used for an ntfs system with label ele
 # all data on the disk is deleted.
@@ -645,11 +647,11 @@ sub installgrub {
 # uses filesystem.squashfs if it exists in dochroot
 # else it builds if from scratch.
 # this speeds up the process of install if filesystem.squashfs has not changed
-# requires MACRIUM/UBUNTU , cdrom and svn to be mounted
+# requires MACRIUM , cdrom and svn to be mounted
 ####################################################
 sub installfs {
 	# parameters
-	my ($label, $casper, $chroot_dir, $part_no) = @_;
+	my ($label, $casper, $chroot_dir) = @_;
 	
 	# check if chroot environment exists
 	die "$chroot_dir does not exist\n" unless -d $chroot_dir;
@@ -657,7 +659,7 @@ sub installfs {
 	# check that dochroot has been executed previously
 	die "dochroot has not been executed\n" unless -d "$chroot_dir/dochroot";
 	
-	# check MACRIUM/UBUNTU is attached
+	# check MACRIUM is attached
 	my $rc = system("blkid -L " . $label . " > /dev/null");
 	die "$label is not attached\n" unless $rc == 0;
 	
@@ -666,7 +668,7 @@ sub installfs {
 	chomp $partition_path;
 	print $label . " is: $partition_path\n";
 	
-	# check if the partition, MACRIUM or UBUNTU is mounted at any location
+	# check if the partition, MACRIUM  is mounted at any location
 	# un mount it if it is mounted
 	my $devandmtpt = `grep "$partition_path" /etc/mtab | cut -d " " -f 1-2`;
 	chomp($devandmtpt);
@@ -729,7 +731,7 @@ sub installfs {
 	system("cp -dR dists install pool preseed " . $chroot_dir . "/boot/");
 	
 	# setup and install grub if this is the first partition
-	installgrub($chroot_dir, $partition_path, $svn) if $part_no == 1;
+	installgrub($chroot_dir, $partition_path, $svn);
 	
 	# set grub colours
 	editgrub($chroot_dir);
@@ -754,32 +756,21 @@ sub installfs {
 }
 
 ####################################################
-# sub to initialise the setup of partition 1|2. This is the ubuntu-mate
-# or ubuntu partition.
+# sub to initialise the setup of the MACRIUM partition.
 # if -c given create new chroot from scratch or use existing one
 # parameters passed:
-# createchroot, ubuntuiso-name, upgrade, debhome dev label, svn full path, packages list, part_no)
+# createchroot, ubuntuiso-name, upgrade, debhome dev label, svn full path, packages list)
 ####################################################
 sub initialise {
-	my ($chroot, $chrootuse, $doinstall, $makefs, $ubuntuiso, $upgrade, $debhomedev, $svnpath, $packages, $part_no)  = @_;
+	my ($chroot, $chrootuse, $doinstall, $makefs, $ubuntuiso, $upgrade, $debhomedev, $svnpath, $packages)  = @_;
 
-	# set up chroot dirs for partition 1 and 2
-	my $chroot_dir1 = "/chroot1";
-	my $chroot_dir2 = "/chroot2";
+	# set up chroot dir
+	my $chroot_dir = "/chroot";
 	
-	# hash part parameters: containing parameters that are partition dependent
-	my %pparam = ("1" 		=> {"chroot"	=> "$chroot_dir1",
-					    "casper"	=> "$chroot_dir1/boot/casper",
-					    "label"	=> "MACRIUM"},
-	              "2" 		=> {"chroot"  	=> "$chroot_dir2",
-					      "casper"  => "$chroot_dir2/boot/casper1",
-				          "label"    	=> "UBUNTU"});
-
 	# some short cuts depending on the parition number
-	my $chroot_dir = $pparam{$part_no}->{"chroot"};
-	my $casper = $pparam{$part_no}->{"casper"};
-	my $label = $pparam{$part_no}->{"label"};
-	
+	my $casper = $chroot_dir . "/boot/casper";
+	my $label = "MACRIUM";
+		
 	# if p or u given then set chrootuse
 	# if chroot does not exist then set chroot
 	print "packages: $packages\n" if $packages;
@@ -840,7 +831,7 @@ sub initialise {
 	makefs($chroot_dir) if $makefs;
 
 	# install in MACRIUM/UBUNTU
-	installfs($label, $casper, $chroot_dir, $part_no) if $doinstall;
+	installfs($label, $casper, $chroot_dir) if $doinstall;
 
 	# un mount debhomedev
 	umountdevice $debhomedev;
@@ -848,17 +839,15 @@ sub initialise {
 
 sub usage {
 	my ($debhomedev, $svnpath) = @_;
-	print "-1 full name of ubuntu-mate iso for partition 1\n";
-	print "-2 full name of ubuntu iso for partition 2\n";
-	print "-u do a full-upgrade -- needs partition number\n";
-	print "-c create changeroot -- only create needs iso image\n";
-	print "-e use existing changeroot -- takes precedence over -c needs -- parition number\n";
-	print "-m make filesystem.squashfs, dochroot must be complete -- needs parition number\n";
-	print "-p list of packages to install in chroot in quotes -- needs parition number\n";
+	print "-c iso name, create changeroot -- only create needs iso image\n";
+	print "-u do a full-upgrade\n";
+	print "-e use existing changeroot takes predence over -c needs\n";
+	print "-m make filesystem.squashfs, dochroot must be complete\n";
+	print "-p list of packages to install in chroot in quotes\n";
 	print "-l disk label for debhome, default is $debhomedev\n";
 	print "-s full path to subversion, default is $svnpath\n";
 	print "-d size of partition in GB the disk into an 8G(default) fat32 MACRIUM plus the reset ntfs ele\n";
-	print "-i install the image to MACRIUM/UBUNTU -- needs partition number\n";
+	print "-i install the image to MACRIUM\n";
 	exit 0;
 }
 ##################
@@ -866,7 +855,7 @@ sub usage {
 ##################
 
 # command line parameters
-# -1 ubuntu-mate iso name
+# -c ubuntu-mate iso name
 # -2 ubuntu iso name
 # -c use existing /chroot1 or /chroot2, do not create a new one for partition 1|2
 # -p "package list of extra packages
@@ -885,16 +874,15 @@ my $svnpath = "/mnt/ad64/svn";
 
 # get command line argument
 # this is the name of the ubuntu iso ima
-our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_1, $opt_2, $opt_p, $opt_l, $opt_s, $opt_h, $opt_d);
+our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_l, $opt_s, $opt_h, $opt_d);
 
 # if -u or -p is given but not -c then chroot = use should be used.
 # get command line options
 
-# if -1 or -2 is given without parameters, then no cdrom should be use
-# makefs, dochroot do not need a cdrom image
+# default parameters for -d default is 8GB
 defaultparameter();
 
-getopts('mice1:2:p:hul:s:d:');
+getopts('mic:ep:hul:s:d:');
 
 # setup debhome if it has changed from the default
 $debhomedev = $opt_l if $opt_l;
@@ -918,10 +906,7 @@ $makefs = $opt_m if $opt_m;
 # if install is given, filesystem.squashfs
 # will be used if it exists.
 # if it does not exist it will be made.
-my $doinstall;
-if ($opt_i) {
-	$doinstall = $opt_i;
-}
+my $doinstall = $opt_i if $opt_i;
 
 # set changeroot usechageroot
 my ($chroot, $chrootuse);
@@ -930,34 +915,15 @@ $chrootuse = "use" if $opt_e;
 
 
 # check for packages and upgrade
-my $packages;
-$packages = "\"" . $opt_p . "\"" if $opt_p;
+my $packages = "\"" . $opt_p . "\"" if $opt_p;
 
-my $upgrade;
-$upgrade = "upgrade" if $opt_u;
+my $upgrade = "upgrade" if $opt_u;
 
-# check if iso 1 exists
-if ($opt_1){
-	# if opt_1 is a cdrom image, check it exists
-	die "$opt_1 does not exist\n" unless -f $opt_1 or $opt_1 eq "none";
-
-	# if cdrom and image is set to none
-	# then chroot and doinstall cannot be invoked
-	if ($chroot and $opt_1 eq "none") {
-		die "create chroot needs a cdrom image\n";
-	}
-}
-
-# check if iso 2 exists
-if ($opt_2) {
-	# if opt_2 is a cdrom image, check it exists
-	die "$opt_2 does not exist\n" unless -f $opt_2 or $opt_2 eq "none";
-
-	# if cdrom and image is set to none
-	# then chroot and doinstall cannot be invoked
-	if ($chroot and $opt_2 eq "none") {
-		die "create chroot needs a cdrom image\n";
-	}
+# check if iso exists
+print "chroot = $chroot : opt_c = $opt_c\n";
+if ( defined $opt_c) {
+	# check iso image exists
+	die "iso image $opt_c does not exist\n" unless -f $opt_c;
 }
 
 # if the -d option is given
@@ -968,12 +934,5 @@ if ($opt_2) {
 
 partitiondisk($opt_d) if $opt_d;
 
-# invoke set partition for each iso given
-if ($opt_1) {
-	initialise($chroot, $chrootuse, $doinstall, $makefs, $opt_1, $upgrade, $debhomedev, $svnpath, $packages, 1);
-}
-
-# invoke set partition for each iso given
-if ($opt_2) {
-	initialise($chroot, $chrootuse, $doinstall, $makefs, $opt_2, $upgrade, $debhomedev, $svnpath, $packages, 2);
-}
+# initialise variables and invoke subs depending on cmdine parameters
+initialise($chroot, $chrootuse, $doinstall, $makefs, $opt_c, $upgrade, $debhomedev, $svnpath, $packages);
