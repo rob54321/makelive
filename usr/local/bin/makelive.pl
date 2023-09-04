@@ -103,8 +103,7 @@ sub defaultparameter {
 	# -v is for mounting vera containers
 	# -u is for unmounting any drive
 	# the default argument, if not given on the command line is all drives
-	my %defparam = ( -1 => "none",
-			 -2 => "none",
+	my %defparam = ( -c => "none",
 			 -d => 8);
 
 	# for each switch in the defparam hash find it's index and insert default arguments if necessary
@@ -855,14 +854,12 @@ sub usage {
 ##################
 
 # command line parameters
-# -c ubuntu-mate iso name
-# -2 ubuntu iso name
-# -c use existing /chroot1 or /chroot2, do not create a new one for partition 1|2
+# -c ubuntu-mate iso name or none (default)
 # -p "package list of extra packages
 # -u upgrade or not
 # -l disk label of debhome
 # -s full path to subersion
-#
+# -d optional size in GB of partition
 # One or both iso's can be given.
 # package list in quotes, if given
 
@@ -920,10 +917,9 @@ my $packages = "\"" . $opt_p . "\"" if $opt_p;
 my $upgrade = "upgrade" if $opt_u;
 
 # check if iso exists
-print "chroot = $chroot : opt_c = $opt_c\n";
-if ( defined $opt_c) {
+if ($opt_c) {
 	# check iso image exists
-	die "iso image $opt_c does not exist\n" unless -f $opt_c;
+	die "iso image $opt_c does not exist\n" unless ((-f $opt_c) or ("$opt_c" eq "none"));
 }
 
 # if the -d option is given
