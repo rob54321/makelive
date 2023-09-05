@@ -765,7 +765,13 @@ return;
 # createchroot, ubuntuiso-name, upgrade, debhome dev label, svn full path, packages list)
 ####################################################
 sub initialise {
-	my ($chrootstatus, $doinstall, $makefs, $ubuntuiso, $upgrade, $debhomedev, $svnpath, $packages)  = @_;
+	my ($doinstall, $makefs, $ubuntuiso, $upgrade, $debhomedev, $svnpath, $packages)  = @_;
+
+	# dochroot must be invoked if -u or -p given
+	# for -i or -m dochroot must be invokded if it has not been done
+	my $dochroot;
+	$dochroot = 1 if ($doinstall or $makefs) and (! -d "$chroot_dir/dochroot");
+	$dochroot = 1 if ($upgrade or $packages);
 
 	# set up chroot dir
 	my $chroot_dir = "/chroot";
@@ -780,12 +786,12 @@ sub initialise {
 	
 	 
 	# if not creating chroot env, check the old one exists
-	if ("$chrootstatus" eq "use") {
+	unless ($opt_c) {
 		die "chroot environment $chroot_dir does not exist\n" unless -d $chroot_dir;
 	}
 
 	# check debhomedev is attached
-	# if chrootstatus = use or newuse
+	# 
 	my $rc;
 	if ("$chrootstatus" eq "use" or "$chrootstatus" eq "newuse") {
 		$rc = system("blkid -L $debhomedev > /dev/null");
@@ -857,12 +863,15 @@ sub usage {
 # default device for local repository debhome
 my $debhomedev = "ad64";
 
+# default device for local subversion repository
+my $svndev = "ad64";
+
 # default path for local subversion
-my $svnpath = "/mnt/ad64/svn";
+my $svnpath = "/mnt/$svndev/svn";
 
 # get command line argument
 # this is the name of the ubuntu iso ima
-our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_l, $opt_s, $opt_h, $opt_d);
+our($opt_m, $opt_i, $opt_c, $opt_u, $opt_p, $opt_D, $opt_s, $opt_S, $opt_h, $opt_d);
 
 # if -u or -p is given but not -c then chroot = use should be used.
 # get command line options
@@ -870,10 +879,13 @@ our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_l, $opt_s, $opt_h, $opt
 # default parameters for -d default is 8GB
 defaultparameter();
 
-getopts('mic:ep:hul:s:d:');
+getopts('mic:p:huD:s:d:S:');
 
 # setup debhome if it has changed from the default
-$debhomedev = $opt_l if $opt_l;
+$debhomedev = $opt_D if $opt_D;
+
+#setup svndev if it has changed
+$svndev = $opt_S if $opt_S;
 
 # setup svn path if it has changed
 # done here for usage sub
@@ -883,35 +895,15 @@ usage($debhomedev, $svnpath) if $opt_h;
 # return code from functions
 my $rc;
 
-
-# if install option was given
-# setup doinstall
-# makefs will overwrite filesystem.squasfs 
-# if it exists
-my $makefs;
-$makefs = $opt_m if $opt_m;
-
-# if install is given, filesystem.squashfs
-# will be used if it exists.
-# if it does not exist it will be made.
-my $doinstall = $opt_i if $opt_i;
-
-# check for packages and upgrade
+# packages must be quoted
 my $packages = "\"" . $opt_p . "\"" if $opt_p;
-
-my $upgrade = "upgrade" if $opt_u;
 
 # chrootstatus is affected by -c -e -u -p
 # the value is given for different combinations of input
 # -c only			=> new		/chroot created
-# -c plus any of -e -u -p 	=> newuse	/chroot created and used
-# any of -e -u -p		=> use		/chroot must exist
+# -c plus any of  -u -p 	=> newuse	/chroot created and used
+# any of -u -p		=> use		/chroot must exist
 
-my $chrootstatus;
-
-$chrootstatus = "new" if ($opt_c and ! ($opt_e or $opt_u or $opt_p));
-$chrootstatus = "use" if (! $opt_c and ($opt_e or $opt_u or $opt_p));
-$chrootstatus = "newuse" if ($opt_c and ($opt_e or $opt_u or $opt_p));
 # check if iso exists
 if ($opt_c) {
 	# check iso image exists
@@ -925,6 +917,6 @@ if ($opt_c) {
 # $opt_d is the size of GB of the partition
 
 partitiondisk($opt_d) if $opt_d;
-print "chrootstatus = $chrootstatus\n";
+
 # initialise variables and invoke subs depending on cmdine parameters
-initialise($chrootstatus, $doinstall, $makefs, $opt_c, $upgrade, $debhomedev, $svnpath, $packages);
+initialise($opt_i, $opt_m, $opt_c, $opt_u, $debhomedev, $svnpath, $opt_p);
