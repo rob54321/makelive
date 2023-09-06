@@ -145,8 +145,7 @@ sub defaultparameter {
 ####################################################
 sub makefs {
 	my $chroot_dir = $_[0];
-print "makefs\n";
-return;	
+	
 	# check that dochroot has been executed previously
 	die "dochroot has not been executed\n" unless -d "$chroot_dir/dochroot";
 
@@ -364,8 +363,7 @@ sub createchroot {
 	# creating new chroot environment
 	my ($chroot_dir, $debhomedev, $svnpath, $ubuntuiso) = @_;
 	my $rc;
-print "createchroot\n";
-return;		
+		
 	# delete the old chroot environment if it exists
 	if (-d $chroot_dir) {
 		unbindall $chroot_dir;
@@ -471,8 +469,7 @@ return;
 ###############################################
 sub dochroot {
 	my ($chroot_dir, $debhomedev, $upgrade, $packages) = @_;
-print "dochroot\n";
-return;
+
 	# get codename
 	open CDN, "<", "$chroot_dir/isoimage/codename.txt" or die "could not open $chroot_dir/isoimage/codename.txt: $!\n";
 	my $codename = <CDN>;
@@ -654,8 +651,7 @@ sub installgrub {
 sub installfs {
 	# parameters
 	my ($label, $casper, $chroot_dir) = @_;
-print "installfs\n";
-return;	
+	
 	# check if chroot environment exists
 	die "$chroot_dir does not exist\n" unless -d $chroot_dir;
 
@@ -666,7 +662,7 @@ return;
 	my $rc = system("blkid -L " . $label . " > /dev/null");
 	die "$label is not attached\n" unless $rc == 0;
 	
-	# get partition_path of partition MACRIUM ex: /dev/sda1
+	# get partition_path of partition MACRIUM/UBUNTU ex: /dev/sda1
 	my $partition_path = `blkid -L $label`;
 	chomp $partition_path;
 	print $label . " is: $partition_path\n";
@@ -677,7 +673,7 @@ return;
 	chomp($devandmtpt);
 	my ($dev, $mtpt) = split /\s+/, $devandmtpt;
 
-	# if label MACRIUM is mounted, un mount it
+	# if label MACRIUM|UBUNTU is mounted, un mount it
 	if (defined $mtpt) {
 		print "$label mounted at: $mtpt\n";
 		$rc = system("umount $mtpt");
@@ -765,13 +761,7 @@ return;
 # createchroot, ubuntuiso-name, upgrade, debhome dev label, svn full path, packages list)
 ####################################################
 sub initialise {
-	my ($doinstall, $makefs, $ubuntuiso, $upgrade, $debhomedev, $svnpath, $packages)  = @_;
-
-	# dochroot must be invoked if -u or -p given
-	# for -i or -m dochroot must be invokded if it has not been done
-	my $dochroot;
-	$dochroot = 1 if ($doinstall or $makefs) and (! -d "$chroot_dir/dochroot");
-	$dochroot = 1 if ($upgrade or $packages);
+	my ($chroot, $chrootuse, $doinstall, $makefs, $ubuntuiso, $upgrade, $debhomedev, $svnpath, $packages)  = @_;
 
 	# set up chroot dir
 	my $chroot_dir = "/chroot";
@@ -780,30 +770,43 @@ sub initialise {
 	my $casper = $chroot_dir . "/boot/casper";
 	my $label = "MACRIUM";
 		
-	# print packages and upgrade for info
+	# if p or u given then set chrootuse
+	# if chroot does not exist then set chroot
 	print "packages: $packages\n" if $packages;
 	print "upgrade: $upgrade\n" if $upgrade;
 	
+	# if packages or upgrade defined, chrootuse must be set
+	if ($packages or $upgrade) {
+		# dochroot must be done
+		$chrootuse = "use";
+		$chroot = "new" unless -d $chroot_dir;
+	}
+	print "chroot: $chroot\n" if $chroot;
+	print "chrootuse: $chrootuse\n" if $chrootuse;
 	 
 	# if not creating chroot env, check the old one exists
-	unless ($opt_c) {
+	if ($chrootuse and ! $chroot) {
 		die "chroot environment $chroot_dir does not exist\n" unless -d $chroot_dir;
 	}
 
 	# check debhomedev is attached
-	# 
+	# only install does not need debhomedev mounted
+	# it must be attached $chroot defined, upgrade or packages to install
 	my $rc;
-	if ("$chrootstatus" eq "use" or "$chrootstatus" eq "newuse") {
+	if ($upgrade or $packages or $chrootuse) {
 		$rc = system("blkid -L $debhomedev > /dev/null");
 		die "$debhomedev is not attached\n" unless $rc == 0;
 	}
 	
 	# if creating new chroot and
+#	print "createchroot $chroot_dir $debhomedev $svn\n" if $chroot eq "new";
 	# un mount debhomedev
 	umountdevice $debhomedev;
-	createchroot($chroot_dir, $debhomedev, $svnpath, $ubuntuiso) if ("$chrootstatus" eq "new" or "$chrootstatus" eq "newuse");
+	createchroot($chroot_dir, $debhomedev, $svnpath, $ubuntuiso) if $chroot;
 
 	# chroot and run liveinstall.sh
+	# print "dochroot $chroot_dir $debhomedev $upgrade $packages\n" if $chrootuse eq "use";
+
 	# mount debhomedev ro
 	$rc = system("mount -r -L $debhomedev /mnt/$debhomedev");
 	die "Could not mount $debhomedev at /mnt/$debhomedev: $!\n" unless $rc == 0;
@@ -821,7 +824,7 @@ sub initialise {
 		die "Could not find subversion at $svnpath\n";
 	}
 
-	dochroot($chroot_dir, $debhomedev, $upgrade, $packages) if ("$chrootstatus" eq "use" or "$chrootstatus" eq "newuse");
+	dochroot($chroot_dir, $debhomedev, $upgrade, $packages) if $chrootuse;
 	
 	# make filesystem.squashfs if not installing
 	makefs($chroot_dir) if $makefs;
@@ -863,15 +866,12 @@ sub usage {
 # default device for local repository debhome
 my $debhomedev = "ad64";
 
-# default device for local subversion repository
-my $svndev = "ad64";
-
 # default path for local subversion
-my $svnpath = "/mnt/$svndev/svn";
+my $svnpath = "/mnt/ad64/svn";
 
 # get command line argument
 # this is the name of the ubuntu iso ima
-our($opt_m, $opt_i, $opt_c, $opt_u, $opt_p, $opt_D, $opt_s, $opt_S, $opt_h, $opt_d);
+our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_l, $opt_s, $opt_h, $opt_d);
 
 # if -u or -p is given but not -c then chroot = use should be used.
 # get command line options
@@ -879,13 +879,10 @@ our($opt_m, $opt_i, $opt_c, $opt_u, $opt_p, $opt_D, $opt_s, $opt_S, $opt_h, $opt
 # default parameters for -d default is 8GB
 defaultparameter();
 
-getopts('mic:p:huD:s:d:S:');
+getopts('mic:ep:hul:s:d:');
 
 # setup debhome if it has changed from the default
-$debhomedev = $opt_D if $opt_D;
-
-#setup svndev if it has changed
-$svndev = $opt_S if $opt_S;
+$debhomedev = $opt_l if $opt_l;
 
 # setup svn path if it has changed
 # done here for usage sub
@@ -895,14 +892,29 @@ usage($debhomedev, $svnpath) if $opt_h;
 # return code from functions
 my $rc;
 
-# packages must be quoted
+
+# if install option was given
+# setup doinstall
+# makefs will overwrite filesystem.squasfs 
+# if it exists
+my $makefs;
+$makefs = $opt_m if $opt_m;
+
+# if install is given, filesystem.squashfs
+# will be used if it exists.
+# if it does not exist it will be made.
+my $doinstall = $opt_i if $opt_i;
+
+# set changeroot usechageroot
+my ($chroot, $chrootuse);
+$chroot = "new" if $opt_c;
+$chrootuse = "use" if $opt_e;
+
+
+# check for packages and upgrade
 my $packages = "\"" . $opt_p . "\"" if $opt_p;
 
-# chrootstatus is affected by -c -e -u -p
-# the value is given for different combinations of input
-# -c only			=> new		/chroot created
-# -c plus any of  -u -p 	=> newuse	/chroot created and used
-# any of -u -p		=> use		/chroot must exist
+my $upgrade = "upgrade" if $opt_u;
 
 # check if iso exists
 if ($opt_c) {
@@ -919,4 +931,4 @@ if ($opt_c) {
 partitiondisk($opt_d) if $opt_d;
 
 # initialise variables and invoke subs depending on cmdine parameters
-initialise($opt_i, $opt_m, $opt_c, $opt_u, $debhomedev, $svnpath, $opt_p);
+initialise($chroot, $chrootuse, $doinstall, $makefs, $opt_c, $upgrade, $debhomedev, $svnpath, $packages);
