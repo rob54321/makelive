@@ -37,6 +37,7 @@ my $debhome = "/mnt/debhome";
 # the partitions are also formatted.
 # parameters passed: partition size in GB
 # sub aborts on any error
+# requires: disk for MACRIUM to be attached, not mounted
 ######################################################
 sub partitiondisk {
 	# get size of first partition
@@ -89,13 +90,14 @@ sub partitiondisk {
 }
 
 
-
+##############################################################################
 # this sub operates on the list @ARGV
 # all the switches in the ARGV list are checked to see if they have arguments
 # if they do not have arguments, the default arguments are inserted into ARGV
 # so that getopts will not fail.
 # no parameters are passed and none are returned.
-
+# requires: none
+##############################################################################
 sub defaultparameter {
 
 	# hash supplying default arguments to switches
@@ -142,6 +144,7 @@ sub defaultparameter {
 # not All directories under /mnt must be empty
 # no devices should be mounted
 # parameters: chroot directory
+# requires: none
 ####################################################
 sub makefs {
 	my $chroot_dir = $_[0];
@@ -157,8 +160,11 @@ sub makefs {
 	my $rc = system("mksquashfs " . $chroot_dir . " $chroot_dir/dochroot/filesystem.squashfs -e oldboot -e dochroot -e upgrade -e packages -e isoimage");
 	die "mksquashfs returned and error\n" unless $rc == 0;
 }
-
+######################################################
 # sub to edit grub default and set the theme in the filesystem.squashfs
+# parameters: chroot dir
+# requires: no devices to be mounted
+######################################################
 sub editgrub {
 	my $chroot_dir = $_[0];
 	
@@ -177,6 +183,8 @@ sub editgrub {
 # and the codename is returned if found
 # else undefined is returned.
 # no parameters are passed to this sub.
+# requires: cdrom to be mounted
+#######################################################
 sub getcodename {
 	# open directory for reading
 	opendir DIR, "/mnt/cdrom/dists" or die "Could not open /mnt/cdrom/dists: $!\n";
@@ -246,6 +254,7 @@ sub unbindall {
 # this sub sets up sources.list and debhome.list
 # in chroot_dir/etc/apt and chroot_dir/etc/apt/sources.list.d
 # The call setaptsources (codename, chroot_dir)
+# requires: svn
 #################################################
 sub setaptsources {
 	my ($codename, $chroot_dir) = @_;
@@ -355,13 +364,13 @@ sub umountdevice {
 ##################################################################
 # sub to set up new chroot environment.
 # the environment is copied from the cdrom
-# requires mountcdrom to be mounted
 # makes the links /mnt/debhome and /mnt/svn in the chroot environment
 # parameters passed: chroot_directory, debhomedevice, svn path
+# requires: mountcdrom to be mounted
 ####################################################################
 sub createchroot {
 	# creating new chroot environment
-	my ($chroot_dir, $debhomedev, $svnpath, $ubuntuiso) = @_;
+	my ($chroot_dir, $debhomedev, $svnpath, $isoimage) = @_;
 	my $rc;
 		
 	# delete the old chroot environment if it exists
@@ -391,7 +400,7 @@ sub createchroot {
 	# copy and edit files to chroot
 	#####################################################################################
 	# mount the cdrom
-	mountcdrom $ubuntuiso;
+	mountcdrom $isoimage;
 	
 	# unsquash filesystem.squashfs to the chroot directory
 	# the chroot_dir directory must not exist
@@ -425,7 +434,7 @@ sub createchroot {
 	# save the name of the iso in $chroot_dir/isoimage/isoimage.txt
 	mkdir "$chroot_dir/isoimage";
 	open ISO, ">", "$chroot_dir/isoimage/isoimage.txt" or die "could not save iso image name: $!\n";
-	print ISO "$ubuntuiso";
+	print ISO "$isoimage";
 	close ISO;
 
 	# get the code name
@@ -463,9 +472,9 @@ sub createchroot {
 # debhomedev was unmounted before createchroot
 # debhomedev must be mounted ro for safety
 # installfs will use filesystem.squashfs if it exists
-# requires debhomedev to be mounted
 # also requires svn if packages and or upgrade are done.
 # parameters: chroot_directory, debhome_device, upgrade, packages_list
+# requires: debhomedev to be mounted svn
 ###############################################
 sub dochroot {
 	my ($chroot_dir, $debhomedev, $upgrade, $packages) = @_;
@@ -552,6 +561,7 @@ sub dochroot {
 # which will be used for grub
 # the full iso name is in $chroot_dir/isoimage/isomage.txt
 # parameter passed: $chroot_dir
+# requirements: none
 ######################################################
 sub getversion {
 	my $chroot_dir = $_[0];
@@ -563,20 +573,20 @@ sub getversion {
 
 	# read the file 
 	open ISO, "<", "$chroot_dir/isoimage/isoimage.txt" or die "could not open $chroot_dir/isoimage/isoimage.txt: $!\n";
-	my $ubuntuiso = <ISO>;
-	chomp($ubuntuiso);
+	my $isoimage = <ISO>;
+	chomp($isoimage);
 	close ISO;
 	
 	# get version
 	# names could be ubuntu-21.04-desktop-amd64.iso
 	# or             ubuntu-mate-21.04-desktop-amd64.iso
 	
-	my $version = (split /-/, $ubuntuiso)[1];
+	my $version = (split /-/, $isoimage)[1];
 
 	# check if version is a digit
 	if ($version !~ /^(\d+)/) {
 		# not a digit, must be the next field
-		$version = (split /-/, $ubuntuiso)[2];
+		$version = (split /-/, $isoimage)[2];
 		
 		# if still not a version, prompt for version
 		if ($version !~ /^\d+/) {
@@ -591,8 +601,8 @@ sub getversion {
 #################################################
 # this sub sets up grub and installs it.
 # this is only necessary for partition 1
-# svn is needed
 # the call: installgrub(ubuntu_iso_name, chroot_directory, partition_path, subversion path)
+# requires: svn and MACRIUM
 #################################################
 sub installgrub {
 	
@@ -646,7 +656,7 @@ sub installgrub {
 # uses filesystem.squashfs if it exists in dochroot
 # else it builds if from scratch.
 # this speeds up the process of install if filesystem.squashfs has not changed
-# requires MACRIUM , cdrom and svn to be mounted
+# requires MACRIUM and svn to be mounted
 ####################################################
 sub installfs {
 	# parameters
@@ -761,7 +771,7 @@ sub installfs {
 # createchroot, ubuntuiso-name, upgrade, debhome dev label, svn full path, packages list)
 ####################################################
 sub initialise {
-	my ($chroot, $chrootuse, $doinstall, $makefs, $ubuntuiso, $upgrade, $debhomedev, $svnpath, $packages)  = @_;
+	my ($doinstall, $makefs, $isoimage, $upgrade, $dochroot, $debhomedev, $svnpath, $packages)  = @_;
 
 	# set up chroot dir
 	my $chroot_dir = "/chroot";
@@ -775,38 +785,20 @@ sub initialise {
 	print "packages: $packages\n" if $packages;
 	print "upgrade: $upgrade\n" if $upgrade;
 	
-	# if packages or upgrade defined, chrootuse must be set
-	if ($packages or $upgrade) {
-		# dochroot must be done
-		$chrootuse = "use";
-		$chroot = "new" unless -d $chroot_dir;
-	}
-	print "chroot: $chroot\n" if $chroot;
-	print "chrootuse: $chrootuse\n" if $chrootuse;
-	 
-	# if not creating chroot env, check the old one exists
-	if ($chrootuse and ! $chroot) {
-		die "chroot environment $chroot_dir does not exist\n" unless -d $chroot_dir;
-	}
+	# if creating new chroot
+	# un mount debhomedev
+	umountdevice $debhomedev;
+	createchroot($chroot_dir, $debhomedev, $svnpath, $isoimage) if $isoimage;
 
-	# check debhomedev is attached
+	# check debhomedev is attached needed for -u | -p | -i | -e
 	# only install does not need debhomedev mounted
 	# it must be attached $chroot defined, upgrade or packages to install
 	my $rc;
-	if ($upgrade or $packages or $chrootuse) {
+	if ($upgrade or $packages or $doinstall or $dochroot) {
 		$rc = system("blkid -L $debhomedev > /dev/null");
 		die "$debhomedev is not attached\n" unless $rc == 0;
 	}
 	
-	# if creating new chroot and
-#	print "createchroot $chroot_dir $debhomedev $svn\n" if $chroot eq "new";
-	# un mount debhomedev
-	umountdevice $debhomedev;
-	createchroot($chroot_dir, $debhomedev, $svnpath, $ubuntuiso) if $chroot;
-
-	# chroot and run liveinstall.sh
-	# print "dochroot $chroot_dir $debhomedev $upgrade $packages\n" if $chrootuse eq "use";
-
 	# mount debhomedev ro
 	$rc = system("mount -r -L $debhomedev /mnt/$debhomedev");
 	die "Could not mount $debhomedev at /mnt/$debhomedev: $!\n" unless $rc == 0;
@@ -824,7 +816,18 @@ sub initialise {
 		die "Could not find subversion at $svnpath\n";
 	}
 
-	dochroot($chroot_dir, $debhomedev, $upgrade, $packages) if $chrootuse;
+	# if packages or upgrade defined dochroot must be done
+	if ($packages or $upgrade or $dochroot) {
+		# if chroot environment does not exist die
+		die ("chroot environment does not exist\n") unless -d $chroot_dir;
+		# dochroot must be done
+		dochroot($chroot_dir, $debhomedev, $upgrade, $packages);
+		
+	} elsif (($doinstall or $makefs) and (! -f "$chroot_dir/dochroot") {
+		# dochroot must be done if directory dochroot does not exist
+		dochroot($chroot_dir, $debhomedev, $upgrade, $packages);
+	}
+	
 	
 	# make filesystem.squashfs if not installing
 	makefs($chroot_dir) if $makefs;
@@ -892,29 +895,9 @@ usage($debhomedev, $svnpath) if $opt_h;
 # return code from functions
 my $rc;
 
-
-# if install option was given
-# setup doinstall
-# makefs will overwrite filesystem.squasfs 
-# if it exists
-my $makefs;
-$makefs = $opt_m if $opt_m;
-
-# if install is given, filesystem.squashfs
-# will be used if it exists.
-# if it does not exist it will be made.
-my $doinstall = $opt_i if $opt_i;
-
-# set changeroot usechageroot
-my ($chroot, $chrootuse);
-$chroot = "new" if $opt_c;
-$chrootuse = "use" if $opt_e;
-
-
 # check for packages and upgrade
+# package list must be in quotes
 my $packages = "\"" . $opt_p . "\"" if $opt_p;
-
-my $upgrade = "upgrade" if $opt_u;
 
 # check if iso exists
 if ($opt_c) {
@@ -931,4 +914,4 @@ if ($opt_c) {
 partitiondisk($opt_d) if $opt_d;
 
 # initialise variables and invoke subs depending on cmdine parameters
-initialise($chroot, $chrootuse, $doinstall, $makefs, $opt_c, $upgrade, $debhomedev, $svnpath, $packages);
+initialise($opt_i, $opt_m, $opt_c, $opt_u, $opt_e, $debhomedev, $svnpath, $packages);
