@@ -823,7 +823,7 @@ sub initialise {
 		# dochroot must be done
 		dochroot($chroot_dir, $debhomedev, $upgrade, $packages);
 		
-	} elsif (($doinstall or $makefs) and (! -f "$chroot_dir/dochroot") {
+	} elsif (($doinstall or $makefs) and (! -f "$chroot_dir/dochroot")) {
 		# dochroot must be done if directory dochroot does not exist
 		dochroot($chroot_dir, $debhomedev, $upgrade, $packages);
 	}
