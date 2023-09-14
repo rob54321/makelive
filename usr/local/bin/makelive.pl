@@ -783,7 +783,7 @@ sub initialise {
 	# if p or u given then set chrootuse
 	# if chroot does not exist then set chroot
 	print "packages: $packages\n" if $packages;
-	print "upgrade: $upgrade\n" if $upgrade;
+	print "upgrade:\n" if $upgrade;
 	
 	# if creating new chroot
 	# un mount debhomedev
@@ -797,24 +797,25 @@ sub initialise {
 	if ($upgrade or $packages or $doinstall or $dochroot) {
 		$rc = system("blkid -L $debhomedev > /dev/null");
 		die "$debhomedev is not attached\n" unless $rc == 0;
+
+		# mount debhomedev ro
+		$rc = system("mount -r -L $debhomedev /mnt/$debhomedev");
+		die "Could not mount $debhomedev at /mnt/$debhomedev: $!\n" unless $rc == 0;
+
+		# check that subversion is accessible
+		# subversion may be on debhome device
+		if (-d $svnpath) {
+			# directory exists, make a link to /mnt/svn
+			unlink "$svn";
+			$rc = symlink "$svnpath", "$svn";
+			die "Could not link $svn -> $svnpath: $!\n" unless $rc;
+		} else {
+			# subversion does not exist
+			die "Could not find subversion at $svnpath\n";
+		}
+
 	}
 	
-	# mount debhomedev ro
-	$rc = system("mount -r -L $debhomedev /mnt/$debhomedev");
-	die "Could not mount $debhomedev at /mnt/$debhomedev: $!\n" unless $rc == 0;
-
-
-	# check that subversion is accessible
-	# subversion may be on debhome device
-	if (-d $svnpath) {
-		# directory exists, make a link to /mnt/svn
-		unlink "$svn";
-		$rc = symlink "$svnpath", "$svn";
-		die "Could not link $svn -> $svnpath: $!\n" unless $rc;
-	} else {
-		# subversion does not exist
-		die "Could not find subversion at $svnpath\n";
-	}
 
 	# if packages or upgrade defined dochroot must be done
 	if ($packages or $upgrade or $dochroot) {
@@ -823,7 +824,7 @@ sub initialise {
 		# dochroot must be done
 		dochroot($chroot_dir, $debhomedev, $upgrade, $packages);
 		
-	} elsif (($doinstall or $makefs) and (! -f "$chroot_dir/dochroot")) {
+	} elsif (($doinstall or $makefs) and (! -d "$chroot_dir/dochroot")) {
 		# dochroot must be done if directory dochroot does not exist
 		dochroot($chroot_dir, $debhomedev, $upgrade, $packages);
 	}
