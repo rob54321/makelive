@@ -776,6 +776,11 @@ sub initialise {
 	# set up chroot dir
 	my $chroot_dir = "/chroot";
 	
+	# die if no /choot and it is not being created
+	if (! -d $chroot_dir) {
+		die "chroot environment does not exist\n" unless $isoimage;
+	}
+	
 	# some short cuts depending on the parition number
 	my $casper = $chroot_dir . "/boot/casper";
 	my $label = "MACRIUM";
