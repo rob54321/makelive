@@ -856,6 +856,7 @@ sub usage {
 	print "-s full path to subversion, default is $svnpath\n";
 	print "-d size of partition in GB the disk into an 8G(default) fat32 MACRIUM plus the reset ntfs ele\n";
 	print "-i install the image to MACRIUM\n";
+	print "-V check version and exit\n";
 	exit 0;
 }
 ##################
@@ -880,7 +881,7 @@ my $svnpath = "/mnt/ad64/svn";
 
 # get command line argument
 # this is the name of the ubuntu iso ima
-our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_l, $opt_s, $opt_h, $opt_d);
+our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_l, $opt_s, $opt_h, $opt_d, $opt_V);
 
 # if -u or -p is given but not -c then chroot = use should be used.
 # get command line options
@@ -888,7 +889,13 @@ our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_l, $opt_s, $opt_h, $opt
 # default parameters for -d default is 8GB
 defaultparameter();
 
-getopts('mic:ep:hul:s:d:');
+getopts('mic:ep:hul:s:d:V');
+
+# check version and exit 
+if ($opt_V) {
+	system("dpkg-query -W makelive");
+	exit 0;
+}
 
 # setup debhome if it has changed from the default
 $debhomedev = $opt_l if $opt_l;
