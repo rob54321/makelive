@@ -668,7 +668,7 @@ sub installfiles {
 	# make target directory if it does not exist
 	mkdir "/mnt/$label" . "$rootdir" unless -d "/mnt/$label" . "$rootdir";
 	$rc = system("cp -dRv -T $source /mnt/$label" . "$rootdir");
-	die "Could not copy $source to /mnt/$label" . "$rootdir": $!\n" unless $rc == 0;
+	die "Could not copy $source to /mnt/$label" . "$rootdir: $!\n" unless $rc == 0;
 
 	#un mount the drive
 	$rc = system("umount /mnt/$label");
