@@ -5,15 +5,22 @@ use warnings;
 use Getopt::Std;
 
 # global constant links for debhome and subversion
+# sources for macrium and recovery
 my $svn = "/mnt/svn";
 my $debhome = "/mnt/debhome";
+my $macriumsource = "/root/MACRIUM";
+my $recoverysource = "/root/RECOVERY";
+
+# get command line arguments
+our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_l, $opt_s, $opt_h, $opt_d, $opt_M, $opt_R, $opt_V);
 
 #######################################################
 # this script makes a live system on a partition
-# called MACRIUM. This script will also partition
+# called linux. This script will also partition
 # and format a disk for the live system.
-# partition 1: 8G default MACRIUM fat32
-# partition 2: rest of disk for ntfs label ele
+# partition 1: 1G fat32 for MACRIUM REFLECT
+# partition 2: 8G (selectable) for linux live
+# partition 3: rest of disk for ntfs label ele
 #
 # MACRIUM reflect can be installed on  partition 1
 # before the live system is installed.
@@ -29,10 +36,11 @@ my $debhome = "/mnt/debhome";
 
 
 ######################################################
-# sub to delete all partitions and make an 8G (default)
-# or a selected size, fat32 partition MACRIUM part uuid AED6-434E
-# for a live system and the rest of the disk
-# is used for an ntfs system with label ele
+# sub to delete all partitions and make a
+# partition 1: 1G fat32 for MACRIUM REFLECT LABEL = MACRIUM uuid = AED6-434E
+# partition 2: 8G (default - or selectable) fat32 for linux live LABEL = LINUXLIVE uuid = 3333-3333
+# partition 3: 2G fat32 LABEL =  RECOVERALL uuid = 4444-4444
+# partition 3: rest of disk ntfs LABEL = ele
 # all data on the disk is deleted.
 # the partitions are also formatted.
 # parameters passed: partition size in GB
@@ -41,7 +49,7 @@ my $debhome = "/mnt/debhome";
 ######################################################
 sub partitiondisk {
 	# get size of first partition
-	my $partsize = $_[0];
+	my $linuxlivesize = $_[0];
 
 	# show devices attached
 	print "######################################################\n";
@@ -67,8 +75,34 @@ sub partitiondisk {
 
 	if ($answer =~ /^yes$/i) {
 		print "partitioning $device\n";
+
+		# MACRIUM is 0 - 1GB
+		# LINUXLIVE partition size is $partsize + 1GB for the MACRIUM partition"
+		# RECOVERALL partition size is 2G after LINUXLIVE
+		# ele partition is 100% after RECOVERALL
+		my $macriumsize = 1;
+		my $recoverallsize = 2;
+		my $part1start = 0;
+		my $part1end = $macriumsize;
+		my $part2start = $part1end;
+		my $part2end = $part2start + $linuxlivesize; 
+		my $part3start = $part2end;
+		my $part3end = $part3start + $recoverallsize;
+		my $part4start = $part3end;
+		my $part4end = "100%";
+
+		# convert part start and end to XXGB string
+		$part1start .= "GB";
+		$part1end   .= "GB";
+		$part2start .= "GB";
+		$part2end   .= "GB";
+		$part3start .= "GB";
+		$part3end   .= "GB";
+		$part4start .= "GB";
+		
+print "$part1start $part1end $part2start $part2end $part3start $part3end $part4start $part4end\n";
 		# delete all partitions and make new ones
-		$rc = system("parted -s --align optimal $device mktable msdos mkpart primary fat32 0GB " . $partsize . "GB mkpart primary ntfs " . $partsize . "GB 100% set 1 boot on");
+		$rc = system("parted -s --align optimal $device mktable msdos mkpart primary fat32 $part1start $part1end mkpart primary fat32 $part2start $part2end mkpart primary fat32 $part3start $part3end mkpart primary ntfs  $part4start $part4end set 1 boot on");
 		die "aborting: error partitioning $device\n" unless $rc == 0;
 
 		# format the first partition
@@ -76,14 +110,27 @@ sub partitiondisk {
 		# after partitioning. With no sleep formatting fails
 		# if partition size is bigger than 12GB
 		sleep 2;
+
+		# format partition 1
 		print "formatting partition " . $device . "1\n";
 		$rc = system( "mkfs.vfat -v -n MACRIUM -i AED6434E " . $device . "1");
 		die "aborting: error formatting " . $device . "1\n" unless $rc == 0;
 
 		# format second partition
 		print "formatting partition " . $device . "2\n";
-		$rc = system("mkfs.ntfs -v -Q -L ele " . $device . "2");
+		$rc = system("mkfs.vfat -v -n LINUXLIVE -i 33333333 " . $device . "2");
 		die "aborting: error formatting " . $device . "2\n" unless $rc == 0;
+
+		# format third partition
+		print "formatting partition " . $device . "3\n";
+		$rc = system("mkfs.vfat -v -n RECOVERALL -i 44444444 " . $device . "3");
+		die "aborting: error formatting " . $device . "3\n" unless $rc == 0;
+
+		# format forth partition
+		print "formatting partition " . $device . "4\n";
+		$rc = system("mkfs.ntfs -v -Q -L ele  " . $device . "4");
+		die "aborting: error formatting " . $device . "4\n" unless $rc == 0;
+
 	} else {
 		print "$device was not partitioned\n";
 	}
@@ -106,7 +153,9 @@ sub defaultparameter {
 	# -u is for unmounting any drive
 	# the default argument, if not given on the command line is all drives
 	my %defparam = ( -c => "none",
-			 -d => 8);
+			 -d => 8,
+			 -M => "$macriumsource",
+			 -R => "$recoverysource");
 
 	# for each switch in the defparam hash find it's index and insert default arguments if necessary
 	foreach my $switch (keys(%defparam)) {
@@ -456,7 +505,7 @@ sub createchroot {
 	# copy pool and install files for ubuntu mate
 	# to a temp directory $chroot_dir/isoimage
 	chdir "/mnt/cdrom";
-	$rc = system("cp -dR dists install pool preseed " . $chroot_dir . "/isoimage/");
+	$rc = system("cp -dR .disk dists install pool preseed " . $chroot_dir . "/isoimage/");
 	die "could not copy dists install pool preseed to $chroot_dir/isoimage: $!\n" unless $rc == 0;
 
 	# umount cdrom
@@ -598,11 +647,36 @@ sub getversion {
 	}
 	return $version;
 }
+
+#################################################
+# install macrium files to MACRIUM/RECOVERALL/SOURCES (ele)
+# the files are copied to the respective partition
+# parameter: full path to source files, partition label
+# the source directory is not created
+#################################################
+sub installfiles {
+	my $source = shift @_;
+	my $label = shift @_;
+
+	# mount the parition
+	mkdir "/mnt/$label" unless -d "/mnt/$label";
+	my $rc = system("mount -L $label /mnt/$label");
+	die "Could not mount $label: $!\n" unless $rc == 0;
+
+	# copy the files
+	$rc = system("cp -dRv -T $source /mnt/$label");
+	die "Could not copy $source to /mnt/$label: $!\n" unless $rc == 0;
+
+	#un mount the drive
+	$rc = system("umount /mnt/$label");
+	die "Could not umount $label: $!\n" unless $rc == 0;
+}
+	
 #################################################
 # this sub sets up grub and installs it.
 # this is only necessary for partition 1
 # the call: installgrub(ubuntu_iso_name, chroot_directory, partition_path, subversion path)
-# requires: svn and MACRIUM
+# requires: svn and LINUXLIVE
 #################################################
 sub installgrub {
 	
@@ -644,7 +718,7 @@ sub installgrub {
 	print "$device\n";
 	system("grub-install --no-floppy --boot-directory=" . $chroot_dir . "/boot --target=i386-pc " . $device);
 	
-	system(" grub-install --no-floppy --boot-directory=" . $chroot_dir . "/boot/EFI --efi-directory="  . $chroot_dir . "/boot --removable --target=x86_64-efi " . $device);
+	system(" grub-install --no-floppy --efi-directory=" . $chroot_dir . "/boot/EFI --boot-directory="  . $chroot_dir . "/boot --removable --target=x86_64-efi " . $device);
 }
 
 ####################################################
@@ -656,7 +730,7 @@ sub installgrub {
 # uses filesystem.squashfs if it exists in dochroot
 # else it builds if from scratch.
 # this speeds up the process of install if filesystem.squashfs has not changed
-# requires MACRIUM and svn to be mounted
+# requires LINUXLIVE and svn to be mounted
 ####################################################
 sub installfs {
 	# parameters
@@ -668,22 +742,22 @@ sub installfs {
 	# check that dochroot has been executed previously
 	die "dochroot has not been executed\n" unless -d "$chroot_dir/dochroot";
 	
-	# check MACRIUM is attached
+	# check LINUXLIVE is attached
 	my $rc = system("blkid -L " . $label . " > /dev/null");
 	die "$label is not attached\n" unless $rc == 0;
 	
-	# get partition_path of partition MACRIUM/UBUNTU ex: /dev/sda1
+	# get partition_path of partition LINUXLIVE/UBUNTU ex: /dev/sda1
 	my $partition_path = `blkid -L $label`;
 	chomp $partition_path;
 	print $label . " is: $partition_path\n";
 	
-	# check if the partition, MACRIUM  is mounted at any location
+	# check if the partition, LINUXLIVE  is mounted at any location
 	# un mount it if it is mounted
 	my $devandmtpt = `grep "$partition_path" /etc/mtab | cut -d " " -f 1-2`;
 	chomp($devandmtpt);
 	my ($dev, $mtpt) = split /\s+/, $devandmtpt;
 
-	# if label MACRIUM|UBUNTU is mounted, un mount it
+	# if label LINUXLIVE|UBUNTU is mounted, un mount it
 	if (defined $mtpt) {
 		print "$label mounted at: $mtpt\n";
 		$rc = system("umount $mtpt");
@@ -706,7 +780,7 @@ sub installfs {
 	chdir $chroot_dir . "/boot";
 	system ("rm -rf *");
 
-	# mount the partition MACRIUM/UBUNTU under 
+	# mount the partition LINUXLIVE/UBUNTU under 
 	# chroot/boot, it was unmounted before chroot
 	$rc = system("mount -L " . $label . " " . $chroot_dir . "/boot");
 	die "Could not mount $label at $chroot_dir/boot\n" unless $rc == 0;
@@ -733,11 +807,11 @@ sub installfs {
 
 	# delete ubuntu install files in chroot/boot
 	chdir $chroot_dir . "/boot";
-	system("rm -rf dists install pool preseed grub");
+	system("rm -rf .disk dists install pool preseed grub");
 	
 	# copy pool and install files for ubuntu mate
 	chdir "$chroot_dir/isoimage";
-	system("cp -dR dists install pool preseed " . $chroot_dir . "/boot/");
+	system("cp -dR .disk dists install pool preseed " . $chroot_dir . "/boot/");
 	
 	# setup and install grub if this is the first partition
 	installgrub($chroot_dir, $partition_path, $svn);
@@ -761,11 +835,10 @@ sub installfs {
 	system("umount " . $chroot_dir . "/boot");
 	$rc = system("findmnt " . $chroot_dir . "/boot");
 	print "count not umount " . $chroot_dir . "/boot\n" if $rc == 0;
-
 }
 
 ####################################################
-# sub to initialise the setup of the MACRIUM partition.
+# sub to initialise the setup of the LINUXLIVE partition.
 # if -c given create new chroot from scratch or use existing one
 # parameters passed:
 # createchroot, ubuntuiso-name, upgrade, debhome dev label, svn full path, packages list)
@@ -783,7 +856,7 @@ sub initialise {
 	
 	# some short cuts depending on the parition number
 	my $casper = $chroot_dir . "/boot/casper";
-	my $label = "MACRIUM";
+	my $label = "LINUXLIVE";
 		
 	# if p or u given then set chrootuse
 	# if chroot does not exist then set chroot
@@ -838,7 +911,22 @@ sub initialise {
 	# make filesystem.squashfs if not installing
 	makefs($chroot_dir) if $makefs;
 
-	# install in MACRIUM/UBUNTU
+	# install MACRIUM to partition 1
+	# and RECOVERALL to partition 3 if -M and/or -R are given
+	# source files are as follows
+	# MACRIUM default /root/MACRIUM
+	# RECOVERALL default /root/RECOVERY/RECOVERALL
+	# SOURCE FILES for recovery /root/RECOVERY/SOURCES
+	# recovery source must contain RECOVERALL for (RECOVERALL) and SOURCES (for ele/sources)
+	installfiles($opt_M, "MACRIUM") if $opt_M;
+
+	# for recovery files
+	do {
+		installfiles("$opt_R/RECOVERALL", "RECOVERALL");
+		installfiles("$opt_R/SOURCES", "ele");
+	} if $opt_R;
+
+	# install in LINUXLIVE/UBUNTU
 	installfs($label, $casper, $chroot_dir) if $doinstall;
 
 	# un mount debhomedev
@@ -854,8 +942,10 @@ sub usage {
 	print "-p list of packages to install in chroot in quotes\n";
 	print "-l disk label for debhome, default is $debhomedev\n";
 	print "-s full path to subversion, default is $svnpath\n";
-	print "-d size of partition in GB the disk into an 8G(default) fat32 MACRIUM plus the reset ntfs ele\n";
-	print "-i install the image to MACRIUM\n";
+	print "-d size of partition in GB the disk into an 8G(default) fat32 LINUXLIVE plus the reset ntfs ele\n";
+	print "-i install the image to LINUXLIVE\n";
+	print "-M fullsource of macrium files, default is $macriumsource\n";
+	print "-R full source of recovery, contains RECOVERALL and SOURCES dirs, default is $recoverysource\n";
 	print "-V check version and exit\n";
 	exit 0;
 }
@@ -879,17 +969,13 @@ my $debhomedev = "ad64";
 # default path for local subversion
 my $svnpath = "/mnt/ad64/svn";
 
-# get command line argument
-# this is the name of the ubuntu iso ima
-our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_l, $opt_s, $opt_h, $opt_d, $opt_V);
-
 # if -u or -p is given but not -c then chroot = use should be used.
 # get command line options
 
 # default parameters for -d default is 8GB
 defaultparameter();
 
-getopts('mic:ep:hul:s:d:V');
+getopts('mic:ep:hul:s:d:M:R:V');
 
 # check version and exit 
 if ($opt_V) {
