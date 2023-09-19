@@ -651,21 +651,24 @@ sub getversion {
 #################################################
 # install macrium files to MACRIUM/RECOVERALL/SOURCES (ele)
 # the files are copied to the respective partition
-# parameter: full path to source files, partition label
+# parameter: full path to source files, partition label, target root directory
 # the source directory is not created
 #################################################
 sub installfiles {
 	my $source = shift @_;
 	my $label = shift @_;
-
+	my $rootdir = shift @_;
+	
 	# mount the parition
 	mkdir "/mnt/$label" unless -d "/mnt/$label";
 	my $rc = system("mount -L $label /mnt/$label");
 	die "Could not mount $label: $!\n" unless $rc == 0;
 
 	# copy the files
-	$rc = system("cp -dRv -T $source /mnt/$label");
-	die "Could not copy $source to /mnt/$label: $!\n" unless $rc == 0;
+	# make target directory if it does not exist
+	mkdir "/mnt/$label" . "$rootdir" unless -d "/mnt/$label" . "$rootdir";
+	$rc = system("cp -dRv -T $source /mnt/$label" . "$rootdir");
+	die "Could not copy $source to /mnt/$label" . "$rootdir": $!\n" unless $rc == 0;
 
 	#un mount the drive
 	$rc = system("umount /mnt/$label");
@@ -918,12 +921,12 @@ sub initialise {
 	# RECOVERALL default /root/RECOVERY/RECOVERALL
 	# SOURCE FILES for recovery /root/RECOVERY/SOURCES
 	# recovery source must contain RECOVERALL for (RECOVERALL) and SOURCES (for ele/sources)
-	installfiles($opt_M, "MACRIUM") if $opt_M;
+	installfiles($opt_M, "MACRIUM", "/") if $opt_M;
 
 	# for recovery files
 	do {
-		installfiles("$opt_R/RECOVERALL", "RECOVERALL");
-		installfiles("$opt_R/SOURCES", "ele");
+		installfiles("$opt_R/RECOVERALL", "RECOVERALL", "/");
+		installfiles("$opt_R/SOURCES", "ele", "/sources");
 	} if $opt_R;
 
 	# install in LINUXLIVE/UBUNTU
