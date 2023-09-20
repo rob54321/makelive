@@ -721,7 +721,7 @@ sub installgrub {
 	print "$device\n";
 	system("grub-install --no-floppy --boot-directory=" . $chroot_dir . "/boot --target=i386-pc " . $device);
 	
-	system(" grub-install --no-floppy --efi-directory=" . $chroot_dir . "/boot/EFI --boot-directory="  . $chroot_dir . "/boot --removable --target=x86_64-efi " . $device);
+	system(" grub-install --no-floppy --boot-directory=" . $chroot_dir . "/boot/EFI --efi-directory="  . $chroot_dir . "/boot --removable --target=x86_64-efi " . $device);
 }
 
 ####################################################
@@ -816,6 +816,11 @@ sub installfs {
 	chdir "$chroot_dir/isoimage";
 	system("cp -dR .disk dists install pool preseed " . $chroot_dir . "/boot/");
 	
+	# make a boot directory on LINUXLIVE
+	# so that there is no error message from grub
+	# at boot time that no /boot/ found.
+	mkdir $chroot_dir . "/boot/boot";
+		
 	# setup and install grub if this is the first partition
 	installgrub($chroot_dir, $partition_path, $svn);
 	
