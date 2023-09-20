@@ -876,9 +876,9 @@ sub initialise {
 	umountdevice $debhomedev;
 	createchroot($chroot_dir, $debhomedev, $svnpath, $isoimage) if $isoimage;
 
-	# check debhomedev is attached needed for -u | -p | -i | -e
-	# only install does not need debhomedev mounted
-	# it must be attached $chroot defined, upgrade or packages to install
+	# check debhomedev is attached needed for -u | -p | -e
+	# only create, install and makefs does not need debhomedev mounted
+	# installfs needs svn
 	my $rc;
 	if ($upgrade or $packages or $doinstall or $dochroot) {
 		$rc = system("blkid -L $debhomedev > /dev/null");
@@ -948,7 +948,8 @@ sub usage {
 	print "-e use existing changeroot takes predence over -c needs\n";
 	print "-m make filesystem.squashfs, dochroot must be complete\n";
 	print "-p list of packages to install in chroot in quotes\n";
-	print "-l disk label for debhome, default is $debhomedev\n";
+	print "-D disk label for debhome, default is $debhomedev\n";
+	print "-S disk label for svn, default is $svndev\n";
 	print "-s full path to subversion, default is $svnpath\n";
 	print "-d size of partition in GB the disk into an 8G(default) fat32 LINUXLIVE plus the reset ntfs ele\n";
 	print "-i install the image to LINUXLIVE\n";
@@ -971,11 +972,13 @@ sub usage {
 # One or both iso's can be given.
 # package list in quotes, if given
 
-# default device for local repository debhome
+# default device for local repository debhome and subversion
+# dehome dev is default for svn
 my $debhomedev = "ad64";
+my $svndev = $debhomedev;
 
 # default path for local subversion
-my $svnpath = "/mnt/ad64/svn";
+my $svnpath = "/mnt/$svndev/svn";
 
 # if -u or -p is given but not -c then chroot = use should be used.
 # get command line options
@@ -983,7 +986,7 @@ my $svnpath = "/mnt/ad64/svn";
 # default parameters for -d default is 8GB
 defaultparameter();
 
-getopts('mic:ep:hul:s:d:M:R:V');
+getopts('mic:ep:hus:d:M:R:VD:S:');
 
 # check version and exit 
 if ($opt_V) {
