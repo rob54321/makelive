@@ -12,7 +12,7 @@ my $macriumsource = "/root/MACRIUM";
 my $recoverysource = "/root/RECOVERY";
 
 # get command line arguments
-our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_l, $opt_s, $opt_h, $opt_d, $opt_M, $opt_R, $opt_V);
+our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_D, $opt_s, $opt_h, $opt_d, $opt_M, $opt_R, $opt_V);
 
 #######################################################
 # this script makes a live system on a partition
@@ -949,7 +949,6 @@ sub usage {
 	print "-m make filesystem.squashfs, dochroot must be complete\n";
 	print "-p list of packages to install in chroot in quotes\n";
 	print "-D disk label for debhome, default is $debhomedev\n";
-	print "-S disk label for svn, default is $svndev\n";
 	print "-s full path to subversion, default is $svnpath\n";
 	print "-d size of partition in GB the disk into an 8G(default) fat32 LINUXLIVE plus the reset ntfs ele\n";
 	print "-i install the image to LINUXLIVE\n";
@@ -975,10 +974,6 @@ sub usage {
 # default device for local repository debhome and subversion
 # dehome dev is default for svn
 my $debhomedev = "ad64";
-my $svndev = $debhomedev;
-
-# default path for local subversion
-my $svnpath = "/mnt/$svndev/svn";
 
 # if -u or -p is given but not -c then chroot = use should be used.
 # get command line options
@@ -986,7 +981,7 @@ my $svnpath = "/mnt/$svndev/svn";
 # default parameters for -d default is 8GB
 defaultparameter();
 
-getopts('mic:ep:hus:d:M:R:VD:S:');
+getopts('mic:ep:hus:d:M:R:VD:');
 
 # check version and exit 
 if ($opt_V) {
@@ -995,10 +990,16 @@ if ($opt_V) {
 }
 
 # setup debhome if it has changed from the default
-$debhomedev = $opt_l if $opt_l;
+$debhomedev = $opt_D if $opt_D;
+
+# default path for local subversion
+# in case debhomedev has changed
+my $svnpath = "/mnt/$debhomedev/svn";
 
 # setup svn path if it has changed
 # done here for usage sub
+# svnpath overrides previous path
+# if it has changed
 $svnpath = $opt_s if $opt_s;
 
 usage($debhomedev, $svnpath) if $opt_h;
