@@ -3,6 +3,7 @@
 use strict;
 use warnings;
 use Getopt::Std;
+use File::Basename;
 
 # global constant links for debhome and subversion
 # sources for macrium and recovery
@@ -628,15 +629,19 @@ sub getversion {
 	
 	# get version
 	# names could be ubuntu-21.04-desktop-amd64.iso
-	# or             ubuntu-mate-21.04-desktop-amd64.iso
-	
-	my $version = (split /-/, $isoimage)[1];
+	# or             /some/path-with/extra/ubuntu-mate-21.04-desktop-amd64.iso
+	# the file name must be striped from the path
+	my $file = basename($isoimage);
+		
+	my $version = (split /-/, $file)[1];
+	print "first try: linux version = $version\n";
 
 	# check if version is a digit
 	if ($version !~ /^(\d+)/) {
 		# not a digit, must be the next field
-		$version = (split /-/, $isoimage)[2];
-		
+		$version = (split /-/, $file)[2];
+		print "linux version = $version\n";
+				
 		# if still not a version, prompt for version
 		if ($version !~ /^\d+/) {
 			# still not a digit, prompt
