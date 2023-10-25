@@ -13,7 +13,7 @@ my $macriumsource = "/root/MACRIUM";
 my $recoverysource = "/root/RECOVERY";
 
 # get command line arguments
-our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_D, $opt_s, $opt_h, $opt_d, $opt_M, $opt_R, $opt_V);
+our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_D, $opt_S, $opt_h, $opt_d, $opt_M, $opt_R, $opt_V);
 
 #######################################################
 # this script makes a live system on a partition
@@ -278,6 +278,17 @@ sub bindall {
 	system("mount --bind /dev dev");
 	system("mount --bind /dev/pts dev/pts");
 	system("mount --bind /sys sys");
+
+	#for the chroot environment to have access
+	# to svn and debhome the directories /mnt/debhome
+	# and /mnt/svn are bound to /chroot/mnt/debhome
+	# and /chroot/mnt/svn
+	# check that the directories exists in the chroot environment
+	mkdir $chroot_dir . $debhome unless -d $chroot_dir . $debhome;
+	mkdir $chroot_dir . $svn unless -d $chroot_dir . $svn;
+	
+	system("mount --bind $svn $chroot_dir . $svn");
+	system("mount --bind $debhome $chroot_dir . $debhome");
 }
 
 #######################################################
@@ -298,6 +309,14 @@ sub unbindall {
 	system("umount $chroot_dir/dev");
 	system("umount $chroot_dir/sys");
 	system("umount $chroot_dir/tmp");
+
+	# svn and debhome are bound to directories of the same name in
+	# the chroot environment. They must be unmounted
+	my $rc = system("umount $chroot_dir . $svn");
+	die "Could not umount $chroot_dir . $svn: $!\n" unless $rc == 0;
+	
+	system("umount $chroot_dir . $debhome");
+	die "Could not umount $chroot_dir . $debhome: $!\n" unless $rc == 0;
 }
 	
 #################################################
@@ -377,50 +396,108 @@ sub mountcdrom {
 	die "Could not mount $isoimage\n" unless $rc == 0;
 }
 
-##################################################################
-# unmount debhome dev no matter where it is mounted
-# it may be mounted in chroot as well.
-# debhomdev can then be mounted in ro mode for safety
-# parameters passed: $debhomedev
-# return: nothing
-##################################################################
-sub umountdevice {
-	my $device = $_[0];
-	
-	# unmount debhomedev if debhomedev is mounted
-	#@mntlist = ("title ...", "mntpt dev fsystem rw,realtime")
-	my @mntlist = `findmnt --source LABEL=$device`;
+#######################################################
+# remakelink removes the link and makes it again
+# to point to the correct directory
+# parameters: path, link
+#######################################################
+sub remakelink {
+	my ($repopath, $link) = @_;
+		unlink $link;
+		my $rc = symlink $repopath, $link;
+		# if link could not be made, die
+		die "Could not link $link -> $repopath\n" unless $rc;
 
-	# @mntlist is of form..
-	# element 0 : title ....
-	# element 1 : mntpt ....
-	# element 2 : mntpt ....
-	# etc
-	# if debhomedev is not mounted return list is undefined
-	my $mntpt;
-	if (@mntlist) {
-		# for each element from index 1, 2  .. unmount
-		for (my $i = 1; $i <= $#mntlist; $i++) {
-			($mntpt) = split /\s+/, $mntlist[$i];
-			if ($mntpt) {
-				# un mount each device
-				my $rc = system("umount -v -f $mntpt");
-				die "$device is mounted Could not umount from $mntpt" unless $rc == 0;
-			}
-		}
-	}
-
+		# change ownership
+		$rc = system("chown -h robert:robert $link");
+		die "Could not change ownership of $link: $!\n" unless $rc == 0;
 }
+#######################################################	
+# findrepo:
+# if path to repo does not exist
+# 	check if path is of form /mnt/device/svn|debhome
+# 	if not die
+# 	if it is a block device try and mount it
+# 	else die
+# 	now check if repo exists or die
+# 	remake the link
+# else 
+# 	path found
+#	remake the link
+#end
+# parameters: repopath, $link  (/mnt/svn or /mnt/debhome)
+#######################################################
+sub findrepo {
+	my ($repopath, $link) = @_;
+
+	my ($rc, $device);
+
+	# repo name is svn or debhome
+	# repo path is /mnt/ad64/debhome or /mnt/ad64/svn
+	my $reponame = basename($repopath);
+	
+	if ( ! -d $repopath) {
+		# not found, check if path is a possible device
+		# if path = /mnt/device/svn
+		if ($repopath =~ m?/mnt/.*/$reponame?) {
+			# path is of form /mnt/something/svn
+			# is 'something a block device'
+			$device = (split(/\//, $repopath))[2];
+			$rc = system("blkid -L $device");
+			if ($rc == 0) {
+				# it is a block device
+				# check if it is mounted,
+				# if so die because repo not found
+				$rc = system("findmnt --source LABEL=$device");
+				die "Device $device is mounted and $reponame not found\n" if $rc == 0;
+				
+				# try and mount it
+				# make the directory if it does not exist
+				print "mounting $device at /mnt/$device\n";
+				mkdir "/mnt/$device" unless -d "/mnt/$device";
+				$rc = system("mount -v -L $device /mnt/$device");
+
+				# die if it is not a block device
+				die "Could not mount $device, $reponame not found: $!\n" unless $rc == 0;
+
+				# check that svn is found
+				# un mount if not
+				unless ( -d $repopath) {
+					# svn not found, umount device and die
+					system("umount -v /mnt/$device");
+					die "Could not find $reponame at $repopath\n";
+				}
+
+				# device is mounted, remake link
+				remakelink $repopath, $link;
+
+			} else {
+				# device is not a block device
+				# and svn not found, die
+				die "$device is not a block device and $reponame was not found\n"
+			}
+		} else {
+			# svn path is not of form /mnt/device/svn
+			# so svn not found, die
+			die "Could not find $reponame at $repopath\n";
+		}
+	} else {
+		# the path does exist check the link
+		remakelink $repopath, $link;
+	}
+	print "found $reponame at $repopath\n";
+}
+
 ##################################################################
 # sub to set up new chroot environment.
 # the environment is copied from the cdrom
 # makes the links /mnt/debhome and /mnt/svn in the chroot environment
-# parameters passed: chroot_directory, debhomedevice, svn path
+# parameters passed: chroot_directory, isoimage
 # requires: mountcdrom to be mounted
 ####################################################################
 sub createchroot {
 	# creating new chroot environment
-	my ($chroot_dir, $debhomedev, $svnpath, $isoimage) = @_;
+	my ($chroot_dir, $isoimage) = @_;
 	my $rc;
 		
 	# delete the old chroot environment if it exists
@@ -459,20 +536,20 @@ sub createchroot {
 	print "unsquashed filesystem.squashfs\n";
 		
 	# edit fstab in chroot so debhome can be mounted
-	chdir $chroot_dir . "/etc";
-	system("sed -i -e '/LABEL=$debhomedev/d' fstab");
-	system("sed -i -e 'a \ LABEL=$debhomedev /mnt/$debhomedev ext4 defaults,noauto 0 0' fstab");
+	#chdir $chroot_dir . "/etc";
+	#system("sed -i -e '/LABEL=$debhomedev/d' fstab");
+	#system("sed -i -e 'a \ LABEL=$debhomedev /mnt/$debhomedev ext4 defaults,noauto 0 0' fstab");
 
 	# make directory for debhomedev to be mounted in the chroot environment
-	mkdir "$chroot_dir/mnt/$debhomedev" unless -d "$chroot_dir/mnt/$debhomedev";
+	#mkdir "$chroot_dir/mnt/$debhomedev" unless -d "$chroot_dir/mnt/$debhomedev";
 
 	# make the link for /mnt/debhome -> /chroot_dir/mnt/$debhomedev in the chroot environment
-	$rc = system("chroot $chroot_dir ln -s /mnt/$debhomedev/debhome $debhome");
-	die "Error making debhome link: $!" unless $rc == 0;
+	#$rc = system("chroot $chroot_dir ln -s /mnt/$debhomedev/debhome $debhome");
+	#die "Error making debhome link: $!" unless $rc == 0;
 
 	# make the link for /mnt/svn -> /chroot_dir/$svnpath in the chroot environment
-	$rc = system("chroot $chroot_dir ln -s $svnpath $svn");
-	die "Could not make link $svn -> $svnpath: $!" unless $rc == 0;
+	#$rc = system("chroot $chroot_dir ln -s $svnpath $svn");
+	#die "Could not make link $svn -> $svnpath: $!" unless $rc == 0;
 
 	# copy resolv.conf and interfaces so network will work
 	system("cp /etc/resolv.conf /etc/hosts " . $chroot_dir . "/etc/");
@@ -519,15 +596,16 @@ sub createchroot {
 # makes a dir dochroot to indicate dochroot was run
 # also deletes filesystem.squashfs in docchroot
 # since it will now change.
-# debhomedev was unmounted before createchroot
-# debhomedev must be mounted ro for safety
+# debhome and svn are accessed from the chroot environment
+# by binding /mnt/debhome and /mnt/svn to /mnt/debhome and /mnt/svn
+# in the chroot environment
 # installfs will use filesystem.squashfs if it exists
 # also requires svn if packages and or upgrade are done.
-# parameters: chroot_directory, debhome_device, upgrade, packages_list
-# requires: debhomedev to be mounted svn
+# parameters: chroot_directory, upgrade, packages_list
+# requires: /mnt/debhome and /mnt/svn to be binded to debhome and svn
 ###############################################
 sub dochroot {
-	my ($chroot_dir, $debhomedev, $upgrade, $packages) = @_;
+	my ($chroot_dir, $upgrade, $packages) = @_;
 
 	# get codename
 	open CDN, "<", "$chroot_dir/isoimage/codename.txt" or die "could not open $chroot_dir/isoimage/codename.txt: $!\n";
@@ -546,13 +624,13 @@ sub dochroot {
 	my $rc;
 	if (-f "$debhome/xconfig/themes.tar.xz") {
 		$rc = system("tar --xz -xf $debhome/xconfig/themes.tar.xz -C $chroot_dir/usr/share");
-		die "Could not extract themes from /mnt/$debhomedev/debhome/xconfig/themes.tar.xz" unless $rc == 0;
+		die "Could not extract themes from $debhome/themes.tar.xz" unless $rc == 0;
 	}
 
 	# if themes.tar.xz and icons.tar.xz are found
-	if (-f "$debhome/debhome/xconfig/icons.tar.xz") {
+	if (-f "$debhome/xconfig/icons.tar.xz") {
 		$rc = system("tar --xz -xf $debhome/xconfig/icons.tar.xz -C $chroot_dir/usr/share");
-		die "Could not extract themes from /mnt$debhomedev/debhome/xconfig/icons.tar.xz" unless $rc == 0;
+		die "Could not extract themes from $debhome/xconfig/icons.tar.xz" unless $rc == 0;
 	}
 	
 	#############################################################################################
@@ -561,16 +639,17 @@ sub dochroot {
 
 	# install apps in the chroot environment
 	bindall $chroot_dir;
-	
+
+	# chroot/mnt/debhome and /chroot/mnt/svn are bound to /mnt/debhome and /mnt/svn
 	# mount debhome in the chroot environment
-	$rc = system("chroot $chroot_dir mount -r -L $debhomedev /mnt/$debhomedev");
-	die "Could not mount $debhomedev in chroot environment: $!\n" unless $rc == 0;
+	#$rc = system("chroot $chroot_dir mount -r -L $debhomedev /mnt/$debhomedev");
+	#die "Could not mount $debhomedev in chroot environment: $!\n" unless $rc == 0;
 	
 	# parameters must be quoted for Bash
-	# liveinstall.sh "-d debhomedev" -u "upgrade/noupgrade" -p "package list"
+	# liveinstall.sh "-u "upgrade/noupgrade" -p "package list"
 	# make parameters list for liveinstall.sh
-	my $parameters = "-d $debhomedev ";
-	$parameters = $parameters . "-u " if $upgrade;
+	my $parameters;
+	$parameters = -u " if $upgrade;
 	$parameters = $parameters . "-p " . $packages if $packages;
 	
 	# execute liveinstall.sh in the chroot environment
@@ -592,10 +671,11 @@ sub dochroot {
 	#####################################################
 	
 	# umount debhome in the chroot environment
-	$rc = system("chroot $chroot_dir umount /mnt/$debhomedev");
-	die "Could not umount $debhomedev in chroot environment: $!\n" unless $rc == 0;
+	#$rc = system("chroot $chroot_dir umount /mnt/$debhomedev");
+	#die "Could not umount $debhomedev in chroot environment: $!\n" unless $rc == 0;
 	
 	# for exiting the chroot environment
+	# unbind debhome and svn
 	unbindall $chroot_dir;
 
 	# check if liveinstall exited with error in chroot environment
@@ -683,7 +763,7 @@ sub installfiles {
 #################################################
 # this sub sets up grub and installs it.
 # this is only necessary for partition 1
-# the call: installgrub(ubuntu_iso_name, chroot_directory, partition_path, subversion path)
+# the call: installgrub(chroot_directory, partition_path)
 # requires: svn and LINUXLIVE
 #################################################
 sub installgrub {
@@ -691,7 +771,7 @@ sub installgrub {
 	##########################################################################################################
 	# export the grub.cfg for mbr and uefi and edit grub only for partition 1
 	##########################################################################################################
-	my ($chroot_dir, $partition_path, $svn) = @_;
+	my ($chroot_dir, $partition_path) = @_;
 	my $rc;
 
 	# export grub
@@ -827,7 +907,7 @@ sub installfs {
 	mkdir $chroot_dir . "/boot/boot";
 		
 	# setup and install grub if this is the first partition
-	installgrub($chroot_dir, $partition_path, $svn);
+	installgrub($chroot_dir, $partition_path);
 	
 	# set grub colours
 	editgrub($chroot_dir);
@@ -854,10 +934,10 @@ sub installfs {
 # sub to initialise the setup of the LINUXLIVE partition.
 # if -c given create new chroot from scratch or use existing one
 # parameters passed:
-# createchroot, ubuntuiso-name, upgrade, debhome dev label, svn full path, packages list)
+# createchroot, ubuntuiso-name, upgrade, debhome path, svn full path, packages list)
 ####################################################
 sub initialise {
-	my ($doinstall, $makefs, $isoimage, $upgrade, $dochroot, $debhomedev, $svnpath, $packages)  = @_;
+	my ($doinstall, $makefs, $isoimage, $upgrade, $dochroot, $debhomepath, $svnpath, $packages)  = @_;
 
 	# set up chroot dir
 	my $chroot_dir = "/chroot";
@@ -878,34 +958,34 @@ sub initialise {
 	
 	# if creating new chroot
 	# un mount debhomedev
-	umountdevice $debhomedev;
-	createchroot($chroot_dir, $debhomedev, $svnpath, $isoimage) if $isoimage;
+	#==============================================
+	# determine how to umount debhome and svn
+	# before creating chroot
+	# debhome and svn are bound to directories in chroot
+	# they are not bound at startup.
+	# nothing to do here
+	#==============================================
 
-	# check debhomedev is attached needed for -u | -p | -e
-	# only create, install and makefs does not need debhomedev mounted
-	# installfs needs svn
-	my $rc;
-	if ($upgrade or $packages or $doinstall or $dochroot) {
-		$rc = system("blkid -L $debhomedev > /dev/null");
-		die "$debhomedev is not attached\n" unless $rc == 0;
+	createchroot($chroot_dir, $isoimage) if $isoimage;
 
-		# mount debhomedev ro
-		$rc = system("mount -r -L $debhomedev /mnt/$debhomedev");
-		die "Could not mount $debhomedev at /mnt/$debhomedev: $!\n" unless $rc == 0;
+	# -i needs svn and linuxlive
+	# -u -p -e need svn and debhome
+	# -c needs cdrom
+	# -m needs nothing
 
+	if ($upgrade or $packages or $dochroot) {
+		# svn and debhome needed
+		findrepo($svnpath, $svn);
+		# now find debhome
+		findrepo($debhomepath, $debhome);
+		
+	} elsif ($doinstall) {
+		# only -i was given, only svn and linuxlive are required
 		# check that subversion is accessible
-		# subversion may be on debhome device
-		if (-d $svnpath) {
-			# directory exists, make a link to /mnt/svn
-			unlink "$svn";
-			$rc = symlink "$svnpath", "$svn";
-			die "Could not link $svn -> $svnpath: $!\n" unless $rc;
-		} else {
-			# subversion does not exist
-			die "Could not find subversion at $svnpath\n";
-		}
-
-	}
+		# if subversion is not accessible try and mount it if it is a device
+		# if subversion is not found die
+		findrepo($svnpath, $svn);
+	} # end of elsif ($doinstall)
 	
 
 	# if packages or upgrade defined dochroot must be done
@@ -913,11 +993,11 @@ sub initialise {
 		# if chroot environment does not exist die
 		die ("chroot environment does not exist\n") unless -d $chroot_dir;
 		# dochroot must be done
-		dochroot($chroot_dir, $debhomedev, $upgrade, $packages);
+		dochroot($chroot_dir, $upgrade, $packages);
 		
 	} elsif (($doinstall or $makefs) and (! -d "$chroot_dir/dochroot")) {
 		# dochroot must be done if directory dochroot does not exist
-		dochroot($chroot_dir, $debhomedev, $upgrade, $packages);
+		dochroot($chroot_dir, $upgrade, $packages);
 	}
 	
 	
@@ -942,19 +1022,17 @@ sub initialise {
 	# install in LINUXLIVE/UBUNTU
 	installfs($label, $casper, $chroot_dir) if $doinstall;
 
-	# un mount debhomedev
-	umountdevice $debhomedev;
 }
 
 sub usage {
-	my ($debhomedev, $svnpath) = @_;
+	my ($debhomepath, $svnpath) = @_;
 	print "-c iso name, create changeroot -- only create needs iso image\n";
 	print "-u do a full-upgrade\n";
 	print "-e use existing changeroot takes predence over -c needs\n";
 	print "-m make filesystem.squashfs, dochroot must be complete\n";
 	print "-p list of packages to install in chroot in quotes\n";
-	print "-D disk label for debhome, default is $debhomedev\n";
-	print "-s full path to subversion, default is $svnpath\n";
+	print "-D full path for debhome, default is $debhomepath\n";
+	print "-S full path to subversion, default is $svnpath\n";
 	print "-d size of partition in GB the disk into an 8G(default) fat32 LINUXLIVE plus the reset ntfs ele\n";
 	print "-i install the image to LINUXLIVE\n";
 	print "-M fullsource of macrium files, default is $macriumsource\n";
@@ -976,17 +1054,21 @@ sub usage {
 # One or both iso's can be given.
 # package list in quotes, if given
 
-# default device for local repository debhome and subversion
-# dehome dev is default for svn
-my $debhomedev = "ad64";
+# -i needs svn and linuxlive
+# -u -p -e need svn and debhome
+# -c needs cdrom
+# -m needs nothing
 
-# if -u or -p is given but not -c then chroot = use should be used.
+# default paths for debhome and svn
+$debhomepath = "/mnt/ad64/debhome";
+$svnpath = "/mnt/ad64/svn";
+
 # get command line options
 
 # default parameters for -d default is 8GB
 defaultparameter();
 
-getopts('mic:ep:hus:d:M:R:VD:');
+getopts('mic:ep:huS:d:M:R:VD:');
 
 # check version and exit 
 if ($opt_V) {
@@ -995,19 +1077,15 @@ if ($opt_V) {
 }
 
 # setup debhome if it has changed from the default
-$debhomedev = $opt_D if $opt_D;
-
-# default path for local subversion
-# in case debhomedev has changed
-my $svnpath = "/mnt/$debhomedev/svn";
+$debhomepath = $opt_D if $opt_D;
 
 # setup svn path if it has changed
 # done here for usage sub
 # svnpath overrides previous path
 # if it has changed
-$svnpath = $opt_s if $opt_s;
+$svnpath = $opt_S if $opt_S;
 
-usage($debhomedev, $svnpath) if $opt_h;
+usage($debhomepath, $svnpath) if $opt_h;
 # return code from functions
 my $rc;
 
@@ -1030,4 +1108,4 @@ if ($opt_c) {
 partitiondisk($opt_d) if $opt_d;
 
 # initialise variables and invoke subs depending on cmdine parameters
-initialise($opt_i, $opt_m, $opt_c, $opt_u, $opt_e, $debhomedev, $svnpath, $packages);
+initialise($opt_i, $opt_m, $opt_c, $opt_u, $opt_e, $debhomepath, $svnpath, $packages);
