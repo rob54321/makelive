@@ -649,7 +649,7 @@ sub dochroot {
 	# liveinstall.sh "-u "upgrade/noupgrade" -p "package list"
 	# make parameters list for liveinstall.sh
 	my $parameters;
-	$parameters = -u " if $upgrade;
+	$parameters = "-u " if $upgrade;
 	$parameters = $parameters . "-p " . $packages if $packages;
 	
 	# execute liveinstall.sh in the chroot environment
@@ -1060,8 +1060,8 @@ sub usage {
 # -m needs nothing
 
 # default paths for debhome and svn
-$debhomepath = "/mnt/ad64/debhome";
-$svnpath = "/mnt/ad64/svn";
+my $debhomepath = "/mnt/ad64/debhome";
+my $svnpath = "/mnt/ad64/svn";
 
 # get command line options
 
