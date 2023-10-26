@@ -263,6 +263,11 @@ sub getcodename {
 #######################################################
 # sub to bind sys tmp dev dev/pts proc for chroot
 # environment
+# access to debhome and svn in the chroot environment
+# is done through the binding of /mnt/debhome to /chroot/mnt/debhome
+# and for svn /mnt/svn to /chroot/mnt/svn
+# the directories are made in by bindall in the
+# chroot environment
 # usage: bindall chroot_dir
 # returns: none
 # exceptions: dies if chroot dir does not exist
