@@ -277,23 +277,28 @@ sub bindall {
 	my $chroot_dir = $_[0];
 	chdir $chroot_dir or die "$chroot_dir does not exist, exiting\n";
 
-	# bind
-	system("mount --bind /proc proc");
-	system("mount --bind /tmp tmp");
-	system("mount --bind /dev dev");
-	system("mount --bind /dev/pts dev/pts");
-	system("mount --bind /sys sys");
+	# bind all in list
+	# bind for all in list
+	my @bindlist = ("/proc", "/dev", "/dev/pts", "/sys", "/tmp", "$svn", "$debhome");
+	my $rc;
 
-	#for the chroot environment to have access
-	# to svn and debhome the directories /mnt/debhome
-	# and /mnt/svn are bound to /chroot/mnt/debhome
-	# and /chroot/mnt/svn
-	# check that the directories exists in the chroot environment
-	mkdir $chroot_dir . $debhome unless -d $chroot_dir . $debhome;
-	mkdir $chroot_dir . $svn unless -d $chroot_dir . $svn;
+	# make directories for debhome and svn
+	mkdir "$chroot_dir" . "$svn" unless -d "$chroot_dir" . "$svn";
+	mkdir "$chroot_dir" . "$debhome" unless -d "$chroot_dir" . "$debhome";
 	
-	system("mount --bind $svn $chroot_dir . $svn");
-	system("mount --bind $debhome $chroot_dir . $debhome");
+	foreach my $dir (@bindlist) {
+		# check if it is already mounted
+		$rc = system("findmnt $chroot_dir" . "$dir 2>&1 >/dev/null");
+		unless ($rc == 0) {
+			# not mounted, mount dir
+			$rc = system("mount --bind $dir $chroot_dir" . "$dir");
+			die "Could not bind $chroot_dir" . "$dir: $!\n" unless $rc == 0;
+			print "$chroot_dir" . "$dir mounted\n";
+		} else {
+			# already mounted
+			print "$chroot_dir" . "$dir is already mounted\n";
+		}
+	}
 }
 
 #######################################################
@@ -308,20 +313,21 @@ sub unbindall {
 	my $chroot_dir = $_[0];
 	die "$chroot_dir does not exist, exiting\n" unless -d $chroot_dir;
 
-	# bind
-	system("umount $chroot_dir/proc");
-	system("umount $chroot_dir/dev/pts");
-	system("umount $chroot_dir/dev");
-	system("umount $chroot_dir/sys");
-	system("umount $chroot_dir/tmp");
-
-	# svn and debhome are bound to directories of the same name in
-	# the chroot environment. They must be unmounted
-	my $rc = system("umount $chroot_dir . $svn");
-	die "Could not umount $chroot_dir . $svn: $!\n" unless $rc == 0;
-	
-	system("umount $chroot_dir . $debhome");
-	die "Could not umount $chroot_dir . $debhome: $!\n" unless $rc == 0;
+	# bind for all in list
+	my @bindlist = ("/proc", "/dev/pts", "/dev", "/sys", "/tmp", "$svn", "$debhome");
+	my $rc;
+	foreach my $dir (@bindlist) {
+		$rc = system("findmnt $chroot_dir" . "$dir 2>&1 >/dev/null");
+		if ($rc == 0) {
+			# dir mounted, unmount it
+			print "$chroot_dir" . "$dir unmounted\n";
+			$rc = system("umount $chroot_dir" . "$dir");
+			die "Could not umount $chroot_dir" . "$dir: $!\n" unless $rc == 0;
+		} else {
+			# dir not mounted
+			print "$chroot_dir" . "$dir not mounted\n";
+		}
+	}
 }
 	
 #################################################
@@ -653,12 +659,14 @@ sub dochroot {
 	# parameters must be quoted for Bash
 	# liveinstall.sh "-u "upgrade/noupgrade" -p "package list"
 	# make parameters list for liveinstall.sh
-	my $parameters;
+	# parameters is set to " " so that if only packages is given
+	# there won't be a warning.
+	my $parameters = " ";
 	$parameters = "-u " if $upgrade;
 	$parameters = $parameters . "-p " . $packages if $packages;
 	
 	# execute liveinstall.sh in the chroot environment
-	print "parameters: $parameters\n";
+	print "parameters: $parameters\n" if $parameters;
 
 	# liveinstall is a package in the dehome distribution
 	# so debhome must be setup for liveinstall to be

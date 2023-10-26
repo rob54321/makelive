@@ -1,21 +1,30 @@
-#!/bin/bash
+#!/usr/bin/perl
+use strict;
+use warnings;
 
-if [ $# != 1 ]
-then
-	echo "chroot directory required"
-	exit 1;
-fi
+my $debhome = "/mnt/debhome";
+my $svn = "/mnt/svn";
 
-CHROOT=$1
+sub unbindall {
+	# parameters
+	my $chroot_dir = $_[0];
+	die "$chroot_dir does not exist, exiting\n" unless -d $chroot_dir;
 
-if [ ! -d ${CHROOT} ]
-then
-	echo "${CHROOT} does not exist"
-	exit 1
-fi
-cd ${CHROOT}
-umount proc
-umount dev/pts
-umount dev
-umount sys
-umount tmp
+	# bind for all in list
+	my @bindlist = ("/proc", "/dev/pts", "/dev", "/sys", "/tmp", "$svn", "$debhome");
+	my $rc;
+	foreach my $dir (@bindlist) {
+		$rc = system("findmnt $chroot_dir" . "$dir 2>&1 >/dev/null");
+		if ($rc == 0) {
+			# dir mounted, unmount it
+			print "$chroot_dir" . "$dir unmounted\n";
+			$rc = system("umount $chroot_dir" . "$dir");
+			die "Could not umount $chroot_dir" . "$dir: $!\n" unless $rc == 0;
+		} else {
+			# dir not mounted
+			print "$chroot_dir" . "$dir not mounted\n";
+		}
+	}
+}
+die "Usage: unbindall chroot directory\n" unless $ARGV[0];
+unbindall $ARGV[0];

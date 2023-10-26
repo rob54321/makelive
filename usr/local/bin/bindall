@@ -1,23 +1,32 @@
-#!/bin/bash
-# this script changes to the directory where the chroot is
-# and binds all necessary directories for a chroot
-# first parameter is distribution
-# second parameter is architecture
-if [ $# != 1 ]
-then
-	echo "chroot directory required"
-	exit 1;
-fi
+#!/usr/bin/perl
+use strict;
+use warnings;
 
-CHROOT=$1
-if [ ! -d ${CHROOT} ]
-then
-	echo "${CHROOT} does not exist"
-	exit 1
-fi
-cd ${CHROOT}
-mount --bind /proc proc
-mount --bind /dev dev
-mount --bind /dev/pts dev/pts
-mount --bind /sys sys
-mount --bind /tmp tmp
+my $debhome = "/mnt/debhome";
+my $svn = "/mnt/svn";
+
+sub bindall {
+	# parameters
+	my $chroot_dir = $_[0];
+	chdir $chroot_dir or die "$chroot_dir does not exist, exiting\n";
+
+	# bind all in list
+	# bind for all in list
+	my @bindlist = ("/proc", "/dev", "/dev/pts", "/sys", "/tmp", "$svn", "$debhome");
+	my $rc;
+	foreach my $dir (@bindlist) {
+		# check if it is already mounted
+		$rc = system("findmnt $chroot_dir" . "$dir 2>&1 >/dev/null");
+		unless ($rc == 0) {
+			# not mounted, mount dir
+			$rc = system("mount --bind $dir $chroot_dir" . "$dir");
+			die "Could not bind $chroot_dir" . "$dir: $!\n" unless $rc == 0;
+			print "$chroot_dir" . "$dir mounted\n";
+		} else {
+			# already mounted
+			print "$chroot_dir" . "$dir is already mounted\n";
+		}
+	}
+}
+die "Usage: bindall chroot directory\n" unless $ARGV[0];
+bindall $ARGV[0];
