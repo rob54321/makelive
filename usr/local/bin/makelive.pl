@@ -1039,14 +1039,14 @@ sub initialise {
 
 sub usage {
 	my ($debhomepath, $svnpath) = @_;
-	print "-c iso name, create changeroot -- only create needs iso image\n";
-	print "-u do a full-upgrade\n";
-	print "-e use existing changeroot takes predence over -c needs\n";
-	print "-m make filesystem.squashfs, dochroot must be complete\n";
-	print "-p list of packages to install in chroot in quotes\n";
+	print "-c iso name, create changeroot -- needs iso image\n";
+	print "-u do a full-upgrade -- needs svn debhome\n";
+	print "-e run dochroot -- needs svn debhome\n";
+	print "-m make filesystem.squashfs, dochroot must be complete -- needs nothing\n";
+	print "-p list of packages to install quotes -- needs svn debhome\n";
 	print "-D full path for debhome, default is $debhomepath\n";
 	print "-S full path to subversion, default is $svnpath\n";
-	print "-d size of partition in GB the disk into an 8G(default) fat32 LINUXLIVE plus the reset ntfs ele\n";
+	print "-d size of partition in GB the disk into an 8G(default) fat32 LINUXLIVE plus the reset ntfs ele\n -- ";
 	print "-i install the image to LINUXLIVE\n";
 	print "-M fullsource of macrium files, default is $macriumsource\n";
 	print "-R full source of recovery, contains RECOVERALL and SOURCES dirs, default is $recoverysource\n";
