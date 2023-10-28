@@ -5,12 +5,20 @@ use warnings;
 use Getopt::Std;
 use File::Basename;
 
+###################################################
+# Global constants
+###################################################
 # global constant links for debhome and subversion
 # sources for macrium and recovery
 my $svn = "/mnt/svn";
 my $debhome = "/mnt/debhome";
 my $macriumsource = "/root/MACRIUM";
 my $recoverysource = "/root/RECOVERY";
+# default paths for debhome and svn
+# these are constant
+my $debhomepathoriginal = "/mnt/ad64/debhome";
+my $svnpathoriginal = "/mnt/ad64/svn";
+###################################################
 
 # get command line arguments
 our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_D, $opt_S, $opt_h, $opt_d, $opt_M, $opt_R, $opt_V);
@@ -35,7 +43,39 @@ our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_D, $opt_S, $opt_h, $opt
 #######################################################
 
 
+######################################################
+# sub to restore links /mnt/svn /mnt/debhome
+# to the default original values if they have changed
+# in the chroot environment
+# parameters: chroot directory
+sub restorelinks{
+	my ($chroot_dir) = @_;
 
+	# /mnt/svn and /mnt/debhome may be
+	# directories.
+	rmdir $chroot_dir . $svn if -d $chroot_dir . $svn;
+	rmdir $chroot_dir . $debhome if -d $chroot_dir . $debhome;
+
+	# debhomepath is of form /mnt/ad64/debhome
+	# svnpath is of form /mnt/ad64/svn
+	# (name, path) = fileparse(fullpath)
+	my $debhomepath = (fileparse($debhomepathoriginal))[1];
+	my $svnpath = (fileparse($svnpathoriginal))[1];
+	
+	# make dirs incase they do not exist
+	mkdir "$chroot_dir" . "$debhomepath" unless -d "$chroot_dir" . "$debhomepath";
+	mkdir "$chroot_dir" . "$svnpath" unless -d "$chroot_dir" . "$svnpath";
+
+	# make the link for /mnt/debhome -> /chroot_dir/mnt/$debhomedev in the chroot environment
+	my $rc = system("chroot $chroot_dir ln -s $debhomepath $debhome");
+	die "Error making $debhome -> $debhomepath link in chroot: $!" unless $rc == 0;
+
+	# make the link for /mnt/svn -> /chroot_dir/$svnpath in the chroot environment
+	$rc = system("chroot $chroot_dir ln -s $svnpath $svn");
+	die "Could not make link $svn -> $svnpath in chroot: $!" unless $rc == 0;
+
+	# owership will be set by init-linux	
+}	
 ######################################################
 # sub to delete all partitions and make a
 # partition 1: 1G fat32 for MACRIUM REFLECT LABEL = MACRIUM uuid = AED6-434E
@@ -205,6 +245,10 @@ sub makefs {
 	# if the file exists, delete it
 	# or mksquashfs will fail.
 	unlink "$chroot_dir/dochroot/filesystem.squashfs";
+	
+	# restore the links for svn and debhome, since directories chroot/mnt/debhome and chroot/mnt/svn
+	# were bound to /mnt/debhome and /mnt/svn for the chroot environment
+	restorelinks($chroot_dir);
 	
 	# make the file system the boot directory must be included, config-xxxx file is needed by initramfs during install
 	my $rc = system("mksquashfs " . $chroot_dir . " $chroot_dir/dochroot/filesystem.squashfs -e oldboot -e dochroot -e upgrade -e packages -e isoimage");
@@ -546,22 +590,6 @@ sub createchroot {
 	die "Error unsquashing /mnt/cdrom/casper/filesystem.squashfs\n"unless $rc == 0;
 	print "unsquashed filesystem.squashfs\n";
 		
-	# edit fstab in chroot so debhome can be mounted
-	#chdir $chroot_dir . "/etc";
-	#system("sed -i -e '/LABEL=$debhomedev/d' fstab");
-	#system("sed -i -e 'a \ LABEL=$debhomedev /mnt/$debhomedev ext4 defaults,noauto 0 0' fstab");
-
-	# make directory for debhomedev to be mounted in the chroot environment
-	#mkdir "$chroot_dir/mnt/$debhomedev" unless -d "$chroot_dir/mnt/$debhomedev";
-
-	# make the link for /mnt/debhome -> /chroot_dir/mnt/$debhomedev in the chroot environment
-	#$rc = system("chroot $chroot_dir ln -s /mnt/$debhomedev/debhome $debhome");
-	#die "Error making debhome link: $!" unless $rc == 0;
-
-	# make the link for /mnt/svn -> /chroot_dir/$svnpath in the chroot environment
-	#$rc = system("chroot $chroot_dir ln -s $svnpath $svn");
-	#die "Could not make link $svn -> $svnpath: $!" unless $rc == 0;
-
 	# copy resolv.conf and interfaces so network will work
 	system("cp /etc/resolv.conf /etc/hosts " . $chroot_dir . "/etc/");
 	system("cp /etc/network/interfaces " . $chroot_dir . "/etc/network/");
@@ -1072,10 +1100,6 @@ sub usage {
 # -c needs cdrom
 # -m needs nothing
 
-# default paths for debhome and svn
-my $debhomepath = "/mnt/ad64/debhome";
-my $svnpath = "/mnt/ad64/svn";
-
 # get command line options
 
 # default parameters for -d default is 8GB
@@ -1090,7 +1114,11 @@ if ($opt_V) {
 }
 
 # setup debhome if it has changed from the default
+my $debhomepath = $debhomepathoriginal;
 $debhomepath = $opt_D if $opt_D;
+
+my $svnpath = $svnpathoriginal;
+$svnpath = $opt_S if $opt_S;
 
 # setup svn path if it has changed
 # done here for usage sub
