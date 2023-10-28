@@ -42,14 +42,57 @@ our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_D, $opt_S, $opt_h, $opt
 #
 #######################################################
 
+#######################################################
+# sub to restore /mnt/debhome and /mnt/svn links
+# in main system
+# parameters: none
+#######################################################
+sub restoremainlinks {
+	# restore links in main system
+	# to the original values
+	my $link;
 
+	# for svn
+	if (-l $svn) {
+		$link = readlink $svn;
+		if ("$link" ne "$svnpathoriginal") {
+			unlink $svn;
+			symlink ($svnpathoriginal, $svn);
+			# set ownership
+			system("chown robert:robert -h $svn");
+		}
+	} else {
+		# link does not exist
+		# make it
+		symlink ($svnpathoriginal, $svn);
+		# set ownership
+		system("chown robert:robert -h $svn");
+	}
+	# for debhome
+	if (-l $debhome) {
+		$link = readlink $debhome;
+		if ("$link" ne "$debhomepathoriginal") {
+			unlink $debhome;
+			symlink ($debhomepathoriginal, $debhome);
+			# set ownership
+			system("chown robert:robert -h $debhome");
+		}
+	} else {
+		# link does not exist
+		# make it
+		symlink ($debhomepathoriginal, $debhome);
+		# set ownership
+		system("chown robert:robert -h $debhome");
+	}
+
+}
 ######################################################
 # sub to restore links /mnt/svn /mnt/debhome
 # to the default original values if they have changed
-# in the chroot environment
 # parameters: chroot directory
-sub restorelinks{
-	my ($chroot_dir) = @_;
+######################################################
+sub restorechrootlinks{
+	my ($chroot_dir) = $_[0];
 
 	# /mnt/svn and /mnt/debhome may be
 	# directories.
@@ -66,15 +109,21 @@ sub restorelinks{
 	mkdir "$chroot_dir" . "$debhomepath" unless -d "$chroot_dir" . "$debhomepath";
 	mkdir "$chroot_dir" . "$svnpath" unless -d "$chroot_dir" . "$svnpath";
 
-	# make the link for /mnt/debhome -> /chroot_dir/mnt/$debhomedev in the chroot environment
-	my $rc = system("chroot $chroot_dir ln -s $debhomepath $debhome");
+	# make the link for /mnt/debhome -> /chroot_dir/mnt/ad64/debhome in the chroot environment
+	unlink "$chroot_dir" . "$debhome";
+	my $rc = system("chroot $chroot_dir ln -v -s $debhomepathoriginal $debhome");
 	die "Error making $debhome -> $debhomepath link in chroot: $!" unless $rc == 0;
 
 	# make the link for /mnt/svn -> /chroot_dir/$svnpath in the chroot environment
-	$rc = system("chroot $chroot_dir ln -s $svnpath $svn");
+	unlink "$chroot_dir" . "$svn";
+	$rc = system("chroot $chroot_dir ln -v -s $svnpathoriginal $svn");
 	die "Could not make link $svn -> $svnpath in chroot: $!" unless $rc == 0;
 
-	# owership will be set by init-linux	
+	# set ownership
+	system("chown robert:robert -h $chroot_dir" . "$svn");
+	system("chown robert:robert -h $chroot_dir" . "$debhome");
+	system("chown robert:robert $chroot_dir" . "/mnt");
+
 }	
 ######################################################
 # sub to delete all partitions and make a
@@ -246,10 +295,6 @@ sub makefs {
 	# or mksquashfs will fail.
 	unlink "$chroot_dir/dochroot/filesystem.squashfs";
 	
-	# restore the links for svn and debhome, since directories chroot/mnt/debhome and chroot/mnt/svn
-	# were bound to /mnt/debhome and /mnt/svn for the chroot environment
-	restorelinks($chroot_dir);
-	
 	# make the file system the boot directory must be included, config-xxxx file is needed by initramfs during install
 	my $rc = system("mksquashfs " . $chroot_dir . " $chroot_dir/dochroot/filesystem.squashfs -e oldboot -e dochroot -e upgrade -e packages -e isoimage");
 	die "mksquashfs returned and error\n" unless $rc == 0;
@@ -326,6 +371,10 @@ sub bindall {
 	my @bindlist = ("/proc", "/dev", "/dev/pts", "/sys", "/tmp", "$svn", "$debhome");
 	my $rc;
 
+	# if links exist delete them
+	unlink $chroot_dir . $svn if -l $chroot_dir . $svn;
+	unlink $chroot_dir . $debhome if -l $chroot_dir . $debhome;
+	
 	# make directories for debhome and svn
 	mkdir "$chroot_dir" . "$svn" unless -d "$chroot_dir" . "$svn";
 	mkdir "$chroot_dir" . "$debhome" unless -d "$chroot_dir" . "$debhome";
@@ -348,7 +397,7 @@ sub bindall {
 #######################################################
 # sub to unbind sys tmp dev dev/pts proc for chroot
 # environment
-# usage: unbindall chroot_dir
+# usage: unbindall chroot_dir, restorelinks
 # returns: none
 # exceptions: dies if chroot dir does not exist
 #######################################################
@@ -372,6 +421,8 @@ sub unbindall {
 			print "$chroot_dir" . "$dir not mounted\n";
 		}
 	}
+	# restore the links in the chroot environment
+	restorechrootlinks($chroot_dir);
 }
 	
 #################################################
@@ -557,6 +608,7 @@ sub createchroot {
 		
 	# delete the old chroot environment if it exists
 	if (-d $chroot_dir) {
+		# unbind dirs
 		unbindall $chroot_dir;
 		# check if $chroot_dir/boot is mounted in chroot environment
 		# need to protect the live drive
@@ -717,6 +769,7 @@ sub dochroot {
 	
 	# for exiting the chroot environment
 	# unbind debhome and svn
+	# reset chroot links
 	unbindall $chroot_dir;
 
 	# check if liveinstall exited with error in chroot environment
@@ -1150,3 +1203,6 @@ partitiondisk($opt_d) if $opt_d;
 
 # initialise variables and invoke subs depending on cmdine parameters
 initialise($opt_i, $opt_m, $opt_c, $opt_u, $opt_e, $debhomepath, $svnpath, $packages);
+
+# restore main links
+restoremainlinks;
