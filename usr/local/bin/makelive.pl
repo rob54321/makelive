@@ -368,7 +368,7 @@ sub bindall {
 
 	# bind all in list
 	# bind for all in list
-	my @bindlist = ("/proc", "/dev", "dev/pts", "/tmp", "/sys", "$svn", "$debhome");
+	my @bindlist = ("/proc", "/dev", "/dev/pts", "/tmp", "/sys", "$svn", "$debhome");
 	my $rc;
 
 	# if links exist delete them
