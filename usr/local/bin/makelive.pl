@@ -368,7 +368,7 @@ sub bindall {
 
 	# bind all in list
 	# bind for all in list
-	my @bindlist = ("/proc", "$svn", "$debhome");
+	my @bindlist = ("/proc", "/dev", "dev/pts", "/tmp", "/sys", "$svn", "$debhome");
 	my $rc;
 
 	# if links exist delete them
@@ -407,7 +407,7 @@ sub unbindall {
 	die "$chroot_dir does not exist, exiting\n" unless -d $chroot_dir;
 
 	# bind for all in list
-	my @bindlist = ("/proc", "$svn", "$debhome");
+	my @bindlist = ("$debhome", "$svn", "/sys", "/tmp", "/dev/pts", "/dev", "/proc");
 	my $rc;
 	foreach my $dir (@bindlist) {
 		$rc = system("findmnt $chroot_dir" . "$dir 2>&1 >/dev/null");
