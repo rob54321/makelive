@@ -102,22 +102,22 @@ sub restorechrootlinks{
 	# debhomepath is of form /mnt/ad64/debhome
 	# svnpath is of form /mnt/ad64/svn
 	# (name, path) = fileparse(fullpath)
-	my $debhomepath = (fileparse($debhomepathoriginal))[1];
-	my $svnpath = (fileparse($svnpathoriginal))[1];
+	my $debhomemount = (fileparse($debhomepathoriginal))[1];
+	my $svnmount = (fileparse($svnpathoriginal))[1];
 	
 	# make dirs incase they do not exist
-	mkdir "$chroot_dir" . "$debhomepath" unless -d "$chroot_dir" . "$debhomepath";
-	mkdir "$chroot_dir" . "$svnpath" unless -d "$chroot_dir" . "$svnpath";
+	mkdir "$chroot_dir" . "$debhomemount" unless -d "$chroot_dir" . "$debhomemount";
+	mkdir "$chroot_dir" . "$svnmount" unless -d "$chroot_dir" . "$svnmount";
 
 	# make the link for /mnt/debhome -> /chroot_dir/mnt/ad64/debhome in the chroot environment
 	unlink "$chroot_dir" . "$debhome";
 	my $rc = system("chroot $chroot_dir ln -v -s $debhomepathoriginal $debhome");
-	die "Error making $debhome -> $debhomepath link in chroot: $!" unless $rc == 0;
+	die "Error making $debhome -> $debhomepathoriginal link in chroot: $!" unless $rc == 0;
 
 	# make the link for /mnt/svn -> /chroot_dir/$svnpath in the chroot environment
 	unlink "$chroot_dir" . "$svn";
 	$rc = system("chroot $chroot_dir ln -v -s $svnpathoriginal $svn");
-	die "Could not make link $svn -> $svnpath in chroot: $!" unless $rc == 0;
+	die "Could not make link $svn -> $svnpathoriginal in chroot: $!" unless $rc == 0;
 
 	# set ownership
 	system("chown robert:robert -h $chroot_dir" . "$svn");
