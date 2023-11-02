@@ -620,14 +620,10 @@ sub createchroot {
 			die "Could not umount $chroot_dir/boot\n" unless $rc == 0;
 		}
 
-		# move it to /tmp/junk
-		$rc = system("mv -f $chroot_dir  /tmp/junk");
-		die "Could not move $chroot_dir to /tmp/junk" unless $rc == 0;
-		
 		# remove directory
-		$rc = system("rm -rf /tmp/junk");
+		$rc = system("rm -rf $chroot_dir");
 		die "cannot remove $chroot_dir\n" unless $rc == 0;
-		print "removed /tmp/junk\n";
+		print "removed $chroot_dir\n";
 	}
 
 	#####################################################################################
