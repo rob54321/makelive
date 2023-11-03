@@ -639,7 +639,8 @@ sub createchroot {
 	open DISK, "<", "/mnt/cdrom/.disk/info" or die "could not open /mnt/cdrom/.disk/info: $!\n";
 	my $string = <DISK>;
 	chomp($string);
-
+	close DISK;
+	
 	# file is of form:
 	# Ubuntu-MATE 24.04 "Noble Numbat" - Daily amd64 (20231101)
 	# get version and code name
