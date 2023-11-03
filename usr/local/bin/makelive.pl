@@ -321,31 +321,18 @@ sub editgrub {
 # the cdrom must be mounted
 # and the codename is returned if found
 # else undefined is returned.
-# no parameters are passed to this sub.
-# requires: cdrom to be mounted
+# parameters: chroot_dir
+# returns codename
+# requires: nothing
 #######################################################
 sub getcodename {
-	# open directory for reading
-	opendir DIR, "/mnt/cdrom/dists" or die "Could not open /mnt/cdrom/dists: $!\n";
-        my ($dir, $codename);
-	undef $codename;
+	my $chroot_dir = $_[0];
 	
-        # search for the correct name, list contains . .. impish stable unstable
-        while ($dir = readdir(DIR)) {
-        	# if dir is a . or .. ignore it
-        	if ($dir =~ /^\./) {
-        		next;
-        	} else {
-        		# check if dir is a link or not
-        		if ( ! -l "/mnt/cdrom/dists/$dir") {
-        			# code name found
-        			$codename = $dir;
-        			last;
-        		}
-        	}
-        }
-        closedir DIR;
-
+	# read file chroot_dir/isoimage/codename.txt
+	open CODENAME, "<", "$chroot_dir/isoimage/codename.txt" or die "could not open $chroot_dir/isoimage/codename.txt: $!\n";
+	my $codename = <CODENAME>;
+	chomp($codename);
+	
         return $codename;
 }
 
@@ -645,18 +632,32 @@ sub createchroot {
 	system("cp -dR /etc/apt/trusted.gpg.d " . $chroot_dir . "/etc/apt/");
 	system("cp -a /etc/apt/trusted.gpg " . $chroot_dir . "/etc/apt/") if -f "/etc/apt/trusted.gpg";
 
-	# save the name of the iso in $chroot_dir/isoimage/isoimage.txt
-	mkdir "$chroot_dir/isoimage";
-	open ISO, ">", "$chroot_dir/isoimage/isoimage.txt" or die "could not save iso image name: $!\n";
-	print ISO "$isoimage";
-	close ISO;
+	# the file /mnt/cdrom/.disk/info contains the codename and version of linux
+	# read this file and store the codename in chroot_dir/isoimage/codename.txt
+	# and store the version in chroot_dir/isoimage/version.txt
+	#open /mnt/cdrom/.disk/info for reading
+	open DISK, "<", "/mnt/cdrom/.disk/info" or die "could not open /mnt/cdrom/.disk/info: $!\n";
+	my $string = <DISK>;
+	chomp($string);
 
-	# get the code name
-	my $codename = getcodename();
-	# write it to a file $chroot_dir/isoimage/codename.txt
-	open CDN, ">", "$chroot_dir/isoimage/codename.txt" or die "could not write code name to $chroot_dir/isoimage/codename.txt: $!\n";
-	print CDN "$codename";
-	close CDN;
+	# file is of form:
+	# Ubuntu-MATE 24.04 "Noble Numbat" - Daily amd64 (20231101)
+	# get version and code name
+	my ($version, $codename) = (split(/\s+/, $string))[1,2];
+	# strip the " from the codename
+	$codename =~ s/\"//;
+	print "codename = $codename: version = $version\n";
+
+	# write codename and version to files in chroot_dir/isoimage/codename.txt
+	# and chroot_dir/isoimage/version.txt
+	mkdir "$chroot_dir/isoimage";
+	open VERSION, ">", "$chroot_dir/isoimage/version.txt" or die "could not save $version to $chroot_dir/isoimage/version.txt: $!\n";
+	print VERSION "$version";
+	close VERSION;
+	open CODENAME, ">", "$chroot_dir/isoimage/codename.txt" or die "could not save $codename to $chroot_dir/isoimage/codename.txt: $!\n";
+	print CODENAME "$codename";
+	close CODENAME;
+	
 
 	# copy vmlinuz and initrd from cdrom to
 	# $chroot_dir/oldboot incase there is no
@@ -681,7 +682,7 @@ sub createchroot {
 ###############################################
 # sub to change root  and run liveinstall.sh
 # makes a dir dochroot to indicate dochroot was run
-# also deletes filesystem.squashfs in docchroot
+# also deletes filesystem.squashfs in dochroot
 # since it will now change.
 # debhome and svn are accessed from the chroot environment
 # by binding /mnt/debhome and /mnt/svn to /mnt/debhome and /mnt/svn
@@ -779,8 +780,9 @@ sub dochroot {
 #######################################################
 # this sub determines the version
 # which will be used for grub
-# the full iso name is in $chroot_dir/isoimage/isomage.txt
+# the full iso name is in $chroot_dir/isoimage/version.txt
 # parameter passed: $chroot_dir
+# returns version
 # requirements: none
 ######################################################
 sub getversion {
@@ -792,34 +794,11 @@ sub getversion {
 	################################
 
 	# read the file 
-	open ISO, "<", "$chroot_dir/isoimage/isoimage.txt" or die "could not open $chroot_dir/isoimage/isoimage.txt: $!\n";
-	my $isoimage = <ISO>;
-	chomp($isoimage);
+	open ISO, "<", "$chroot_dir/isoimage/version.txt" or die "could not open $chroot_dir/isoimage/isoimage.txt: $!\n";
+	my $version = <ISO>;
+	chomp($version);
 	close ISO;
 	
-	# get version
-	# names could be ubuntu-21.04-desktop-amd64.iso
-	# or             /some/path-with/extra/ubuntu-mate-21.04-desktop-amd64.iso
-	# the file name must be striped from the path
-	my $file = basename($isoimage);
-		
-	my $version = (split /-/, $file)[1];
-	print "first try: linux version = $version\n";
-
-	# check if version is a digit
-	if ($version !~ /^(\d+)/) {
-		# not a digit, must be the next field
-		$version = (split /-/, $file)[2];
-		print "linux version = $version\n";
-				
-		# if still not a version, prompt for version
-		if ($version !~ /^\d+/) {
-			# still not a digit, prompt
-			print "Can't determine version, enter version\n";
-			$version = <STDIN>;
-			chomp($version);
-		}
-	}
 	return $version;
 }
 
