@@ -646,11 +646,11 @@ sub createchroot {
 	# get version and code name
 	my ($version, $codename) = (split(/\s+/, $string))[1,2];
 
+	# strip the " from the codename
+	$codename =~ s/\"//;
 	# convert codename to lower case
 	$codename = lc $codename;
 	
-	# strip the " from the codename
-	$codename =~ s/\"//;
 	print "codename = $codename: version = $version\n";
 
 	# write codename and version to files in chroot_dir/isoimage/codename.txt
