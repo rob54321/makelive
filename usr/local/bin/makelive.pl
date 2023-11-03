@@ -645,6 +645,10 @@ sub createchroot {
 	# Ubuntu-MATE 24.04 "Noble Numbat" - Daily amd64 (20231101)
 	# get version and code name
 	my ($version, $codename) = (split(/\s+/, $string))[1,2];
+
+	# convert codename to lower case
+	$codename = lc $codename;
+	
 	# strip the " from the codename
 	$codename =~ s/\"//;
 	print "codename = $codename: version = $version\n";
