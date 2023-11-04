@@ -190,7 +190,13 @@ sub partitiondisk {
 		$part3end   .= "GB";
 		$part4start .= "GB";
 		
-print "$part1start $part1end $part2start $part2end $part3start $part3end $part4start $part4end\n";
+		# print partition sizes
+		print "Macrium size = $part1end\n";
+		print "Linux Live size = $linuxlivesize" . "GB\n";
+		print "Recovery size = $recoverallsize" . "GB\n";
+		print "Ele size = rest of disk\n";
+				
+#print "$part1start $part1end $part2start $part2end $part3start $part3end $part4start $part4end\n";
 		# delete all partitions and make new ones
 		$rc = system("parted -s --align optimal $device mktable msdos mkpart primary fat32 $part1start $part1end mkpart primary fat32 $part2start $part2end mkpart primary fat32 $part3start $part3end mkpart primary ntfs  $part4start $part4end set 1 boot on");
 		die "aborting: error partitioning $device\n" unless $rc == 0;
