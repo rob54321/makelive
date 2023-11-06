@@ -321,6 +321,81 @@ sub editgrub {
 }
 
 #######################################################
+# sub to write version and code name to disk
+# the version and code name are retrieved
+# from a string in /mnt/cdrom/.disk/info file
+# parameters chroot_dir
+# requirements, iso image must be mounted
+#######################################################
+sub saveversioncodename {
+	my $chroot_dir = $_[0];
+	
+	# the file /mnt/cdrom/.disk/info contains the codename and version of linux
+	# read this file and store the codename in chroot_dir/isoimage/codename.txt
+	# and store the version in chroot_dir/isoimage/version.txt
+	#open /mnt/cdrom/.disk/info for reading
+	open DISK, "<", "/mnt/cdrom/.disk/info" or die "could not open /mnt/cdrom/.disk/info: $!\n";
+	my $string = <DISK>;
+	chomp($string);
+	close DISK;
+	
+	# file is of form:
+	# Ubuntu-MATE 24.04 "Noble Numbat" - Daily amd64 (20231101)
+	# get version , which could be 23.04 or 2300
+	my ($version, $codename);
+	
+	my @matches = $string =~ /\s+(\d+\.\d+)\s+/;
+
+	# if nothing found search for version of form 2300
+	# with no decimal point
+	if (@matches == 0) {
+		# match of form 2300 not found
+		@matches = $string =~ /\s+(\d+)\s+/;
+		if (@matches == 0) {
+			# could not find the version of form 2300 or 23.04
+			# enter it manually
+			print "Could not find the version of linux, enter it below\n";
+			$version = <STDIN>;
+			chomp($version);
+		} else {
+			# version found 
+			$version = $matches[0];
+		}
+	} else {
+		# match found of form 23.04
+		$version = $matches[0];
+	}
+	
+	# get the codename
+	@matches = $string =~ /\s+"(\w+)\s+/;
+	if (@matches == 0) {
+		# the code name could not be found
+		# enter it manually
+		print "the code name could not be found, enter it below\n";
+		$codename = <STDIN>;
+		chomp($codename);
+	} else {
+		# code name found
+		$codename = $matches[0];
+	}
+
+	# convert codename to lower case
+	$codename = lc $codename;
+	
+	print "codename = $codename: version = $version\n";
+
+	# write codename and version to files in chroot_dir/isoimage/codename.txt
+	# and chroot_dir/isoimage/version.txt
+	mkdir "$chroot_dir/isoimage";
+	open VERSION, ">", "$chroot_dir/isoimage/version.txt" or die "could not save $version to $chroot_dir/isoimage/version.txt: $!\n";
+	print VERSION "$version";
+	close VERSION;
+	open CODENAME, ">", "$chroot_dir/isoimage/codename.txt" or die "could not save $codename to $chroot_dir/isoimage/codename.txt: $!\n";
+	print CODENAME "$codename";
+	close CODENAME;
+
+}
+#######################################################
 # sub to get codename from the cdrom
 # the name is in /mnt/cdrom/dists   impish
 # which is a directory.
@@ -638,38 +713,6 @@ sub createchroot {
 	system("cp -dR /etc/apt/trusted.gpg.d " . $chroot_dir . "/etc/apt/");
 	system("cp -a /etc/apt/trusted.gpg " . $chroot_dir . "/etc/apt/") if -f "/etc/apt/trusted.gpg";
 
-	# the file /mnt/cdrom/.disk/info contains the codename and version of linux
-	# read this file and store the codename in chroot_dir/isoimage/codename.txt
-	# and store the version in chroot_dir/isoimage/version.txt
-	#open /mnt/cdrom/.disk/info for reading
-	open DISK, "<", "/mnt/cdrom/.disk/info" or die "could not open /mnt/cdrom/.disk/info: $!\n";
-	my $string = <DISK>;
-	chomp($string);
-	close DISK;
-	
-	# file is of form:
-	# Ubuntu-MATE 24.04 "Noble Numbat" - Daily amd64 (20231101)
-	# get version and code name
-	my ($version, $codename) = (split(/\s+/, $string))[1,2];
-
-	# strip the " from the codename
-	$codename =~ s/\"//;
-	# convert codename to lower case
-	$codename = lc $codename;
-	
-	print "codename = $codename: version = $version\n";
-
-	# write codename and version to files in chroot_dir/isoimage/codename.txt
-	# and chroot_dir/isoimage/version.txt
-	mkdir "$chroot_dir/isoimage";
-	open VERSION, ">", "$chroot_dir/isoimage/version.txt" or die "could not save $version to $chroot_dir/isoimage/version.txt: $!\n";
-	print VERSION "$version";
-	close VERSION;
-	open CODENAME, ">", "$chroot_dir/isoimage/codename.txt" or die "could not save $codename to $chroot_dir/isoimage/codename.txt: $!\n";
-	print CODENAME "$codename";
-	close CODENAME;
-	
-
 	# copy vmlinuz and initrd from cdrom to
 	# $chroot_dir/oldboot incase there is no
 	# upgrade for the kernel. If there was 
@@ -685,6 +728,9 @@ sub createchroot {
 	$rc = system("cp -dR .disk dists install pool preseed " . $chroot_dir . "/isoimage/");
 	die "could not copy dists install pool preseed to $chroot_dir/isoimage: $!\n" unless $rc == 0;
 
+	# save the version and codename of linux
+	saveversioncodename ($chroot_dir);
+	
 	# umount cdrom
 	chdir "/root";
 	umountcdrom;
