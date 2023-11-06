@@ -386,7 +386,6 @@ sub saveversioncodename {
 
 	# write codename and version to files in chroot_dir/isoimage/codename.txt
 	# and chroot_dir/isoimage/version.txt
-	mkdir "$chroot_dir/isoimage";
 	open VERSION, ">", "$chroot_dir/isoimage/version.txt" or die "could not save $version to $chroot_dir/isoimage/version.txt: $!\n";
 	print VERSION "$version";
 	close VERSION;
@@ -725,6 +724,8 @@ sub createchroot {
 	# copy pool and install files for ubuntu mate
 	# to a temp directory $chroot_dir/isoimage
 	chdir "/mnt/cdrom";
+	mkdir "$chroot_dir/isoimage" unless -d "$chroot_dir/isoimage";
+	
 	$rc = system("cp -dR .disk dists install pool preseed " . $chroot_dir . "/isoimage/");
 	die "could not copy dists install pool preseed to $chroot_dir/isoimage: $!\n" unless $rc == 0;
 
