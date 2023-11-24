@@ -1235,7 +1235,7 @@ if ($opt_c) {
 partitiondisk($opt_d) if $opt_d;
 
 # initialise variables and invoke subs depending on cmdine parameters
-initialise($opt_i, $opt_m, $opt_c, $opt_u, $opt_e, $debhomepath, $svnpath, $packages);
+initialise($opt_i, $opt_m, $opt_c, $opt_u, $opt_e, $debhomepath, $svnpath, $packages) if ($opt_c or $opt_u or $opt_e or $opt_p or $opt_i or $opt_m or $opt_M or $opt_R);
 
 # restore main links
 restoremainlinks;
