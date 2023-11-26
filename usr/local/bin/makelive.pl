@@ -12,8 +12,10 @@ use File::Basename;
 # sources for macrium and recovery
 my $svn = "/mnt/svn";
 my $debhome = "/mnt/debhome";
-my $macriumsource = "/root/MACRIUM";
-my $recoverysource = "/root/RECOVERY";
+my $macriumsource = "/mnt/debhome/livesystem/MACRIUM";
+# root directory of recovery
+# it contains RECOVERALL, SOURCES directories
+my $recoveryroot = "/mnt/debhome/livesystem";
 # default paths for debhome and svn
 # these are constant
 my $debhomepathoriginal = "/mnt/ad64/debhome";
@@ -251,7 +253,7 @@ sub defaultparameter {
 	my %defparam = ( -c => "none",
 			 -d => 8,
 			 -M => "$macriumsource",
-			 -R => "$recoverysource");
+			 -R => "$recoveryroot");
 
 	# for each switch in the defparam hash find it's index and insert default arguments if necessary
 	foreach my $switch (keys(%defparam)) {
@@ -863,7 +865,7 @@ sub getversion {
 #################################################
 # install macrium files to MACRIUM/RECOVERALL/SOURCES (ele)
 # the files are copied to the respective partition
-# parameter: full path to source files, partition label, target root directory
+# parameter: full path to source files, partition label, target root directory on partition
 # the source directory is not created
 #################################################
 sub installfiles {
@@ -1163,7 +1165,7 @@ sub usage {
 	print "-d size of partition in GB the disk into an 8G(default) fat32 LINUXLIVE plus the reset ntfs ele\n -- ";
 	print "-i install the image to LINUXLIVE\n";
 	print "-M fullsource of macrium files, default is $macriumsource\n";
-	print "-R full source of recovery, contains RECOVERALL and SOURCES dirs, default is $recoverysource\n";
+	print "-R full source of recovery, contains RECOVERALL and SOURCES dirs, default is $recoveryroot\n";
 	print "-V check version and exit\n";
 	exit 0;
 }
