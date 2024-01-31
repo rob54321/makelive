@@ -13,9 +13,16 @@ use File::Basename;
 my $svn = "/mnt/svn";
 my $debhome = "/mnt/debhome";
 my $macriumsource = "/mnt/debhome/livesystem/MACRIUM";
-# root directory of recovery
-# it contains RECOVERY, SOURCES directories
-my $recoveryroot = "/mnt/debhome/livesystem";
+
+# path to RECOVERY files
+my $recoverysource = "/mnt/debhome/livesystem/RECOVERY";
+
+# path to MCTREC file
+my $mctrecsource = "/mnt/debhome/livesystem/MCTREC";
+
+# default for SOURCES path
+my $sourcessource = "/mnt/debhome/livesystem/SOURCES";
+
 # default paths for debhome and svn
 # these are constant
 my $debhomepathoriginal = "/mnt/ad64/debhome";
@@ -23,7 +30,7 @@ my $svnpathoriginal = "/mnt/ad64/svn";
 ###################################################
 
 # get command line arguments
-our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_D, $opt_S, $opt_h, $opt_d, $opt_M, $opt_R, $opt_V);
+our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_s, $opt_D, $opt_S, $opt_h, $opt_d, $opt_M, $opt_R, $opt_T, $opt_V);
 
 #######################################################
 # this script makes a live system on a partition
@@ -253,7 +260,9 @@ sub defaultparameter {
 	my %defparam = ( -c => "none",
 			 -d => 8,
 			 -M => "$macriumsource",
-			 -R => "$recoveryroot");
+			 -R => "$recoverysource",
+			 -S => "$sourcessource",
+			 -T => "$mctrecsource");
 
 	# for each switch in the defparam hash find it's index and insert default arguments if necessary
 	foreach my $switch (keys(%defparam)) {
@@ -1133,21 +1142,24 @@ sub initialise {
 	# make filesystem.squashfs if not installing
 	makefs($chroot_dir) if $makefs;
 
-	# install MACRIUM to partition 1
-	# and RECOVERY to partition 3 if -M and/or -R are given
-	# source files are as follows
-	# MACRIUM default /root/MACRIUM
-	# RECOVERY default /root/RECOVERY/RECOVERY
-	# SOURCE FILES for recovery /root/RECOVERY/SOURCES
-	# recovery source must contain RECOVERY for (RECOVERY) and SOURCES (for ele/sources)
-	installfiles($opt_M, "MACRIUM", "/") if $opt_M;
+	###########################################################################
+	# install MACRIUM files if -M given
+	# install RECOVERY and SOURCES files if -R or -S given
+	# install MCTREC files if -T given
+	###########################################################################
+	installfiles($opt_M, "LINUXLIVE", "/") if $opt_M;
 
-	# for recovery files
 	do {
-		installfiles("$opt_R/RECOVERY", "RECOVERY", "/");
-		installfiles("$opt_R/SOURCES", "ele", "/sources");
-	} if $opt_R;
+		# for recovery files
+		installfiles("$opt_R", "RECOVERY", "/");
 
+		# for sources
+		installfiles("$opt_S", "ele", "/sources");
+	} if $opt_R or $opt_S;
+
+	# for MCTREC files
+	installfiles("$opt_T", "MCTREC", "/") if $opt_T;
+	
 	# install in LINUXLIVE/UBUNTU
 	installfs($label, $casper, $chroot_dir) if $doinstall;
 
@@ -1160,12 +1172,14 @@ sub usage {
 	print "-e run dochroot -- needs svn debhome\n";
 	print "-m make filesystem.squashfs, dochroot must be complete -- needs nothing\n";
 	print "-p list of packages to install quotes -- needs svn debhome\n";
-	print "-D full path for debhome, default is $debhomepath\n";
-	print "-S full path to subversion, default is $svnpath\n";
-	print "-d size of partition in GB the disk into an 8G(default) fat32 LINUXLIVE plus the reset ntfs ele\n -- ";
+	print "-d full path for debhome, default is $debhomepath\n";
+	print "-s full path to subversion, default is $svnpath\n";
+	print "-D size of LINUXLIVE partition in GB default is 8GB fat32\n";
 	print "-i install the image to LINUXLIVE\n";
-	print "-M fullsource of macrium files, default is $macriumsource\n";
-	print "-R full source of recovery, contains RECOVERY and SOURCES dirs, default is $recoveryroot\n";
+	print "-M full path to MACRIUM files, default is $macriumsource\n";
+	print "-R full path to RECOVERY files, default is $recoverysource\n";
+	print "-S full path to SOURCES files, default is $sourcessource\n";
+	print "-T full path to MCTREC files, default is $mctrecsource\n";
 	print "-V check version and exit\n";
 	exit 0;
 }
@@ -1177,13 +1191,13 @@ sub usage {
 # -c ubuntu-mate iso name or none (default)
 # -p "package list of extra packages
 # -u upgrade or not
-# -l disk label of debhome
 # -s full path to subersion
-# -d optional size in GB of partition
+# -d full path to dehome
+# -D optional size in GB of partition
 # One or both iso's can be given.
 # package list in quotes, if given
 
-# -i needs svn and linuxlive
+# -i needs svn and LINUXLIVE
 # -u -p -e need svn and debhome
 # -c needs cdrom
 # -m needs nothing
@@ -1193,7 +1207,7 @@ sub usage {
 # default parameters for -d default is 8GB
 defaultparameter();
 
-getopts('mic:ep:huS:d:M:R:VD:');
+getopts('mic:ep:hus:S:d:M:R:VD:');
 
 # check version and exit 
 if ($opt_V) {
@@ -1203,16 +1217,15 @@ if ($opt_V) {
 
 # setup debhome if it has changed from the default
 my $debhomepath = $debhomepathoriginal;
-$debhomepath = $opt_D if $opt_D;
+$debhomepath = $opt_d if $opt_d;
 
 my $svnpath = $svnpathoriginal;
-$svnpath = $opt_S if $opt_S;
 
 # setup svn path if it has changed
 # done here for usage sub
 # svnpath overrides previous path
 # if it has changed
-$svnpath = $opt_S if $opt_S;
+$svnpath = $opt_s if $opt_s;
 
 usage($debhomepath, $svnpath) if $opt_h;
 # return code from functions
@@ -1228,13 +1241,13 @@ if ($opt_c) {
 	die "iso image $opt_c does not exist\n" unless ((-f $opt_c) or ("$opt_c" eq "none"));
 }
 
-# if the -d option is given
+# if the -D option is given
 # partition the disk imediately
 # so the questions can be answered
 # at the begining
-# $opt_d is the size of GB of the partition
+# $opt_D is the size of GB of the partition
 
-partitiondisk($opt_d) if $opt_d;
+partitiondisk($opt_D) if $opt_D;
 
 # initialise variables and invoke subs depending on cmdine parameters
 initialise($opt_i, $opt_m, $opt_c, $opt_u, $opt_e, $debhomepath, $svnpath, $packages) if ($opt_c or $opt_u or $opt_e or $opt_p or $opt_i or $opt_m or $opt_M or $opt_R);
