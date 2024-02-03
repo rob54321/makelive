@@ -869,6 +869,9 @@ sub installfiles {
 	my $label = shift @_;
 	my $rootdir = shift @_;
 	
+	# check if source files are available
+	die "$source does not exist\n" unless -d $source;
+	
 	# make mount dir if it does not exist
 	mkdir "/mnt/$label" unless -d "/mnt/$label";
 
