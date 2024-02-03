@@ -36,18 +36,11 @@ our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_s, $opt_D, $opt_S, $opt
 # this script makes a live system on a partition
 # called linux. This script will also partition
 # and format a disk for the live system.
-# partition 1: 1G fat32 for MACRIUM REFLECT
-# partition 2: 8G (selectable) for linux live
-# partition 3: rest of disk for ntfs label ele
+# partition 1: 8G fat32 for LINUXLIVE and MACRIUM
+# partition 2: 8G fat32 for MCTREC
+# partition 3: 1G fat32 for RECOVERY
+# partition 4: 100% ntfs for ele contains sources directory for RECOVERY
 #
-# MACRIUM reflect can be installed on  partition 1
-# before the live system is installed.
-# command line parameters:
-# makelive.pl -c ubuntu-mate iso nameand -u for upgrade and -p package list -d for partitioning disk -e for do chroot
-#
-# the disk
-# partition 1 8G    [MACRIUM] fat32   contains macrium and ubuntu-mate, boots from grub uuid = AED6-434E
-# partition 2 rest  [ele]     ntfs    contains backup files and sources for windows recovery, Lenovo and desktop
 #
 #######################################################
 
@@ -175,39 +168,32 @@ sub partitiondisk {
 	if ($answer =~ /^yes$/i) {
 		print "partitioning $device\n";
 
-		# MACRIUM is 0 - 1GB
-		# LINUXLIVE partition size is $partsize + 1GB for the MACRIUM partition"
-		# RECOVERY partition size is 2G after LINUXLIVE
-		# ele partition is 100% after RECOVERY
-		my $macriumsize = 1;
-		my $recoverysize = 2;
-		my $part1start = 0;
-		my $part1end = $macriumsize;
-		my $part2start = $part1end;
-		my $part2end = $part2start + $linuxlivesize; 
-		my $part3start = $part2end;
-		my $part3end = $part3start + $recoverysize;
-		my $part4start = $part3end;
-		my $part4end = "100%";
+		# partition 1: LINUXLIVE partition size is passed as a parameter to this sub
+		# partition 2: MCTREC size is 8GB media tool creation recovery
+		# partition 3: RECOVERY size is 1Gb
+		# partition 4: ele partition is 100% and contains sources for RECOVERY
+		my $recoverysize = 1;
+		my $mctrecsize = 8;
+		my $p1start = 0;
+		my $p1end = $linuxlivesize;
+		my $p2start = $p1end;
+		my $p2end = $p2start + $mctrecsize; 
+		my $p3start = $p2end;
+		my $p3end = $p3start + $recoverysize;
+		my $p4start = $p3end;
+		my $p4end = "100%";
 
-		# convert part start and end to XXGB string
-		$part1start .= "GB";
-		$part1end   .= "GB";
-		$part2start .= "GB";
-		$part2end   .= "GB";
-		$part3start .= "GB";
-		$part3end   .= "GB";
-		$part4start .= "GB";
+		# convert p start and end to XXGB string
+		$p1start .= "GB";
+		$p1end   .= "GB";
+		$p2start .= "GB";
+		$p2end   .= "GB";
+		$p3start .= "GB";
+		$p3end   .= "GB";
+		$p4start .= "GB";
 		
-		# print partition sizes
-		print "Macrium size = $part1end\n";
-		print "Linux Live size = $linuxlivesize" . "GB\n";
-		print "Recovery size = $recoverysize" . "GB\n";
-		print "Ele size = rest of disk\n";
-				
-#print "$part1start $part1end $part2start $part2end $part3start $part3end $part4start $part4end\n";
 		# delete all partitions and make new ones
-		$rc = system("parted -s --align optimal $device mktable msdos mkpart primary fat32 $part1start $part1end mkpart primary fat32 $part2start $part2end mkpart primary fat32 $part3start $part3end mkpart primary ntfs  $part4start $part4end set 1 boot on");
+		$rc = system("parted -s --align optimal $device mktable msdos mkpart primary fat32 $p1start $p1end mkpart primary fat32 $p2start $p2end mkpart primary fat32 $p3start $p3end mkpart primary ntfs  $p4start $p4end set 1 boot on");
 		die "aborting: error partitioning $device\n" unless $rc == 0;
 
 		# format the first partition
@@ -218,17 +204,17 @@ sub partitiondisk {
 
 		# format partition 1
 		print "formatting partition " . $device . "1\n";
-		$rc = system( "mkfs.vfat -v -n MACRIUM -i AED6434E " . $device . "1");
+		$rc = system( "mkfs.vfat -v -n LINUXLIVE -i AED6434E " . $device . "1");
 		die "aborting: error formatting " . $device . "1\n" unless $rc == 0;
 
 		# format second partition
 		print "formatting partition " . $device . "2\n";
-		$rc = system("mkfs.vfat -v -n LINUXLIVE -i 33333333 " . $device . "2");
+		$rc = system("mkfs.vfat -v -n MCTREC -i 22222222 " . $device . "2");
 		die "aborting: error formatting " . $device . "2\n" unless $rc == 0;
 
 		# format third partition
 		print "formatting partition " . $device . "3\n";
-		$rc = system("mkfs.vfat -v -n RECOVERY -i 44444444 " . $device . "3");
+		$rc = system("mkfs.vfat -v -n RECOVERY -i 33333333 " . $device . "3");
 		die "aborting: error formatting " . $device . "3\n" unless $rc == 0;
 
 		# format forth partition
