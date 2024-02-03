@@ -244,7 +244,7 @@ sub defaultparameter {
 	# -u is for unmounting any drive
 	# the default argument, if not given on the command line is all drives
 	my %defparam = ( -c => "none",
-			 -d => 8,
+			 -D => 8,
 			 -M => "$macriumsource",
 			 -R => "$recoverysource",
 			 -S => "$sourcessource",
@@ -1193,7 +1193,7 @@ sub usage {
 # default parameters for -d default is 8GB
 defaultparameter();
 
-getopts('mic:ep:hus:S:d:M:R:VD:');
+getopts('mic:ep:hus:S:d:M:R:VD:T:');
 
 # check version and exit 
 if ($opt_V) {
@@ -1236,7 +1236,7 @@ if ($opt_c) {
 partitiondisk($opt_D) if $opt_D;
 
 # initialise variables and invoke subs depending on cmdine parameters
-initialise($opt_i, $opt_m, $opt_c, $opt_u, $opt_e, $debhomepath, $svnpath, $packages) if ($opt_c or $opt_u or $opt_e or $opt_p or $opt_i or $opt_m or $opt_M or $opt_R);
+initialise($opt_i, $opt_m, $opt_c, $opt_u, $opt_e, $debhomepath, $svnpath, $packages) if ($opt_c or $opt_u or $opt_e or $opt_p or $opt_i or $opt_m or $opt_M or $opt_R, $opt_T);
 
 # restore main links
 restoremainlinks;
