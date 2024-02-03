@@ -858,7 +858,8 @@ sub getversion {
 }
 
 #################################################
-# install macrium files to MACRIUM/RECOVERY/SOURCES (ele)
+# copies files for MACRIUM -M, RECOVERY and SOURCES -R or -S, MCTREC -T
+# needs /mnt/debhome by default
 # the files are copied to the respective partition
 # parameter: full path to source files, partition label, target root directory on partition
 # the source directory is not created
@@ -868,14 +869,21 @@ sub installfiles {
 	my $label = shift @_;
 	my $rootdir = shift @_;
 	
-	# mount the parition
+	# make mount dir if it does not exist
 	mkdir "/mnt/$label" unless -d "/mnt/$label";
-	my $rc = system("mount -L $label /mnt/$label");
-	die "Could not mount $label: $!\n" unless $rc == 0;
+
+	# mount partion if it is not mounted
+	my $rc = system("findmnt --source LABEL=$label");
+	if ($rc != 0) {
+		# not mounted, mount it
+		$rc = system("mount -L $label /mnt/$label");
+		die "Could not mount $label: $!\n" unless $rc == 0;
+	}
 
 	# copy the files
 	# make target directory if it does not exist
 	mkdir "/mnt/$label" . "$rootdir" unless -d "/mnt/$label" . "$rootdir";
+
 	$rc = system("cp -dRv -T $source /mnt/$label" . "$rootdir");
 	die "Could not copy $source to /mnt/$label" . "$rootdir: $!\n" unless $rc == 0;
 
@@ -1137,9 +1145,13 @@ sub initialise {
 
 	do {
 		# for recovery files
+		# set opt_R if not set
+		$opt_R = $recoverysource unless $opt_R;
 		installfiles("$opt_R", "RECOVERY", "/");
 
 		# for sources
+		# set opt_S if not set
+		$opt_S = $sourcessource unless $opt_S;
 		installfiles("$opt_S", "ele", "/sources");
 	} if $opt_R or $opt_S;
 
@@ -1236,7 +1248,7 @@ if ($opt_c) {
 partitiondisk($opt_D) if $opt_D;
 
 # initialise variables and invoke subs depending on cmdine parameters
-initialise($opt_i, $opt_m, $opt_c, $opt_u, $opt_e, $debhomepath, $svnpath, $packages) if ($opt_c or $opt_u or $opt_e or $opt_p or $opt_i or $opt_m or $opt_M or $opt_R, $opt_T);
+initialise($opt_i, $opt_m, $opt_c, $opt_u, $opt_e, $debhomepath, $svnpath, $packages) if ($opt_c or $opt_u or $opt_e or $opt_p or $opt_i or $opt_m or $opt_M or $opt_R or $opt_S or $opt_T);
 
 # restore main links
 restoremainlinks;
