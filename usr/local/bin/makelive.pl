@@ -10,18 +10,19 @@ use File::Basename;
 ###################################################
 # global constant links for debhome and subversion
 # sources for macrium and recovery
+# the source directory is the root of MACRIUM, MCTREC, RECOVERY or SOURCES
 my $svn = "/mnt/svn";
 my $debhome = "/mnt/debhome";
-my $macriumsource = "/mnt/debhome/livesystem/MACRIUM";
+my $macriumsource = "/mnt/debhome/livesystem";
 
 # path to RECOVERY files
-my $recoverysource = "/mnt/debhome/livesystem/RECOVERY";
+my $recoverysource = "/mnt/debhome/livesystem";
 
 # path to MCTREC file
-my $mctrecsource = "/mnt/debhome/livesystem/MCTREC";
+my $mctrecsource = "/mnt/debhome/livesystem";
 
 # default for SOURCES path
-my $sourcessource = "/mnt/debhome/livesystem/SOURCES";
+my $sourcessource = "/mnt/debhome/livesystem";
 
 # default paths for debhome and svn
 # these are constant
@@ -51,6 +52,11 @@ our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_s, $opt_D, $opt_S, $opt
 # if mounted , umount all locations.
 # then mount with the options
 # finish and klaar
+# returns:
+# 0 success and was not mounted
+# +n success mounted n times including at correct location
+# -n success mounted n times and not at correct location
+# on failure script will die.
 ###################################################
 sub mountdevice {
 	# parameters
@@ -69,6 +75,12 @@ sub mountdevice {
 	# return codes
 	my $rc;
 
+	# flag to indicate it was mounted
+	my $wasmounted = "false";
+
+	# indicates no of mounts
+	my $noofmounts = 0;
+			
 	#@target = ("TARGET", mountpoint)
 	# it may be mounted at multiple locations
 	# one of the locations may or may not be correct
@@ -80,9 +92,14 @@ sub mountdevice {
 
 		# umount all mounts
 		foreach my $item (@target) {
-			# umount
+			# umount label
 			$rc = system("umount -v $item");
 			die "Could not umount $label from $item: $!\n" unless $rc == 0;
+			$noofmounts++;
+			
+			# if label was mounted at correct mountpoint
+			# set flag to enable return status
+			$wasmounted = "true" if "$item" eq "$mtpt";
 		}
 		# all mounts now un mounted for the device
 	}
@@ -91,6 +108,12 @@ sub mountdevice {
 	$rc = system("mount -L $label -o $options $mtpt");
 	die "Could not mount $label at $mtpt -o $options: $!\n" unless $rc == 0;
 	print "mounted $label at $mtpt options: $options\n";
+
+	if ("$wasmounted" eq "true") {
+		return $noofmounts;
+	} else {
+		return $noofmounts * -1;
+	}
 }
 
 #######################################################
@@ -664,20 +687,15 @@ sub findrepo {
 			$device = (split(/\//, $repopath))[2];
 			$rc = system("blkid -L $device");
 			if ($rc == 0) {
-				# it is a block device
-				# check if it is mounted,
-				# if so die because repo not found
-				$rc = system("findmnt --source LABEL=$device");
-				die "Device $device is mounted and $reponame not found\n" if $rc == 0;
-				
-				# try and mount it
-				# make the directory if it does not exist
-				print "mounting $device at /mnt/$device\n";
-				mkdir "/mnt/$device" unless -d "/mnt/$device";
-				$rc = system("mount -v -L $device /mnt/$device");
+				# repo should be on this block device
+				# if the device is mounted at the correct location
+				# and the repo not found then die
+				$rc = mountdevice($device, "/mnt/$device", "rw");
+				# if $rc >= 1 device was mounted at correct location
+				# but repo was not found, die
+				die "Device $device is mounted and $reponame not found\n" if $rc >= 1;
 
-				# die if it is not a block device
-				die "Could not mount $device, $reponame not found: $!\n" unless $rc == 0;
+				# device is now mounted
 
 				# check that svn is found
 				# un mount if not
@@ -908,9 +926,10 @@ sub getversion {
 
 #################################################
 # copies files for MACRIUM -M, RECOVERY and SOURCES -R or -S, MCTREC -T
+# the root directories of the soures must be MACRIUM or RECOVERY or SOURCES
 # needs /mnt/debhome by default
 # the files are copied to the respective partition
-# parameter: full path to source files, partition label, target root directory on partition
+# parameter: full path to source eg /mnt/debhome/livesystem/MACRIUM, partition label, target root directory on partition
 # the source directory is not created
 #################################################
 sub installfiles {
@@ -918,28 +937,65 @@ sub installfiles {
 	my $label = shift @_;
 	my $rootdir = shift @_;
 	
-	# check if source files are available
-	die "$source does not exist\n" unless -d $source;
-	
-	# make mount dir if it does not exist
-	mkdir "/mnt/$label" unless -d "/mnt/$label";
+	# return codes
+	my $rc;
 
-	# mount partion if it is not mounted
-	my $rc = system("findmnt --source LABEL=$label");
-	if ($rc != 0) {
-		# not mounted, mount it
-		$rc = system("mount -L $label /mnt/$label");
-		die "Could not mount $label: $!\n" unless $rc == 0;
-	}
+	# check that the source does exist and copy or else die
+	if (! -d $source) {
+		# source not found
+		# source is of form /mnt/debhome/livesystem/MACRIUM
+		# where livesystem is the root directory
+		# determine if the source is on a block device
+		# if it is mount it and check if it exists
+		# get the directory name
+		my $dir = dirname(dirname($source));
+print "source $source dir $dir\n";
+		# check if this is a link
+		if (-l $dir) {
+			# this is a link
+			# get the actual directory name
+			my $list = `ls -l $dir`;
+			# path is of form /mnt/ad64/debhome
+			my $fullname = (split (/\s+/, $list))[10];
+			# get the actual parent name
+			# dir is of the form /mnt/ad64
+			$dir = dirname($fullname);
+			# get the device name from
+			# the dir = /mnt/ad64 or /mnt/device
+			$dir =~ s/\/mnt\///;
+			print "device is $dir\n";
+			# if device is a block device with label device
+			# try and mount it
+			my $device = $dir;
+			$rc = system("blkid -L $device");
+			if ($rc == 0) {
+				# mount it 
+				$rc = mountdevice($device, "/mnt/$device", "rw");
+				unless (-d $source) {
+					# source does not exist
+					# umount destination
+					system("umount /mnt/$device");
+					die "Could not find $source on $device mounted at /mnt/$device\n";
+				}
+			} else {
+				# device is not a block device
+				# and source does not exist
+				die "$source not found and $device is not a block device\n";
+			}
+		} else {
+			# source is not a link and not found
+			die "$source not found and it is not a link\n";
+		}
+	} # end of if ! -d source
 
-	# copy the files
-	# make target directory if it does not exist
-	mkdir "/mnt/$label" . "$rootdir" unless -d "/mnt/$label" . "$rootdir";
+	# mount the destination parition
+	$rc = mountdevice($label, "/mnt/$label", "rw");
 
+	# source found, copy it
 	$rc = system("cp -dRv -T $source /mnt/$label" . "$rootdir");
 	die "Could not copy $source to /mnt/$label" . "$rootdir: $!\n" unless $rc == 0;
 
-	#un mount the drive
+	#un mount the destination drive
 	$rc = system("umount /mnt/$label");
 	die "Could not umount $label: $!\n" unless $rc == 0;
 }
@@ -1054,9 +1110,8 @@ sub installfs {
 
 	# mount the partition LINUXLIVE/UBUNTU under 
 	# chroot/boot, it was unmounted before chroot
-	$rc = system("mount -L " . $label . " " . $chroot_dir . "/boot");
-	die "Could not mount $label at $chroot_dir/boot\n" unless $rc == 0;
-	
+	$rc = mountdevice($label, "$chroot_dir/boot", "rw");
+
 	# make casper dir if it does not exist
 	if ( -d $casper) {
 		# clean directory
@@ -1171,7 +1226,6 @@ sub initialise {
 		findrepo($svnpath, $svn);
 	} # end of elsif ($doinstall)
 	
-
 	# if packages or upgrade defined dochroot must be done
 	if ($packages or $upgrade or $dochroot) {
 		# if chroot environment does not exist die
@@ -1193,22 +1247,46 @@ sub initialise {
 	# install RECOVERY and SOURCES files if -R or -S given
 	# install MCTREC files if -T given
 	###########################################################################
-	installfiles($opt_M, "LINUXLIVE", "/") if $opt_M;
+	# setup the fullname source from the parent directory
+	do {
+		$opt_M = $opt_M . "/MACRIUM";
+		installfiles($opt_M, "LINUXLIVE", "/");
+	} if $opt_M;
 
 	do {
 		# for recovery files
-		# set opt_R if not set
-		$opt_R = $recoverysource unless $opt_R;
+		# if opt_R is set append /RECOVERY
+		# else set opt_R to default + /RECOVERY
+		if ($opt_R) {
+			# opt_R set append RECOVERY
+			$opt_R = $opt_R . "/RECOVERY";
+		} else {
+			# opt_R not set
+			$opt_R = $recoverysource . "/RECOVERY";
+		}
+		
 		installfiles("$opt_R", "RECOVERY", "/");
 
 		# for sources
-		# set opt_S if not set
-		$opt_S = $sourcessource unless $opt_S;
+		# if opt_S is set append /sources
+		# else set opt_S to default + /sources
+		if ($opt_S) {
+			# opt_S is set, append /sources
+			$opt_S = $opt_S . "/sources";
+		} else {
+			# opt_S is not set, set it to default + /sources		
+			$opt_S = $sourcessource . "/sources";
+		}
+		# install the files
 		installfiles("$opt_S", "ele", "/sources");
+		
 	} if $opt_R or $opt_S;
 
 	# for MCTREC files
-	installfiles("$opt_T", "MCTREC", "/") if $opt_T;
+	do {
+		$opt_T = $opt_T . "/MCTREC";
+		installfiles("$opt_T", "MCTREC", "/");
+	} if $opt_T;
 	
 	# install in LINUXLIVE/UBUNTU
 	installfs($label, $casper, $chroot_dir) if $doinstall;
@@ -1226,10 +1304,10 @@ sub usage {
 	print "-s full path to subversion, default is $svnpath\n";
 	print "-D size of LINUXLIVE partition in GB default is 8GB fat32\n";
 	print "-i install the image to LINUXLIVE\n";
-	print "-M full path to MACRIUM files, default is $macriumsource\n";
-	print "-R full path to RECOVERY files, default is $recoverysource\n";
-	print "-S full path to SOURCES files, default is $sourcessource\n";
-	print "-T full path to MCTREC files, default is $mctrecsource\n";
+	print "-M full parent directory of MACRIUM files, default is $macriumsource\n";
+	print "-R full parent directory of RECOVERY files, default is $recoverysource\n";
+	print "-S full parent directory of SOURCES files, default is $sourcessource\n";
+	print "-T full parent directory of MCTREC files, default is $mctrecsource\n";
 	print "-V check version and exit\n";
 	exit 0;
 }
