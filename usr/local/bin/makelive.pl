@@ -940,6 +940,9 @@ sub installfiles {
 	# return codes
 	my $rc;
 
+	# device , if it is one
+	my $device;
+	
 	# check that the source does exist and copy or else die
 	if (! -d $source) {
 		# source not found
@@ -966,25 +969,24 @@ print "source $source dir $dir\n";
 			print "device is $dir\n";
 			# if device is a block device with label device
 			# try and mount it
-			my $device = $dir;
-			$rc = system("blkid -L $device");
-			if ($rc == 0) {
-				# mount it 
-				$rc = mountdevice($device, "/mnt/$device", "rw");
-				unless (-d $source) {
-					# source does not exist
-					# umount destination
-					system("umount /mnt/$device");
-					die "Could not find $source on $device mounted at /mnt/$device\n";
-				}
-			} else {
-				# device is not a block device
-				# and source does not exist
-				die "$source not found and $device is not a block device\n";
+			$device = $dir;
+		}
+
+		# try and mount the device if it is a block device
+		$rc = system("blkid -L $device");
+		if ($rc == 0) {
+			# mount it 
+			$rc = mountdevice($device, "/mnt/$device", "rw");
+			unless (-d $source) {
+				# source does not exist
+				# umount destination
+				system("umount /mnt/$device");
+				die "Could not find $source on $device mounted at /mnt/$device\n";
 			}
 		} else {
-			# source is not a link and not found
-			die "$source not found and it is not a link\n";
+			# device is not a block device
+			# and source does not exist
+			die "$source not found and $device is not a block device\n";
 		}
 	} # end of if ! -d source
 
