@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use Getopt::Std;
 use File::Basename;
+use File::Path qw (make_path);
 
 ###################################################
 # Global constants
@@ -105,6 +106,9 @@ sub mountdevice {
 	}
 
 	# mount the device
+	# make mount directory if not found
+	make_path($mtpt) unless -d $mtpt;
+	
 	$rc = system("mount -L $label -o $options $mtpt");
 	die "Could not mount $label at $mtpt -o $options: $!\n" unless $rc == 0;
 	print "mounted $label at $mtpt options: $options\n";
@@ -113,6 +117,105 @@ sub mountdevice {
 		return $noofmounts;
 	} else {
 		return $noofmounts * -1;
+	}
+}
+
+###################################################################
+# sub to find the source files for installfiles sub
+# the source must be a full path with no links it it such as
+#
+#   /mnt/ad64/debhome/livesystem/MACRIUM | MCTREC | RECOVERY | SOURCES
+# or
+#   /home/robert/MACRIUM | MCTREC | RECOVERY | SOURCES
+# or 
+#   /mnt/chaos/MACRIUM
+# parent directory of each source could be MACRIUM, MCTREC, RECOVERY or SOURCES
+# the source could be a block device or a directory
+#
+# if the source exists then return
+# if source never found then die
+# to look for the source
+# 1 check if an element of path is a block device
+# try and mount it if it is
+
+# parameters passed: source path (which cannot contain links)
+###################################################################
+sub findsource {
+	# get source
+	my $source = shift @_;
+
+	# if the source exists return
+	if (-d $source) {
+		print "found $source";
+		return;
+	}
+
+	# source does not exist.
+	# check if it is a block device
+	# and try and mount it.
+	
+	# get all path elements of the source
+	my @pathelements = split /\//, $source;
+	chomp(@pathelements);
+	
+	# the first element is "" since path is /...
+	# remove it 
+	shift @pathelements;
+print "path elements @pathelements\n";
+	# check if the path is on a block device
+	# that is attached, if not die
+	# get the attached block devices
+	my @blkdev = `lsblk -l -o LABEL`;
+	chomp(@blkdev);
+	
+	# check if a block device matches
+	# a path element
+	my $device;
+	# used to find index of device element in blkdev
+	my $count = 0;
+	LOOP: foreach my $dir (@pathelements) {
+		foreach my $bdev (@blkdev) {
+#print "bdev $bdev    path elements $dir\n";
+			if ("$dir" eq "$bdev") {
+				$device = $bdev;
+				last LOOP;
+			}
+		}
+		$count++;
+	}
+#print "device = $device count = $count\n";
+	# if device was found
+	# try and mount it else source not found -- die
+	if ($device) {
+		# try and mount it
+		# determine the mount point
+		# path might be /a/b/c/d/MACRIUM
+		# then device might be c
+		# then mount point is /a/b
+		# all elements before the device in pathelements
+		my $mountpoint = "/";
+		# if path is /mnt/ad64/debhome/livesyste/MACRIUM
+		# then mount point is /mnt/ad64
+		for(my $i=0; $i<=$count; $i++) {
+			# append elements to make path
+			$mountpoint = $mountpoint . $pathelements[$i] . "/";
+		}
+#print "device = $device mountpoint = $mountpoint\n";
+		
+		mountdevice($device, $mountpoint, "rw");
+		# check if the source exists
+		if ( -d $source ) {
+			print "found $source: mounted $device at $mountpoint\n";
+			return;
+		} else {
+			# source not found
+			# umount it 
+			system("umount -v $mountpoint");
+			die "Could not find $source with device = $device mounted at $mountpoint\n";
+		}
+	} else {
+		# no device found
+		die "Could not find $source and path is not on a block device\n";
 	}
 }
 
@@ -940,14 +1043,10 @@ sub installfiles {
 	# return codes
 	my $rc;
 
-	# device , if it is one
-	my $device;
-	
 	# check that the source does exist and copy or else die
-	if (! -d $source) {
-			
-
-	} # end of if ! -d source
+	# find source by mounting block device
+	# retrieved from the path
+	findsource($source);
 
 	# mount the destination parition
 	$rc = mountdevice($label, "/mnt/$label", "rw");
