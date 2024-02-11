@@ -3,6 +3,7 @@
 use strict;
 use warnings;
 use File::Basename;
+use File::Path qw (make_path);
 
 ###################################################
 # sub to mount devices
@@ -63,6 +64,9 @@ sub mountdevice {
 	}
 
 	# mount the device
+	# make mount directory if not found
+	make_path($mtpt) unless -d $mtpt;
+	
 	$rc = system("mount -L $label -o $options $mtpt");
 	die "Could not mount $label at $mtpt -o $options: $!\n" unless $rc == 0;
 	print "mounted $label at $mtpt options: $options\n";
@@ -99,7 +103,10 @@ sub findsource {
 	my $source = shift @_;
 
 	# if the source exists return
-	return if -d $source;
+	if (-d $source) {
+		print "found $source";
+		return;
+	}
 
 	# source does not exist.
 	# check if it is a block device
@@ -124,9 +131,9 @@ print "path elements @pathelements\n";
 	my $device;
 	# used to find index of device element in blkdev
 	my $count = 0;
-	LOOP: foreach my $bdev (@blkdev) {
-		foreach my $dir (@pathelements) {
-print "bdev $bdev    path elements $dir\n";
+	LOOP: foreach my $dir (@pathelements) {
+		foreach my $bdev (@blkdev) {
+#print "bdev $bdev    path elements $dir\n";
 			if ("$dir" eq "$bdev") {
 				$device = $bdev;
 				last LOOP;
@@ -134,7 +141,7 @@ print "bdev $bdev    path elements $dir\n";
 		}
 		$count++;
 	}
-print "device = $device count = $count\n";
+#print "device = $device count = $count\n";
 	# if device was found
 	# try and mount it else source not found -- die
 	if ($device) {
@@ -145,15 +152,18 @@ print "device = $device count = $count\n";
 		# then mount point is /a/b
 		# all elements before the device in pathelements
 		my $mountpoint = "/";
-		for(my $i=0; $i<$count; $i++) {
+		# if path is /mnt/ad64/debhome/livesyste/MACRIUM
+		# then mount point is /mnt/ad64
+		for(my $i=0; $i<=$count; $i++) {
 			# append elements to make path
-			$mountpoint = $mountpoint . "/" . $pathelements[$i];
+			$mountpoint = $mountpoint . $pathelements[$i] . "/";
 		}
-print "device = $device mountpoint = $mountpoint\n";
+#print "device = $device mountpoint = $mountpoint\n";
 		
 		mountdevice($device, $mountpoint, "rw");
 		# check if the source exists
 		if ( -d $source ) {
+			print "found $source: mounted $device at $mountpoint\n";
 			return;
 		} else {
 			# source not found
@@ -167,4 +177,4 @@ print "device = $device mountpoint = $mountpoint\n";
 	}
 }
 
-findsource("/mnt/ad64/livesystem");
+findsource("/a/b/c/d/e/MACRIUM");
