@@ -945,49 +945,8 @@ sub installfiles {
 	
 	# check that the source does exist and copy or else die
 	if (! -d $source) {
-		# source not found
-		# source is of form /mnt/debhome/livesystem/MACRIUM
-		# where livesystem is the root directory
-		# determine if the source is on a block device
-		# if it is mount it and check if it exists
-		# get the directory name
-		my $dir = dirname(dirname($source));
-print "source $source dir $dir\n";
-		# check if this is a link
-		if (-l $dir) {
-			# this is a link
-			# get the actual directory name
-			my $list = `ls -l $dir`;
-			# path is of form /mnt/ad64/debhome
-			my $fullname = (split (/\s+/, $list))[10];
-			# get the actual parent name
-			# dir is of the form /mnt/ad64
-			$dir = dirname($fullname);
-			# get the device name from
-			# the dir = /mnt/ad64 or /mnt/device
-			$dir =~ s/\/mnt\///;
-			print "device is $dir\n";
-			# if device is a block device with label device
-			# try and mount it
-			$device = $dir;
-		}
+			
 
-		# try and mount the device if it is a block device
-		$rc = system("blkid -L $device");
-		if ($rc == 0) {
-			# mount it 
-			$rc = mountdevice($device, "/mnt/$device", "rw");
-			unless (-d $source) {
-				# source does not exist
-				# umount destination
-				system("umount /mnt/$device");
-				die "Could not find $source on $device mounted at /mnt/$device\n";
-			}
-		} else {
-			# device is not a block device
-			# and source does not exist
-			die "$source not found and $device is not a block device\n";
-		}
 	} # end of if ! -d source
 
 	# mount the destination parition
