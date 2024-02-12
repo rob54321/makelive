@@ -14,16 +14,22 @@ use File::Path qw (make_path);
 # the source directory is the root of MACRIUM, MCTREC, RECOVERY or SOURCES
 my $svn = "/mnt/svn";
 my $debhome = "/mnt/debhome";
-my $macriumsource = "/mnt/debhome/livesystem";
+my $macriumsource = "/mnt/ad64/debhome/livesystem";
 
 # path to RECOVERY files
-my $recoverysource = "/mnt/debhome/livesystem";
+my $recoverysource = "/mnt/ad64/debhome/livesystem";
 
 # path to MCTREC file
-my $mctrecsource = "/mnt/debhome/livesystem";
+my $mctrecsource = "/mnt/ad64/debhome/livesystem";
 
 # default for SOURCES path
-my $sourcessource = "/mnt/debhome/livesystem";
+my $sourcessource = "/mnt/ad64/debhome/livesystem";
+
+# parent directory of sources
+my $MACRIUM = "MACRIUM";
+my $MCTREC = "MCTREC";
+my $RECOVERY = "RECOVERY";
+my $SOURCES = "SOURCES";
 
 # default paths for debhome and svn
 # these are constant
@@ -1309,7 +1315,7 @@ sub initialise {
 	###########################################################################
 	# setup the fullname source from the parent directory
 	do {
-		$opt_M = $opt_M . "/MACRIUM";
+		$opt_M = $opt_M . "/" . $MACRIUM;
 		installfiles($opt_M, "LINUXLIVE", "/");
 	} if $opt_M;
 
@@ -1319,10 +1325,10 @@ sub initialise {
 		# else set opt_R to default + /RECOVERY
 		if ($opt_R) {
 			# opt_R set append RECOVERY
-			$opt_R = $opt_R . "/RECOVERY";
+			$opt_R = $opt_R . "/" . $RECOVERY;
 		} else {
 			# opt_R not set
-			$opt_R = $recoverysource . "/RECOVERY";
+			$opt_R = $recoverysource . "/" . $RECOVERY;
 		}
 		
 		installfiles("$opt_R", "RECOVERY", "/");
@@ -1332,10 +1338,10 @@ sub initialise {
 		# else set opt_S to default + /sources
 		if ($opt_S) {
 			# opt_S is set, append /sources
-			$opt_S = $opt_S . "/sources";
+			$opt_S = $opt_S . "/" . $SOURCES;
 		} else {
 			# opt_S is not set, set it to default + /sources		
-			$opt_S = $sourcessource . "/sources";
+			$opt_S = $sourcessource . "/" . $SOURCES;
 		}
 		# install the files
 		installfiles("$opt_S", "ele", "/sources");
@@ -1344,7 +1350,7 @@ sub initialise {
 
 	# for MCTREC files
 	do {
-		$opt_T = $opt_T . "/MCTREC";
+		$opt_T = $opt_T . "/" . $MCTREC;
 		installfiles("$opt_T", "MCTREC", "/");
 	} if $opt_T;
 	
