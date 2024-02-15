@@ -24,6 +24,9 @@ my $mctrecsource = "/mnt/ad64/debhome/livesystem";
 
 # default for SOURCES path
 my $sourcessource = "/mnt/ad64/debhome/livesystem";
+# sizes of MCTREC and RECOVERY partitions
+my $recoverysize = 1;
+my $mctrecsize = 8;
 
 # parent directory of sources
 my $MACRIUM = "MACRIUM";
@@ -353,8 +356,6 @@ sub partitiondisk {
 		# partition 2: MCTREC size is 8GB media tool creation recovery
 		# partition 3: RECOVERY size is 1Gb
 		# partition 4: ele partition is 100% and contains sources for RECOVERY
-		my $recoverysize = 1;
-		my $mctrecsize = 8;
 		my $p1start = 0;
 		my $p1end = $linuxlivesize;
 		my $p2start = $p1end;
