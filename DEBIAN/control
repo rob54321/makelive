@@ -1,5 +1,5 @@
 Package: makelive
-Version: 2.7.1
+Version: 2.7.2
 Architecture: all
 Maintainer: Robert Key robkey@mighty.co.za
 Depends: subversion, git, initialise-linux, editfstab
