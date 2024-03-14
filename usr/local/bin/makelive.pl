@@ -983,6 +983,10 @@ sub dochroot {
 	# do an update and install liveinstall
 	$rc = system("chroot $chroot_dir apt update");
 	die "Could not apt update in chroot environment $!\n" unless $rc == 0;
+
+	# live install depends on subversion and git.
+	# this is how subversion and git are installed
+	# in the chroot environment
 	$rc = system("chroot $chroot_dir apt install -y liveinstall");
 	die "Could not install liveinstall in chroot environment $!\n" unless $rc == 0;
 
