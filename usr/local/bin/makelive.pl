@@ -844,12 +844,14 @@ sub findrepo {
 ####################################################################
 sub createchroot {
 	# creating new chroot environment
-	my ($chroot_dir, $isoimage) = @_;
+	my ($chroot_dir, $isoimage, $debhomepath, $svnpath) = @_;
 	my $rc;
 		
 	# delete the old chroot environment if it exists
+	# make sure debhome and svn are not mounted
+	# as the flash drive they are on will get deleted.
 	if (-d $chroot_dir) {
-		# unbind dirs
+		# chroot dir exists unbindall
 		unbindall $chroot_dir;
 		# check if $chroot_dir/boot is mounted in chroot environment
 		# need to protect the live drive
@@ -861,6 +863,21 @@ sub createchroot {
 			die "Could not umount $chroot_dir/boot\n" unless $rc == 0;
 		}
 
+		# for debhome, could be mounted at /chroot/mnt/debhome
+		$rc = system("findmnt $chroot_dir/mnt/debhome");
+		if ($rc == 0) {
+			# un mount drive
+			$rc = system("umount -v -f $chroot_dir/mnt/debhome");
+			die "Could not umount $chroot_dir/mnt/debhome\n" unless $rc == 0;
+		}
+
+		# for svn, could be mounted at /chroot/mnt/svn
+		$rc = system("findmnt $chroot_dir/mnt/svn");
+		if ($rc == 0) {
+			# un mount drive
+			$rc = system("umount -v -f $chroot_dir/mnt/svn");
+			die "Could not umount $chroot_dir/mnt/svn\n" unless $rc == 0;
+		}
 		# remove directory
 		$rc = system("rm -rf $chroot_dir");
 		die "cannot remove $chroot_dir\n" unless $rc == 0;
@@ -1273,10 +1290,13 @@ sub initialise {
 	# before creating chroot
 	# debhome and svn are bound to directories in chroot
 	# they are not bound at startup.
-	# nothing to do here
+	# dehomepath and svnpath are passed
+	# to make sure they are unmounted
+	# so the flash drive they are on does not
+	# get deleted
 	#==============================================
 
-	createchroot($chroot_dir, $isoimage) if $isoimage;
+	createchroot($chroot_dir, $isoimage, $debhomepath, $svnpath) if $isoimage;
 
 	# -i needs svn and linuxlive
 	# -u -p -e need svn and debhome
