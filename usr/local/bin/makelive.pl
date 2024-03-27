@@ -683,9 +683,9 @@ sub setaptsources {
 	# create sources.list
 	open (SOURCES, ">", "$chroot_dir/etc/apt/sources.list");
 	print SOURCES "deb http://archive.ubuntu.com/ubuntu $codename main restricted multiverse universe
-	deb http://archive.ubuntu.com/ubuntu $codename-security main restricted multiverse universe
-	deb http://archive.ubuntu.com/ubuntu $codename-updates  main restricted multiverse universe
-	deb http://archive.ubuntu.com/ubuntu $codename-proposed  main restricted multiverse universe\n";
+deb http://archive.ubuntu.com/ubuntu $codename-security main restricted multiverse universe
+deb http://archive.ubuntu.com/ubuntu $codename-updates  main restricted multiverse universe
+deb http://archive.ubuntu.com/ubuntu $codename-proposed  main restricted multiverse universe\n";
 	close SOURCES;
 
 	# debhome.sources and debhomepubkey.asc are installed from liveinstall package now.
