@@ -630,7 +630,7 @@ sub bindall {
 		$rc = system("findmnt $chroot_dir" . "$dir 2>&1 >/dev/null");
 		unless ($rc == 0) {
 			# not mounted, mount dir
-			$rc = system("mount --bind $dir $chroot_dir" . "$dir");
+			$rc = system("mount -v --bind $dir $chroot_dir" . "$dir");
 			die "Could not bind $chroot_dir" . "$dir: $!\n" unless $rc == 0;
 			print "$chroot_dir" . "$dir mounted\n";
 		} else {
@@ -660,13 +660,26 @@ sub unbindall {
 		if ($rc == 0) {
 			# dir mounted, unmount it
 			print "$chroot_dir" . "$dir unmounted\n";
-			$rc = system("umount $chroot_dir" . "$dir");
+			$rc = system("umount -v $chroot_dir" . "$dir");
 			die "Could not umount $chroot_dir" . "$dir: $!\n" unless $rc == 0;
 		} else {
 			# dir not mounted
 			print "$chroot_dir" . "$dir not mounted\n";
 		}
 	}
+
+	# check that /chroot/mnt/debhome and /chroot/mnt/svn do not contain
+	# any files. If they do, abort
+	# open directory
+	foreach my $dir ($chroot_dir . $debhome, $chroot_dir . $svn) {
+		opendir (my $dh, $dir) || die "Could not open directory $dir: $!\n";
+		my @nofiles = readdir $dh;
+		closedir $dh;
+		# remove count for . and ..
+		my $nofiles = scalar(@nofiles) - 2;
+		die "$dir still contains $nofiles files\n" if $nofiles > 0;
+	}
+	
 	# restore the links in the chroot environment
 	restorechrootlinks($chroot_dir);
 }
@@ -859,7 +872,7 @@ sub createchroot {
 		$rc = system("findmnt $chroot_dir/boot");
 		if ($rc == 0) {
 			# un mount drive
-			$rc = system("umount -v -f $chroot_dir/boot");
+			$rc = system("umount -v $chroot_dir/boot");
 			die "Could not umount $chroot_dir/boot\n" unless $rc == 0;
 		}
 
@@ -867,7 +880,7 @@ sub createchroot {
 		$rc = system("findmnt $chroot_dir/mnt/debhome");
 		if ($rc == 0) {
 			# un mount drive
-			$rc = system("umount -v -f $chroot_dir/mnt/debhome");
+			$rc = system("umount -v $chroot_dir/mnt/debhome");
 			die "Could not umount $chroot_dir/mnt/debhome\n" unless $rc == 0;
 		}
 
@@ -875,7 +888,7 @@ sub createchroot {
 		$rc = system("findmnt $chroot_dir/mnt/svn");
 		if ($rc == 0) {
 			# un mount drive
-			$rc = system("umount -v -f $chroot_dir/mnt/svn");
+			$rc = system("umount -v $chroot_dir/mnt/svn");
 			die "Could not umount $chroot_dir/mnt/svn\n" unless $rc == 0;
 		}
 		# remove directory
