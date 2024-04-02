@@ -83,12 +83,16 @@ sub unbindall {
 	# any files. If they do, abort
 	# open directory
 	foreach my $dir ($chroot_dir . $debhome, $chroot_dir . $svn) {
-		opendir (my $dh, $dir) || die "Could not open directory $dir: $!\n";
-		my @nofiles = readdir $dh;
-		closedir $dh;
-		# remove count for . and ..
-		my $nofiles = scalar(@nofiles) - 2;
-		die "$dir still contains $nofiles files\n" if $nofiles > 0;
+
+		# the directory may not exist
+		unless( -d $dir) {
+			opendir (my $dh, $dir) || die "Could not open directory $dir: $!\n";
+			my @nofiles = readdir $dh;
+			closedir $dh;
+			# remove count for . and ..
+			my $nofiles = scalar(@nofiles) - 2;
+			die "$dir still contains $nofiles files\n" if $nofiles > 0;
+		}
 	}
 	
 

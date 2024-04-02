@@ -622,15 +622,23 @@ sub bindall {
 	unlink $chroot_dir . $debhome if -l $chroot_dir . $debhome;
 	
 	# make directories for debhome and svn
-	mkdir "$chroot_dir" . "$svn" unless -d "$chroot_dir" . "$svn";
-	mkdir "$chroot_dir" . "$debhome" unless -d "$chroot_dir" . "$debhome";
+	if (! -d $chroot_dir . $svn) {
+		$rc = mkdir "$chroot_dir" . "$svn";
+		die "Could not make directory $chroot_dir" . "$svn" unless $rc;
+	}
+
+	# for debhome
+	if (! -d $chroot_dir . $svn) {
+		$rc = mkdir "$chroot_dir" . "$debhome";
+		die "Could not make directory $chroot_dir" . "$svn" unless $rc;
+	}
 	
 	foreach my $dir (@bindlist) {
 		# check if it is already mounted
 		$rc = system("findmnt $chroot_dir" . "$dir 2>&1 >/dev/null");
 		unless ($rc == 0) {
 			# not mounted, mount dir
-			$rc = system("mount -v --bind $dir $chroot_dir" . "$dir");
+			$rc = system("mount --bind $dir $chroot_dir" . "$dir");
 			die "Could not bind $chroot_dir" . "$dir: $!\n" unless $rc == 0;
 			print "$chroot_dir" . "$dir mounted\n";
 		} else {
@@ -660,7 +668,7 @@ sub unbindall {
 		if ($rc == 0) {
 			# dir mounted, unmount it
 			print "$chroot_dir" . "$dir unmounted\n";
-			$rc = system("umount -v $chroot_dir" . "$dir");
+			$rc = system("umount $chroot_dir" . "$dir");
 			die "Could not umount $chroot_dir" . "$dir: $!\n" unless $rc == 0;
 		} else {
 			# dir not mounted
@@ -672,12 +680,16 @@ sub unbindall {
 	# any files. If they do, abort
 	# open directory
 	foreach my $dir ($chroot_dir . $debhome, $chroot_dir . $svn) {
-		opendir (my $dh, $dir) || die "Could not open directory $dir: $!\n";
-		my @nofiles = readdir $dh;
-		closedir $dh;
-		# remove count for . and ..
-		my $nofiles = scalar(@nofiles) - 2;
-		die "$dir still contains $nofiles files\n" if $nofiles > 0;
+
+		# the directory may not exist
+		unless( -d $dir) {
+			opendir (my $dh, $dir) || die "Could not open directory $dir: $!\n";
+			my @nofiles = readdir $dh;
+			closedir $dh;
+			# remove count for . and ..
+			my $nofiles = scalar(@nofiles) - 2;
+			die "$dir still contains $nofiles files\n" if $nofiles > 0;
+		}
 	}
 	
 	# restore the links in the chroot environment

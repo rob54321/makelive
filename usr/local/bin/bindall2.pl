@@ -32,9 +32,17 @@ sub bindall {
 	unlink $chroot_dir . $debhome if -l $chroot_dir . $debhome;
 	
 	# make directories for debhome and svn
-	mkdir "$chroot_dir" . "$svn" unless -d "$chroot_dir" . "$svn";
-	mkdir "$chroot_dir" . "$debhome" unless -d "$chroot_dir" . "$debhome";
-	
+	if (! -d $chroot_dir . $svn) {
+		$rc = mkdir "$chroot_dir" . "$svn";
+		die "Could not make directory $chroot_dir" . "$svn" unless $rc;
+	}
+
+	# for debhome
+	if (! -d $chroot_dir . $svn) {
+		$rc = mkdir "$chroot_dir" . "$debhome";
+		die "Could not make directory $chroot_dir" . "$svn" unless $rc;
+	}
+
 	foreach my $dir (@bindlist) {
 		# check if it is already mounted
 		$rc = system("findmnt $chroot_dir" . "$dir 2>&1 >/dev/null");
