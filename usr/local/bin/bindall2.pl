@@ -47,7 +47,8 @@ sub bindall {
 		# check if it is already mounted
 		$rc = system("findmnt $chroot_dir" . "$dir 2>&1 >/dev/null");
 		unless ($rc == 0) {
-			# not mounted, mount dir
+			# $dir must be accessible
+			# so debhome and svn must be accessible or bind will fail.
 			$rc = system("mount --bind $dir $chroot_dir" . "$dir");
 			die "Could not bind $chroot_dir" . "$dir: $!\n" unless $rc == 0;
 			print "$chroot_dir" . "$dir mounted\n";

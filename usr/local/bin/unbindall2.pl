@@ -85,7 +85,7 @@ sub unbindall {
 	foreach my $dir ($chroot_dir . $debhome, $chroot_dir . $svn) {
 
 		# the directory may not exist
-		unless( -d $dir) {
+		if ( -d $dir) {
 			opendir (my $dh, $dir) || die "Could not open directory $dir: $!\n";
 			my @nofiles = readdir $dh;
 			closedir $dh;
