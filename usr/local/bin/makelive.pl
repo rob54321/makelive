@@ -628,9 +628,9 @@ sub bindall {
 	}
 
 	# for debhome
-	if (! -d $chroot_dir . $svn) {
+	if (! -d $chroot_dir . $debhome) {
 		$rc = mkdir "$chroot_dir" . "$debhome";
-		die "Could not make directory $chroot_dir" . "$svn" unless $rc;
+		die "Could not make directory $chroot_dir" . "$debhome" unless $rc;
 	}
 	
 	foreach my $dir (@bindlist) {
