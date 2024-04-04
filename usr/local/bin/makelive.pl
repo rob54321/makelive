@@ -75,8 +75,8 @@ sub mountdevice {
 	my $options = shift @_;
 
 	# if no options given, use defaults
-	# which is rw
-	$options = "rw" unless ($options);
+	# which is read only
+	$options = "ro" unless ($options);
 
 	# check if device is mounted and if mounted multiple times
 	my @target = `findmnt --source LABEL=$label -o TARGET`;
@@ -211,7 +211,7 @@ print "path elements @pathelements\n";
 		}
 #print "device = $device mountpoint = $mountpoint\n";
 		
-		mountdevice($device, $mountpoint, "rw");
+		mountdevice($device, $mountpoint, "ro");
 		# check if the source exists
 		if ( -d $source ) {
 			print "found $source: mounted $device at $mountpoint\n";
@@ -790,6 +790,56 @@ sub remakelink {
 		$rc = system("chown -h robert:robert $link");
 		die "Could not change ownership of $link: $!\n" unless $rc == 0;
 }
+
+#######################################################
+# pathtype
+# determins the path type of svn or debhome
+# parameters : repopath, ref to type which will be set
+# returns: actual_device or where_link_points_to or directory_of_svn/debhome or file_name_if_file or 0
+# corresponding to type: "device" or "link" or "directory" or "file" or "unknown"
+# reference to type
+#######################################################
+sub pathtype {
+	my $repopath = shift @_;
+	my $refdescription = shift @_;
+	my $reponame = basename($repopath);
+print "pathtype: repopath = $repopath refdescription = $refdescription reponame = $reponame\n";
+	
+	# if path = /mnt/device/svn or /mnt/device/a/b/c/d/e/debhome
+	# the match delimeter m? ? only matches once. cannot be used.
+	if ($repopath =~ m/\/mnt\/.*\/$reponame/) {
+		# path is of form /mnt/something/svn
+		# is 'something a block device'
+		my $device = (split(/\//, $repopath))[2];
+print "pathtype: device = $device\n";
+		my $rc = system("blkid -L $device");
+		if ($rc == 0) {
+			# device is a block device
+			# set the refdescription
+			$$refdescription = "device";
+			return $device;
+		}
+	} elsif (-l $repopath) {
+		#repopath is a link
+		$$refdescription = "link";
+		# where does the link point to
+		my $destination = readlink $repopath;
+		return $destination;
+	} elsif (-d $repopath) {
+		# repopath is a directory
+		$$refdescription = "directory";
+		return $repopath;
+	} elsif (-f $repopath) {
+		# repopath is a regular file
+		$$refdescription = "file";
+		return $repopath;
+	} else {
+		# unknown type
+		$$refdescription =  "unknown";
+		return 0;
+	}
+}
+
 #######################################################	
 # findrepo:
 # if path to repo does not exist
@@ -814,50 +864,80 @@ sub findrepo {
 	# repo path is /mnt/ad64/debhome or /mnt/ad64/svn
 	my $reponame = basename($repopath);
 	
-	if ( ! -d $repopath) {
-		# not found, check if path is a possible device
-		# if path = /mnt/device/svn
-		if ($repopath =~ m?/mnt/.*/$reponame?) {
-			# path is of form /mnt/something/svn
-			# is 'something a block device'
-			$device = (split(/\//, $repopath))[2];
-			$rc = system("blkid -L $device");
-			if ($rc == 0) {
-				# repo should be on this block device
-				# if the device is mounted at the correct location
-				# and the repo not found then die
-				$rc = mountdevice($device, "/mnt/$device", "rw");
-				# if $rc >= 1 device was mounted at correct location
-				# but repo was not found, die
-				die "Device $device is mounted and $reponame not found\n" if $rc >= 1;
+	# check what type the path to the repo is
+	# link or dir or contains a device
+	# as in /mnt/device/svn or /mnt/device/debhome
+	# descripion is device or link or directory or file or unknown
+	# type is actual_device or where_link_points_to or directory_name or file_name or 0
+	my $description;
+#print "findrepo: calling pathtype: params repopath = $repopath ref = " . \$description . "\n";
+	my $repopathtype = pathtype($repopath, \$description);
+#print "findrepo: repopath = $repopath description = $description repopathtype = $repopathtype\n";
 
-				# device is now mounted
+	# check if the repo is found at the repo path
+	if (! -d $repopath) {
+		# the repo was not found
+		# the path may contain a device
+		# which needs to be mounted
+		# for a device
+		if ($description eq "device") {
+			$rc = mountdevice($repopathtype, "/mnt/$repopathtype", "ro") if $description eq "device";
+			# if $rc >= 1 device was already mounted at correct location
+			# but repo was not found, die
+			die "Device $repopathtype is mounted and $reponame not found\n" if $rc >= 1;
 
-				# check that svn is found
-				# un mount if not
-				unless ( -d $repopath) {
-					# svn not found, umount device and die
-					system("umount -v /mnt/$device");
-					die "Could not find $reponame at $repopath\n";
-				}
+			# device is now mounted
 
-				# device is mounted, remake link
-				remakelink $repopath, $link;
-
-			} else {
-				# device is not a block device
-				# and svn not found, die
-				die "$device is not a block device and $reponame was not found\n"
+			# check that svn | debhome found
+			# un mount if not
+			if (! -d $repopath) {
+				# svn | debhome not found, umount device and die
+				system("umount -v /mnt/$repopathtype");
+				die "Could not find $reponame on device $repopathtype at $repopath\n";
 			}
-		} else {
-			# svn path is not of form /mnt/device/svn
-			# so svn not found, die
-			die "Could not find $reponame at $repopath\n";
+
+			# device is mounted found repository
+		} elsif ($description eq "directory") {
+			# repo path is a directory
+			# and repo not found
+			# die. type is the directory
+			die "Could not find repository $reponame at directory $repopath\n";
+		} elsif ($description eq "link") {
+			# repository not found at link -> type
+			#$repopathtype  is where the link points to 
+			die "Could not find repository $reponame at link $repopathtype\n";
+
+		} elsif ($description eq "file") {
+			# the repo path is a file not a directory
+			# therefore it does not exist
+			die "Repository path for $reponame is a file not a directory: $repopath\n";
+		} elsif ($description eq "unknown") {
+			# unknown type
+			die "Repository path for $reponame is unknown: $repopath\n";
 		}
 	} else {
-		# the path does exist check the link
-		remakelink $repopath, $link;
+		# the repository path exists
+		# if it is on a device, mount the device
+		# ro to protect it from being deleted by
+		# createchroot function
+		# get the path type
+print "findrepo: $reponame exists at $repopath\n";
+print "findrepo: calling pathtype repopath = $repopath\n";
+		$repopathtype = pathtype($repopath, \$description);
+print "findrepo: pathtype: repopathtype = $repopathtype description = $description\n";
+
+		# remount device ro
+		mountdevice($repopathtype, "/mnt/$repopathtype", "ro") if $description eq "device";
+
+		# repopathtype may also be a directory
+		# which should be protected, not sure how
+		#==============================================================================
+		# figure out how to make a directory read only
+		#==============================================================================
 	}
+	# the path does exist check the link
+	remakelink $repopath, $link;
+
 	print "found $reponame at $repopath\n";
 }
 
@@ -889,21 +969,6 @@ sub createchroot {
 			die "Could not umount $chroot_dir/boot\n" unless $rc == 0;
 		}
 
-		# for debhome, could be mounted at /chroot/mnt/debhome
-		$rc = system("findmnt $chroot_dir/mnt/debhome");
-		if ($rc == 0) {
-			# un mount drive
-			$rc = system("umount -v $chroot_dir/mnt/debhome");
-			die "Could not umount $chroot_dir/mnt/debhome\n" unless $rc == 0;
-		}
-
-		# for svn, could be mounted at /chroot/mnt/svn
-		$rc = system("findmnt $chroot_dir/mnt/svn");
-		if ($rc == 0) {
-			# un mount drive
-			$rc = system("umount -v $chroot_dir/mnt/svn");
-			die "Could not umount $chroot_dir/mnt/svn\n" unless $rc == 0;
-		}
 		# remove directory
 		$rc = system("rm -rf $chroot_dir");
 		die "cannot remove $chroot_dir\n" unless $rc == 0;
@@ -1103,7 +1168,7 @@ sub installfiles {
 	findsource($source);
 
 	# mount the destination parition
-	$rc = mountdevice($label, "/mnt/$label", "rw");
+	$rc = mountdevice($label, "/mnt/$label", "ro");
 
 	# source found, copy it
 	$rc = system("cp -dRv -T $source /mnt/$label" . "$rootdir");
@@ -1224,7 +1289,7 @@ sub installfs {
 
 	# mount the partition LINUXLIVE/UBUNTU under 
 	# chroot/boot, it was unmounted before chroot
-	$rc = mountdevice($label, "$chroot_dir/boot", "rw");
+	$rc = mountdevice($label, "$chroot_dir/boot", "ro");
 
 	# make casper dir if it does not exist
 	if ( -d $casper) {
@@ -1323,6 +1388,7 @@ sub initialise {
 	#==============================================
 
 	createchroot($chroot_dir, $isoimage, $debhomepath, $svnpath) if $isoimage;
+print "initialise: debhomepath = $debhomepath svnpath = $svnpath\n";
 
 	# -i needs svn and linuxlive
 	# -u -p -e need svn and debhome
@@ -1332,9 +1398,10 @@ sub initialise {
 	if ($upgrade or $packages or $dochroot) {
 		# svn and debhome needed
 		findrepo($svnpath, $svn);
+exit 0;
 		# now find debhome
 		findrepo($debhomepath, $debhome);
-		
+
 	} elsif ($doinstall) {
 		# only -i was given, only svn and linuxlive are required
 		# check that subversion is accessible
@@ -1471,6 +1538,7 @@ my $svnpath = $svnpathoriginal;
 # svnpath overrides previous path
 # if it has changed
 $svnpath = $opt_s if $opt_s;
+print "main: debhome = $debhomepath svn = $svnpath\n";
 
 usage($debhomepath, $svnpath) if $opt_h;
 # return code from functions
