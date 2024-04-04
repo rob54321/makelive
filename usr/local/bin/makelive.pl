@@ -1398,7 +1398,7 @@ print "initialise: debhomepath = $debhomepath svnpath = $svnpath\n";
 	if ($upgrade or $packages or $dochroot) {
 		# svn and debhome needed
 		findrepo($svnpath, $svn);
-exit 0;
+
 		# now find debhome
 		findrepo($debhomepath, $debhome);
 
