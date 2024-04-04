@@ -62,6 +62,7 @@ our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_s, $opt_D, $opt_S, $opt
 # if mounted , umount all locations.
 # then mount with the options
 # finish and klaar
+# params: label mountpoint options true | false -- true for mount false for no mount
 # returns:
 # 0 success and was not mounted
 # +n success mounted n times including at correct location
@@ -74,6 +75,9 @@ sub mountdevice {
 	my $mtpt = shift @_;
 	my $options = shift @_;
 
+	# true for mount , false for no mount
+	my $mount = shift @_;
+	
 	# if no options given, use defaults
 	# which is read only
 	$options = "ro" unless ($options);
@@ -117,11 +121,14 @@ sub mountdevice {
 	# mount the device
 	# make mount directory if not found
 	make_path($mtpt) unless -d $mtpt;
-	
-	$rc = system("mount -L $label -o $options $mtpt");
-	die "Could not mount $label at $mtpt -o $options: $!\n" unless $rc == 0;
-	print "mounted $label at $mtpt options: $options\n";
 
+	# only mount if mount flag is true
+	if ($mount eq "true") {
+		$rc = system("mount -L $label -o $options $mtpt");
+		die "Could not mount $label at $mtpt -o $options: $!\n" unless $rc == 0;
+		print "mounted $label at $mtpt options: $options\n";
+	}
+	
 	if ("$wasmounted" eq "true") {
 		return $noofmounts;
 	} else {
@@ -211,7 +218,7 @@ print "path elements @pathelements\n";
 		}
 #print "device = $device mountpoint = $mountpoint\n";
 		
-		mountdevice($device, $mountpoint, "ro");
+		mountdevice($device, $mountpoint, "ro", "true");
 		# check if the source exists
 		if ( -d $source ) {
 			print "found $source: mounted $device at $mountpoint\n";
@@ -881,7 +888,7 @@ sub findrepo {
 		# which needs to be mounted
 		# for a device
 		if ($description eq "device") {
-			$rc = mountdevice($repopathtype, "/mnt/$repopathtype", "ro") if $description eq "device";
+			$rc = mountdevice($repopathtype, "/mnt/$repopathtype", "ro", "true") if $description eq "device";
 			# if $rc >= 1 device was already mounted at correct location
 			# but repo was not found, die
 			die "Device $repopathtype is mounted and $reponame not found\n" if $rc >= 1;
@@ -927,7 +934,7 @@ print "findrepo: calling pathtype repopath = $repopath\n";
 print "findrepo: pathtype: repopathtype = $repopathtype description = $description\n";
 
 		# remount device ro
-		mountdevice($repopathtype, "/mnt/$repopathtype", "ro") if $description eq "device";
+		mountdevice($repopathtype, "/mnt/$repopathtype", "ro", "true") if $description eq "device";
 
 		# repopathtype may also be a directory
 		# which should be protected, not sure how
@@ -957,6 +964,16 @@ sub createchroot {
 	# make sure debhome and svn are not mounted
 	# as the flash drive they are on will get deleted.
 	if (-d $chroot_dir) {
+		# if svn | debhome mounted on a device
+		# unmount it
+		my $description;
+		my $device = pathtype($svnpath, \$description);
+		mountdevice($device, "/mnt/$device", "ro", "false") if $description eq "device";
+
+		# for debhome
+		$device = pathtype($debhome, \$description);
+		mountdevice($device, "/mnt/$device", "ro", "false") if $description eq "device";
+
 		# chroot dir exists unbindall
 		unbindall $chroot_dir;
 		# check if $chroot_dir/boot is mounted in chroot environment
@@ -1168,7 +1185,7 @@ sub installfiles {
 	findsource($source);
 
 	# mount the destination parition
-	$rc = mountdevice($label, "/mnt/$label", "ro");
+	$rc = mountdevice($label, "/mnt/$label", "ro", "true");
 
 	# source found, copy it
 	$rc = system("cp -dRv -T $source /mnt/$label" . "$rootdir");
@@ -1289,7 +1306,7 @@ sub installfs {
 
 	# mount the partition LINUXLIVE/UBUNTU under 
 	# chroot/boot, it was unmounted before chroot
-	$rc = mountdevice($label, "$chroot_dir/boot", "ro");
+	$rc = mountdevice($label, "$chroot_dir/boot", "ro", "true");
 
 	# make casper dir if it does not exist
 	if ( -d $casper) {
