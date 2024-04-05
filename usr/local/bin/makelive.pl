@@ -625,6 +625,7 @@ sub bindall {
 	my $rc;
 
 	# if links exist delete them
+	# cannot bind a link to a directory for svn | debhome
 	unlink $chroot_dir . $svn if -l $chroot_dir . $svn;
 	unlink $chroot_dir . $debhome if -l $chroot_dir . $debhome;
 	
