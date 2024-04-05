@@ -19,9 +19,10 @@ sub bindall {
 		$rc = system("findmnt $chroot_dir" . "$dir 2>&1 >/dev/null");
 		unless ($rc == 0) {
 			# not mounted, mount dir
+			print "bindall: binding old = $dir to new = $chroot_dir" . "$dir\n";
 			$rc = system("mount --bind $dir $chroot_dir" . "$dir");
-			die "Could not bind $chroot_dir" . "$dir: $!\n" unless $rc == 0;
-			print "$chroot_dir" . "$dir mounted\n";
+			die "Could not bind new = $chroot_dir" . "$dir to old = $dir: $!\n" unless $rc == 0;
+			print "$chroot_dir" . "$dir mounted at $dir\n";
 		} else {
 			# already mounted
 			print "$chroot_dir" . "$dir is already mounted\n";

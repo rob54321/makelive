@@ -49,6 +49,7 @@ sub bindall {
 		unless ($rc == 0) {
 			# $dir must be accessible
 			# so debhome and svn must be accessible or bind will fail.
+			print "binadall2: binding old = $dir to new = $chroot_dir" . "$dir\n";
 			$rc = system("mount --bind $dir $chroot_dir" . "$dir");
 			die "Could not bind $chroot_dir" . "$dir: $!\n" unless $rc == 0;
 			print "$chroot_dir" . "$dir mounted\n";
