@@ -17,7 +17,18 @@ use warnings;
 my $debhome = "/mnt/debhome";
 my $svn = "/mnt/svn";
 
-
+#######################################################
+# sub to bind sys tmp dev dev/pts proc for chroot
+# environment
+# access to debhome and svn in the chroot environment
+# is done through the binding of /mnt/debhome to /chroot/mnt/debhome
+# and for svn /mnt/svn to /chroot/mnt/svn
+# the directories are made in by bindall in the
+# chroot environment
+# usage: bindall chroot_dir
+# returns: none
+# exceptions: dies if chroot dir does not exist
+#######################################################
 sub bindall {
 	# parameters
 	my $chroot_dir = $_[0];
@@ -51,9 +62,17 @@ sub bindall {
 		unless ($rc == 0) {
 			# $dir must be accessible
 			# so debhome and svn must be accessible or bind will fail.
-			$rc = system("mount --bind $dir $chroot_dir" . "$dir");
-			die "Could not bind $chroot_dir" . "$dir: $!\n" unless $rc == 0;
-			print "$chroot_dir" . "$dir mounted\n";
+			# bind svn and debhome ro
+			if ("$dir" eq "$svn" or "$dir" eq "$debhome") {
+				# bind svn and debhome ro
+				$rc = system("mount -v -o ro --bind $dir $chroot_dir" . "$dir");
+				die "Could not bind $chroot_dir" . "$dir: $!\n" unless $rc == 0;
+				print "$chroot_dir" . "$dir mounted\n";
+			} else {
+				$rc = system("mount -v --bind $dir $chroot_dir" . "$dir");
+				die "Could not bind $chroot_dir" . "$dir: $!\n" unless $rc == 0;
+				print "$chroot_dir" . "$dir mounted\n";
+			}
 		} else {
 			# already mounted
 			print "$chroot_dir" . "$dir is already mounted\n";

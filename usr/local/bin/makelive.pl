@@ -311,12 +311,12 @@ sub restorechrootlinks{
 	# make the link for /mnt/debhome -> /chroot_dir/mnt/ad64/debhome in the chroot environment
 	unlink "$chroot_dir" . "$debhome";
 	my $rc = system("chroot $chroot_dir ln -v -s $debhomepathoriginal $debhome");
-	die "Error making $debhome -> $debhomepathoriginal link in chroot: $!" unless $rc == 0;
+	die "restorechrootlinks: error making $debhome -> $debhomepathoriginal link in chroot: $!" unless $rc == 0;
 
 	# make the link for /mnt/svn -> /chroot_dir/$svnpath in the chroot environment
 	unlink "$chroot_dir" . "$svn";
 	$rc = system("chroot $chroot_dir ln -v -s $svnpathoriginal $svn");
-	die "Could not make link $svn -> $svnpathoriginal in chroot: $!" unless $rc == 0;
+	die "restorechrootlinks: Could not make link $svn -> $svnpathoriginal in chroot: $!" unless $rc == 0;
 
 	# set ownership
 	system("chown robert:robert -h $chroot_dir" . "$svn");
@@ -653,9 +653,17 @@ sub bindall {
 		unless ($rc == 0) {
 			# $dir must be accessible
 			# so debhome and svn must be accessible or bind will fail.
-			$rc = system("mount --bind $dir $chroot_dir" . "$dir");
-			die "Could not bind $chroot_dir" . "$dir: $!\n" unless $rc == 0;
-			print "$chroot_dir" . "$dir mounted\n";
+			# bind svn and debhome ro
+			if ("$dir" eq "$svn" or "$dir" eq "$debhome") {
+				# bind svn and debhome ro
+				$rc = system("mount -v -o ro --bind $dir $chroot_dir" . "$dir");
+				die "Could not bind $chroot_dir" . "$dir: $!\n" unless $rc == 0;
+				print "$chroot_dir" . "$dir mounted\n";
+			} else {
+				$rc = system("mount -v --bind $dir $chroot_dir" . "$dir");
+				die "Could not bind $chroot_dir" . "$dir: $!\n" unless $rc == 0;
+				print "$chroot_dir" . "$dir mounted\n";
+			}
 		} else {
 			# already mounted
 			print "$chroot_dir" . "$dir is already mounted\n";
@@ -979,22 +987,23 @@ sub createchroot {
 	my ($chroot_dir, $isoimage, $debhomepath, $svnpath) = @_;
 	my $rc;
 		
+	# if svn | debhome mounted on a device
+	# unmount it
+	my $description;
+print "createchroot: calling pathtype $svnpath " . \$description . "\n";
+	my $device = pathtype($svnpath, \$description);
+print "createchroot after pathtype: device = $device svnpath = $svnpath description = $description\n";
+
+	mountdevice($device, "/mnt/$device", "ro", "false") if $description eq "device";
+
+	# for debhome
+	$device = pathtype($debhome, \$description);
+	mountdevice($device, "/mnt/$device", "ro", "false") if $description eq "device";
+
 	# delete the old chroot environment if it exists
 	# make sure debhome and svn are not mounted
 	# as the flash drive they are on will get deleted.
 	if (-d $chroot_dir) {
-		# if svn | debhome mounted on a device
-		# unmount it
-		my $description;
-print "createchroot: calling pathtype $svnpath " . \$description . "\n";
-		my $device = pathtype($svnpath, \$description);
-print "createchroot after pathtype: device = $device svnpath = $svnpath description = $description\n";
-
-		mountdevice($device, "/mnt/$device", "ro", "false") if $description eq "device";
-
-		# for debhome
-		$device = pathtype($debhome, \$description);
-		mountdevice($device, "/mnt/$device", "ro", "false") if $description eq "device";
 
 		# chroot dir exists unbindall
 		unbindall $chroot_dir;
@@ -1085,7 +1094,7 @@ sub dochroot {
 
 	# generate chroot_dir/etc/apt/sources.list
 	# and chroot_dir/etc/sources.list.d/debhome.list
-#	setaptsources ($codename, $chroot_dir);
+	setaptsources ($codename, $chroot_dir);
 
 	# copy xwindows themes and icons to /usr/share
 	# if themes.tar.xz and icons.tar.xz are found
