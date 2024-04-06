@@ -17,6 +17,7 @@ use warnings;
 my $debhome = "/mnt/debhome";
 my $svn = "/mnt/svn";
 
+
 sub bindall {
 	# parameters
 	my $chroot_dir = $_[0];
@@ -28,6 +29,7 @@ sub bindall {
 	my $rc;
 
 	# if links exist delete them
+	# cannot bind a link to a directory for svn | debhome
 	unlink $chroot_dir . $svn if -l $chroot_dir . $svn;
 	unlink $chroot_dir . $debhome if -l $chroot_dir . $debhome;
 	
@@ -42,14 +44,13 @@ sub bindall {
 		$rc = mkdir "$chroot_dir" . "$debhome";
 		die "Could not make directory $chroot_dir" . "$debhome" unless $rc;
 	}
-
+	
 	foreach my $dir (@bindlist) {
 		# check if it is already mounted
 		$rc = system("findmnt $chroot_dir" . "$dir 2>&1 >/dev/null");
 		unless ($rc == 0) {
 			# $dir must be accessible
 			# so debhome and svn must be accessible or bind will fail.
-			print "binadall2: binding old = $dir to new = $chroot_dir" . "$dir\n";
 			$rc = system("mount --bind $dir $chroot_dir" . "$dir");
 			die "Could not bind $chroot_dir" . "$dir: $!\n" unless $rc == 0;
 			print "$chroot_dir" . "$dir mounted\n";
@@ -59,5 +60,6 @@ sub bindall {
 		}
 	}
 }
+
 die "Usage: bindall chroot directory\n" unless $ARGV[0];
 bindall $ARGV[0];

@@ -101,11 +101,17 @@ sub mountdevice {
 	if (@target) {
 		# device is mounted at lease once
 
-		#get rid of header TARGET
+		# the first element of @target is TARGET  for a title
+		# remove it
 		shift @target;
+		
+		# @target = (/mnt/ad64, /chroot/mnt/debhome, /chroot/mnt/svn)
+		# reverse the order since /mnt/ad64 must be un mounted last
+		my @rtarget = reverse @target;
 
+		#also the 
 		# umount all mounts
-		foreach my $item (@target) {
+		foreach my $item (@rtarget) {
 			# umount label
 			$rc = system("umount -v $item");
 			die "Could not umount $label from $item: $!\n" unless $rc == 0;
@@ -811,7 +817,7 @@ sub pathtype {
 	my $repopath = shift @_;
 	my $refdescription = shift @_;
 	my $reponame = basename($repopath);
-print "pathtype: repopath = $repopath refdescription = $refdescription reponame = $reponame\n";
+#print "pathtype: repopath = $repopath refdescription = $refdescription reponame = $reponame\n";
 	
 	# if path = /mnt/device/svn or /mnt/device/a/b/c/d/e/debhome
 	# the match delimeter m? ? only matches once. cannot be used.
@@ -819,12 +825,17 @@ print "pathtype: repopath = $repopath refdescription = $refdescription reponame 
 		# path is of form /mnt/something/svn
 		# is 'something a block device'
 		my $device = (split(/\//, $repopath))[2];
-print "pathtype: device = $device\n";
+#print "pathtype: device = $device\n";
 		my $rc = system("blkid -L $device");
 		if ($rc == 0) {
 			# device is a block device
 			# set the refdescription
 			$$refdescription = "device";
+			return $device;
+		} else {
+			# svn | debhome is on a device
+			# but the device is not attached
+			$$refdescription = "device not attached";
 			return $device;
 		}
 	} elsif (-l $repopath) {
@@ -903,6 +914,13 @@ sub findrepo {
 				system("umount -v /mnt/$repopathtype");
 				die "Could not find $reponame on device $repopathtype at $repopath\n";
 			}
+			# device is mounted
+		} elsif ($description eq "device not attached") {
+			# svn | debhome is on a device of form /mnt/device/svn | /mnt/device/debhome
+			# but the device is not attached so svn | debhome not available
+			print "$repopathtype is not attached for $repopath\n";
+			print "please attach $repopathtype\n";
+			die "Device $repopathtype not attached, could not find $repopath\n";
 
 			# device is mounted found repository
 		} elsif ($description eq "directory") {
@@ -929,10 +947,10 @@ sub findrepo {
 		# ro to protect it from being deleted by
 		# createchroot function
 		# get the path type
-print "findrepo: $reponame exists at $repopath\n";
-print "findrepo: calling pathtype repopath = $repopath\n";
+#print "findrepo: $reponame exists at $repopath\n";
+#print "findrepo: calling pathtype repopath = $repopath\n";
 		$repopathtype = pathtype($repopath, \$description);
-print "findrepo: pathtype: repopathtype = $repopathtype description = $description\n";
+#print "findrepo: pathtype: repopathtype = $repopathtype description = $description\n";
 
 		# remount device ro
 		mountdevice($repopathtype, "/mnt/$repopathtype", "ro", "true") if $description eq "device";
@@ -968,7 +986,10 @@ sub createchroot {
 		# if svn | debhome mounted on a device
 		# unmount it
 		my $description;
+print "createchroot: calling pathtype $svnpath " . \$description . "\n";
 		my $device = pathtype($svnpath, \$description);
+print "createchroot after pathtype: device = $device svnpath = $svnpath description = $description\n";
+
 		mountdevice($device, "/mnt/$device", "ro", "false") if $description eq "device";
 
 		# for debhome
@@ -988,6 +1009,7 @@ sub createchroot {
 		}
 
 		# remove directory
+print "createchroot: about to remove $chroot_dir\n";
 		$rc = system("rm -rf $chroot_dir");
 		die "cannot remove $chroot_dir\n" unless $rc == 0;
 		print "removed $chroot_dir\n";
@@ -1063,7 +1085,7 @@ sub dochroot {
 
 	# generate chroot_dir/etc/apt/sources.list
 	# and chroot_dir/etc/sources.list.d/debhome.list
-	setaptsources ($codename, $chroot_dir);
+#	setaptsources ($codename, $chroot_dir);
 
 	# copy xwindows themes and icons to /usr/share
 	# if themes.tar.xz and icons.tar.xz are found
@@ -1084,8 +1106,9 @@ sub dochroot {
 	#############################################################################################
 
 	# install apps in the chroot environment
+	# svn and debhome must be accessible at this point
+# print "dochroot: calling bindall\n";
 	bindall $chroot_dir;
-
 	# chroot/mnt/debhome and /chroot/mnt/svn are bound to /mnt/debhome and /mnt/svn
 	# mount debhome in the chroot environment
 	#$rc = system("chroot $chroot_dir mount -r -L $debhomedev /mnt/$debhomedev");

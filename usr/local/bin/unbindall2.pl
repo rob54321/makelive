@@ -51,6 +51,7 @@ sub restorechrootlinks{
 
 }	
 
+
 #######################################################
 # sub to unbind sys tmp dev dev/pts proc for chroot
 # environment
@@ -95,9 +96,9 @@ sub unbindall {
 		}
 	}
 	
-
 	# restore the links in the chroot environment
 	restorechrootlinks($chroot_dir);
 }
+
 die "Usage: unbindall chroot directory\n" unless $ARGV[0];
 unbindall $ARGV[0];
