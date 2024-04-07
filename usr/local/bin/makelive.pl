@@ -1092,6 +1092,11 @@ sub createchroot {
 	# umount cdrom
 	chdir "/root";
 	umountcdrom;
+
+	# make a directory /chrootenvironment
+	# so that init-linux can determine if
+	# it is running in the chroot environment
+	mkdir "$chroot_dir/chrootenvironment" or die "Could not make directory $chroot_dir/chrootenvironment: $!\n";
 }
 
 ###############################################
