@@ -750,8 +750,10 @@ sub unbindall {
 	# open directory
 	foreach my $dir ($chroot_dir . $debhome, $chroot_dir . $svn) {
 
-		# the directory may not exist
-		if ( -d $dir) {
+		# the directory must be empty
+		# -d and -l are both true for a link
+		# -l is false for a directory
+		if ( ! -l $dir and -d $dir) {
 			opendir (my $dh, $dir) || die "Could not open directory $dir: $!\n";
 			my @nofiles = readdir $dh;
 			closedir $dh;
@@ -762,7 +764,7 @@ sub unbindall {
 	}
 	
 	# restore the links in the chroot environment
-#	restorechrootlinks($chroot_dir);
+	restorechrootlinks($chroot_dir);
 }
 	
 #################################################

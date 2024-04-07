@@ -10,7 +10,30 @@ my $svn = "/mnt/svn";
 # these are constant
 my $debhomepathoriginal = "/mnt/ad64/debhome";
 my $svnpathoriginal = "/mnt/ad64/svn";
+my $config = "/root/.makelive.rc";
 
+###################################################
+# sub to restore links from file
+# for svn | debhome
+# if the file does not exist
+# then use the default settings
+# no parameters passed
+# on failure abort
+###################################################
+sub loadlinks {
+	# see if file exists
+	if (-f $config) {
+		# open and read file
+		open (FH, "<", $config) or die "Could not open $config for reading: $!\n";
+
+		# set the global default variables for svn and debhome
+		$svnpathoriginal = <FH>;
+		chomp($svnpathoriginal);
+		$debhomepathoriginal = <FH>;
+		chomp($debhomepathoriginal);
+		close FH;
+	}
+}
 ######################################################
 # sub to restore links /mnt/svn /mnt/debhome
 # to the default original values if they have changed
@@ -36,11 +59,13 @@ sub restorechrootlinks{
 
 	# make the link for /mnt/debhome -> /chroot_dir/mnt/ad64/debhome in the chroot environment
 	unlink "$chroot_dir" . "$debhome";
+	print "unbindall: $debhome -> $debhomepathoriginal\n";
 	my $rc = system("chroot $chroot_dir ln -v -s $debhomepathoriginal $debhome");
 	die "restorechrootlinks: error making $debhome -> $debhomepathoriginal link in chroot: $!" unless $rc == 0;
 
 	# make the link for /mnt/svn -> /chroot_dir/$svnpath in the chroot environment
 	unlink "$chroot_dir" . "$svn";
+	print "unbindall: $svn -> $svnpathoriginal\n";
 	$rc = system("chroot $chroot_dir ln -v -s $svnpathoriginal $svn");
 	die "restorechrootlinks: could not make link $svn -> $svnpathoriginal in chroot: $!" unless $rc == 0;
 
@@ -84,8 +109,8 @@ sub unbindall {
 	# open directory
 	foreach my $dir ($chroot_dir . $debhome, $chroot_dir . $svn) {
 
-		# the directory may not exist
-		if ( -d $dir) {
+		# make sure $dir is not a link
+		if ( ! -d $dir and -d $dir) {
 			opendir (my $dh, $dir) || die "Could not open directory $dir: $!\n";
 			my @nofiles = readdir $dh;
 			closedir $dh;
@@ -94,6 +119,9 @@ sub unbindall {
 			die "$dir still contains $nofiles files\n" if $nofiles > 0;
 		}
 	}
+	
+	# load the links from the config file
+	loadlinks();
 	
 	# restore the links in the chroot environment
 	restorechrootlinks($chroot_dir);
