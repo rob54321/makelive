@@ -110,7 +110,7 @@ sub unbindall {
 	foreach my $dir ($chroot_dir . $debhome, $chroot_dir . $svn) {
 
 		# make sure $dir is not a link
-		if ( ! -d $dir and -d $dir) {
+		if ( ! -l $dir and -d $dir) {
 			opendir (my $dh, $dir) || die "Could not open directory $dir: $!\n";
 			my @nofiles = readdir $dh;
 			closedir $dh;
