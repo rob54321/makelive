@@ -15,6 +15,7 @@ use File::Path qw (make_path);
 my $svn = "/mnt/svn";
 my $debhome = "/mnt/debhome";
 my $macriumsource = "/mnt/ad64/debhome/livesystem";
+my $config = "/root/.makelive.rc";
 
 # path to RECOVERY files
 my $recoverysource = "/mnt/ad64/debhome/livesystem";
@@ -55,7 +56,52 @@ our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_s, $opt_D, $opt_S, $opt
 #
 #######################################################
 
+#######################################################
+# sub to save current links for svn | debhome
+# to a file so it can be loaded
+# one or two links may change
+# so write one or two links if both change
+# params 1 svnpath
+#        2 dehomepath
+#######################################################
+sub savelinks {
+	# get the directories pointed to by links
+	# first svn the debhome
+	my $svnpath = shift @_;
+	my $debhomepath = shift @_;
 
+	# write them to a disk file
+	# /root/makelive.rc
+	# overwrite if it exists
+	open (MKRC, ">", $config) or die "Could not open $config for writing: $!\n";
+	print MKRC "$svnpath\n";
+	print MKRC "$debhomepath\n";
+	close MKRC;
+}
+
+###################################################
+# sub to restore links from file
+# for svn | debhome
+# if the file does not exist
+# then use the default settings
+# no parameters passed
+# on failure abort
+###################################################
+sub loadlinks {
+	# see if file exists
+	if (-f $config) {
+		# open and read file
+		open (FH, "<", $config) or die "Could not open $config for reading: $!\n";
+
+		# set the global default variables for svn and debhome
+		$svnpathoriginal = <FH>;
+		chomp($svnpathoriginal);
+		$debhomepathoriginal = <FH>;
+		chomp($debhomepathoriginal);
+		close FH;
+	}
+}
+			
 ###################################################
 # sub to mount devices
 # simple script to mount a device
@@ -243,7 +289,7 @@ print "path elements @pathelements\n";
 
 #######################################################
 # sub to restore /mnt/debhome and /mnt/svn links
-# in main system
+# in main system to default values
 # parameters: none
 #######################################################
 sub restoremainlinks {
@@ -286,7 +332,7 @@ sub restoremainlinks {
 
 }
 ######################################################
-# sub to restore links /mnt/svn /mnt/debhome
+# sub to restore links /mnt/svn /mnt/debhome in chroot
 # to the default original values if they have changed
 # parameters: chroot directory
 ######################################################
@@ -716,7 +762,7 @@ sub unbindall {
 	}
 	
 	# restore the links in the chroot environment
-	restorechrootlinks($chroot_dir);
+#	restorechrootlinks($chroot_dir);
 }
 	
 #################################################
@@ -990,9 +1036,9 @@ sub createchroot {
 	# if svn | debhome mounted on a device
 	# unmount it
 	my $description;
-print "createchroot: calling pathtype $svnpath " . \$description . "\n";
+#print "createchroot: calling pathtype $svnpath " . \$description . "\n";
 	my $device = pathtype($svnpath, \$description);
-print "createchroot after pathtype: device = $device svnpath = $svnpath description = $description\n";
+#print "createchroot after pathtype: device = $device svnpath = $svnpath description = $description\n";
 
 	mountdevice($device, "/mnt/$device", "ro", "false") if $description eq "device";
 
@@ -1018,7 +1064,7 @@ print "createchroot after pathtype: device = $device svnpath = $svnpath descript
 		}
 
 		# remove directory
-print "createchroot: about to remove $chroot_dir\n";
+#print "createchroot: about to remove $chroot_dir\n";
 		$rc = system("rm -rf $chroot_dir");
 		die "cannot remove $chroot_dir\n" unless $rc == 0;
 		print "removed $chroot_dir\n";
@@ -1438,7 +1484,7 @@ sub initialise {
 	#==============================================
 
 	createchroot($chroot_dir, $isoimage, $debhomepath, $svnpath) if $isoimage;
-print "initialise: debhomepath = $debhomepath svnpath = $svnpath\n";
+#print "initialise: debhomepath = $debhomepath svnpath = $svnpath\n";
 
 	# -i needs svn and linuxlive
 	# -u -p -e need svn and debhome
@@ -1571,6 +1617,10 @@ defaultparameter();
 
 getopts('mic:ep:hus:S:d:M:R:VD:T:');
 
+# read config file if it exists
+# to set links for svn and debhome
+loadlinks();
+
 # check version and exit 
 if ($opt_V) {
 	system("dpkg-query -W makelive");
@@ -1583,12 +1633,20 @@ $debhomepath = $opt_d if $opt_d;
 
 my $svnpath = $svnpathoriginal;
 
+
 # setup svn path if it has changed
 # done here for usage sub
 # svnpath overrides previous path
 # if it has changed
 $svnpath = $opt_s if $opt_s;
-print "main: debhome = $debhomepath svn = $svnpath\n";
+
+# save the links if they have changed
+if ($opt_s or $opt_d) {
+	# save the changed links
+	savelinks($svnpath, $debhomepath);
+}
+
+print "main: svnpath = $svnpath debhomepath = $debhomepath\n";
 
 usage($debhomepath, $svnpath) if $opt_h;
 # return code from functions
@@ -1616,4 +1674,4 @@ partitiondisk($opt_D) if $opt_D;
 initialise($opt_i, $opt_m, $opt_c, $opt_u, $opt_e, $debhomepath, $svnpath, $packages) if ($opt_c or $opt_u or $opt_e or $opt_p or $opt_i or $opt_m or $opt_M or $opt_R or $opt_S or $opt_T);
 
 # restore main links
-restoremainlinks;
+# restoremainlinks;
