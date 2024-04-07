@@ -42,7 +42,7 @@ my $svnpathoriginal = "/mnt/ad64/svn";
 ###################################################
 
 # get command line arguments
-our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_s, $opt_D, $opt_S, $opt_h, $opt_d, $opt_M, $opt_R, $opt_T, $opt_V);
+our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_s, $opt_D, $opt_S, $opt_h, $opt_d, $opt_M, $opt_R, $opt_T, $opt_V, $opt_L);
 
 #######################################################
 # this script makes a live system on a partition
@@ -1590,6 +1590,7 @@ sub usage {
 	print "-R full parent directory of RECOVERY files, default is $recoverysource\n";
 	print "-S full parent directory of SOURCES files, default is $sourcessource\n";
 	print "-T full parent directory of MCTREC files, default is $mctrecsource\n";
+	print "-L reset svn and debhome links to defaults and exit\n";
 	print "-V check version and exit\n";
 	exit 0;
 }
@@ -1617,8 +1618,21 @@ sub usage {
 # default parameters for -d default is 8GB
 defaultparameter();
 
-getopts('mic:ep:hus:S:d:M:R:VD:T:');
+getopts('mic:ep:hus:S:d:M:R:VD:T:L');
 
+# reset links for svn and debhome to original
+# before loading links.
+if ($opt_L) {
+	# restore links before links are loaded
+	restoremainlinks();
+
+	# now save the links
+	# to the rc file
+	savelinks($svnpathoriginal, $debhomepathoriginal);
+
+	# exit
+	exit 0;
+}
 # read config file if it exists
 # to set links for svn and debhome
 loadlinks();
