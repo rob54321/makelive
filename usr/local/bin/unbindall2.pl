@@ -11,6 +11,7 @@ my $svn = "/mnt/svn";
 my $debhomepathoriginal = "/mnt/ad64/debhome";
 my $svnpathoriginal = "/mnt/ad64/svn";
 my $config = "/root/.makelive.rc";
+my $chroot_dir = "/chroot";
 
 ###################################################
 # sub to restore links from file
@@ -79,13 +80,12 @@ sub restorechrootlinks{
 #######################################################
 # sub to unbind sys tmp dev dev/pts proc for chroot
 # environment
-# usage: unbindall chroot_dir, restorelinks
+# usage: unbindall ()
 # returns: none
 # exceptions: dies if chroot dir does not exist
 #######################################################
 sub unbindall {
 	# parameters
-	my $chroot_dir = $_[0];
 	die "$chroot_dir does not exist, exiting\n" unless -d $chroot_dir;
 
 	# bind for all in list
@@ -127,5 +127,4 @@ sub unbindall {
 	restorechrootlinks($chroot_dir);
 }
 
-die "Usage: unbindall chroot directory\n" unless $ARGV[0];
-unbindall $ARGV[0];
+unbindall ();

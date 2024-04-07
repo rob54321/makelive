@@ -16,6 +16,7 @@ use warnings;
 
 my $debhome = "/mnt/debhome";
 my $svn = "/mnt/svn";
+my $chroot_dir = "/chroot";
 
 #######################################################
 # sub to bind sys tmp dev dev/pts proc for chroot
@@ -31,7 +32,6 @@ my $svn = "/mnt/svn";
 #######################################################
 sub bindall {
 	# parameters
-	my $chroot_dir = $_[0];
 	chdir $chroot_dir or die "$chroot_dir does not exist, exiting\n";
 
 	# bind all in list
@@ -80,5 +80,4 @@ sub bindall {
 	}
 }
 
-die "Usage: bindall chroot directory\n" unless $ARGV[0];
-bindall $ARGV[0];
+bindall ();

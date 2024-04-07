@@ -14,17 +14,26 @@ use File::Path qw (make_path);
 # the source directory is the root of MACRIUM, MCTREC, RECOVERY or SOURCES
 my $svn = "/mnt/svn";
 my $debhome = "/mnt/debhome";
-my $macriumsource = "/mnt/ad64/debhome/livesystem";
+# set up chroot dir
+my $chroot_dir = "/chroot";
+
+# default paths for debhome and svn
+# these are constant
+my $debhomepathoriginal = "/mnt/ad64/debhome";
+my $svnpathoriginal = "/mnt/ad64/svn";
+
+# set the variables for the sources
+# as they depend on debhomepath
+my $macriumsource = $debhome . "/livesystem";
+my $recoverysource = $debhome . "/livesystem";
+my $mctrecsource = $debhome . "/livsystem";
+my $sourcessource = $debhome . "/livesytem";
+
+# config file for saving svn and debhome links
 my $config = "/root/.makelive.rc";
 
-# path to RECOVERY files
-my $recoverysource = "/mnt/ad64/debhome/livesystem";
 
-# path to MCTREC file
-my $mctrecsource = "/mnt/ad64/debhome/livesystem";
 
-# default for SOURCES path
-my $sourcessource = "/mnt/ad64/debhome/livesystem";
 # sizes of MCTREC and RECOVERY partitions
 my $recoverysize = 1;
 my $mctrecsize = 8;
@@ -35,10 +44,6 @@ my $MCTREC = "MCTREC";
 my $RECOVERY = "RECOVERY";
 my $SOURCES = "SOURCES";
 
-# default paths for debhome and svn
-# these are constant
-my $debhomepathoriginal = "/mnt/ad64/debhome";
-my $svnpathoriginal = "/mnt/ad64/svn";
 ###################################################
 
 # get command line arguments
@@ -334,10 +339,9 @@ sub restoremainlinks {
 ######################################################
 # sub to restore links /mnt/svn /mnt/debhome in chroot
 # to the default original values if they have changed
-# parameters: chroot directory
+# parameters: none
 ######################################################
-sub restorechrootlinks{
-	my ($chroot_dir) = $_[0];
+sub restorechrootlinks {
 
 	# /mnt/svn and /mnt/debhome may be
 	# directories.
@@ -526,11 +530,10 @@ sub defaultparameter {
 # filesystem.squashfs is written to chroot1/dochroot
 # not All directories under /mnt must be empty
 # no devices should be mounted
-# parameters: chroot directory
+# parameters: none
 # requires: none
 ####################################################
 sub makefs {
-	my $chroot_dir = $_[0];
 	
 	# check that dochroot has been executed previously
 	die "dochroot has not been executed\n" unless -d "$chroot_dir/dochroot";
@@ -545,11 +548,10 @@ sub makefs {
 }
 ######################################################
 # sub to edit grub default and set the theme in the filesystem.squashfs
-# parameters: chroot dir
+# parameters: none
 # requires: no devices to be mounted
 ######################################################
 sub editgrub {
-	my $chroot_dir = $_[0];
 	
 	# set /etc/default/grub, GRUB-CMDLINE_LINUX_DEFAULT=""
 	system("sed -i -e 's/GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT=\"\"/' $chroot_dir/etc/default/grub");
@@ -562,11 +564,10 @@ sub editgrub {
 # sub to write version and code name to disk
 # the version and code name are retrieved
 # from a string in /mnt/cdrom/.disk/info file
-# parameters chroot_dir
+# parameters none
 # requirements, iso image must be mounted
 #######################################################
 sub saveversioncodename {
-	my $chroot_dir = $_[0];
 	
 	# the file /mnt/cdrom/.disk/info contains the codename and version of linux
 	# read this file and store the codename in chroot_dir/isoimage/codename.txt
@@ -632,27 +633,6 @@ sub saveversioncodename {
 	close CODENAME;
 
 }
-#######################################################
-# sub to get codename from the cdrom
-# the name is in /mnt/cdrom/dists   impish
-# which is a directory.
-# the cdrom must be mounted
-# and the codename is returned if found
-# else undefined is returned.
-# parameters: chroot_dir
-# returns codename
-# requires: nothing
-#######################################################
-sub getcodename {
-	my $chroot_dir = $_[0];
-	
-	# read file chroot_dir/isoimage/codename.txt
-	open CODENAME, "<", "$chroot_dir/isoimage/codename.txt" or die "could not open $chroot_dir/isoimage/codename.txt: $!\n";
-	my $codename = <CODENAME>;
-	chomp($codename);
-	
-        return $codename;
-}
 
 #######################################################
 # sub to bind sys tmp dev dev/pts proc for chroot
@@ -662,13 +642,12 @@ sub getcodename {
 # and for svn /mnt/svn to /chroot/mnt/svn
 # the directories are made in by bindall in the
 # chroot environment
-# usage: bindall chroot_dir
+# usage: bindall
 # returns: none
 # exceptions: dies if chroot dir does not exist
 #######################################################
 sub bindall {
 	# parameters
-	my $chroot_dir = $_[0];
 	chdir $chroot_dir or die "$chroot_dir does not exist, exiting\n";
 
 	# bind all in list
@@ -720,13 +699,12 @@ sub bindall {
 #######################################################
 # sub to unbind sys tmp dev dev/pts proc for chroot
 # environment
-# usage: unbindall chroot_dir, restorelinks
+# usage: unbindall
 # returns: none
 # exceptions: dies if chroot dir does not exist
 #######################################################
 sub unbindall {
 	# parameters
-	my $chroot_dir = $_[0];
 	die "$chroot_dir does not exist, exiting\n" unless -d $chroot_dir;
 
 	# bind for all in list
@@ -764,17 +742,17 @@ sub unbindall {
 	}
 	
 	# restore the links in the chroot environment
-	restorechrootlinks($chroot_dir);
+	restorechrootlinks();
 }
 	
 #################################################
 # this sub sets up sources.list and debhome.list
 # in chroot_dir/etc/apt and chroot_dir/etc/apt/sources.list.d
-# The call setaptsources (codename, chroot_dir)
+# The call setaptsources (codename)
 # requires: svn
 #################################################
 sub setaptsources {
-	my ($codename, $chroot_dir) = @_;
+	my ($codename) = @_;
 	my $rc;
 	# create sources.list
 	open (SOURCES, ">", "$chroot_dir/etc/apt/sources.list");
@@ -1032,7 +1010,7 @@ sub findrepo {
 ####################################################################
 sub createchroot {
 	# creating new chroot environment
-	my ($chroot_dir, $isoimage, $debhomepath, $svnpath) = @_;
+	my ($isoimage, $debhomepath, $svnpath) = @_;
 	my $rc;
 		
 	# if svn | debhome mounted on a device
@@ -1054,7 +1032,7 @@ sub createchroot {
 	if (-d $chroot_dir) {
 
 		# chroot dir exists unbindall
-		unbindall $chroot_dir;
+		unbindall ();
 		# check if $chroot_dir/boot is mounted in chroot environment
 		# need to protect the live drive
 		# incase the binds are still active
@@ -1109,7 +1087,7 @@ sub createchroot {
 	die "could not copy dists install pool preseed to $chroot_dir/isoimage: $!\n" unless $rc == 0;
 
 	# save the version and codename of linux
-	saveversioncodename ($chroot_dir);
+	saveversioncodename ();
 	
 	# umount cdrom
 	chdir "/root";
@@ -1130,7 +1108,7 @@ sub createchroot {
 # requires: /mnt/debhome and /mnt/svn to be binded to debhome and svn
 ###############################################
 sub dochroot {
-	my ($chroot_dir, $upgrade, $packages) = @_;
+	my ($upgrade, $packages) = @_;
 
 	# get codename
 	open CDN, "<", "$chroot_dir/isoimage/codename.txt" or die "could not open $chroot_dir/isoimage/codename.txt: $!\n";
@@ -1142,7 +1120,7 @@ sub dochroot {
 
 	# generate chroot_dir/etc/apt/sources.list
 	# and chroot_dir/etc/sources.list.d/debhome.list
-	setaptsources ($codename, $chroot_dir);
+	setaptsources ($codename);
 
 	# copy xwindows themes and icons to /usr/share
 	# if themes.tar.xz and icons.tar.xz are found
@@ -1165,7 +1143,7 @@ sub dochroot {
 	# install apps in the chroot environment
 	# svn and debhome must be accessible at this point
 # print "dochroot: calling bindall\n";
-	bindall $chroot_dir;
+	bindall ();
 	# chroot/mnt/debhome and /chroot/mnt/svn are bound to /mnt/debhome and /mnt/svn
 	# mount debhome in the chroot environment
 	#$rc = system("chroot $chroot_dir mount -r -L $debhomedev /mnt/$debhomedev");
@@ -1209,7 +1187,7 @@ sub dochroot {
 	# for exiting the chroot environment
 	# unbind debhome and svn
 	# reset chroot links
-	unbindall $chroot_dir;
+	unbindall ();
 
 	# check if liveinstall exited with error in chroot environment
 	die "liveinstall.sh exited with error" unless $lirc == 0;
@@ -1223,12 +1201,11 @@ sub dochroot {
 # this sub determines the version
 # which will be used for grub
 # the full iso name is in $chroot_dir/isoimage/version.txt
-# parameter passed: $chroot_dir
+# parameter passed: none
 # returns version
 # requirements: none
 ######################################################
 sub getversion {
-	my $chroot_dir = $_[0];
 	
 	################################
 	# determine the version for grub
@@ -1280,7 +1257,7 @@ sub installfiles {
 #################################################
 # this sub sets up grub and installs it.
 # this is only necessary for partition 1
-# the call: installgrub(chroot_directory, partition_path)
+# the call: installgrub(partition_path)
 # requires: svn and LINUXLIVE
 #################################################
 sub installgrub {
@@ -1288,7 +1265,7 @@ sub installgrub {
 	##########################################################################################################
 	# export the grub.cfg for mbr and uefi and edit grub only for partition 1
 	##########################################################################################################
-	my ($chroot_dir, $partition_path) = @_;
+	my ($partition_path) = @_;
 	my $rc;
 
 	# export grub
@@ -1300,7 +1277,7 @@ sub installgrub {
 	# now edit grub.cfg with the new version no.
 	# edit mbr grub and set version
 	# get version
-	my $version = getversion($chroot_dir);
+	my $version = getversion();
     
 	chdir $chroot_dir . "/boot/grub";
 	system("sed -i -e 's/ubuntu-version/$version/' grub.cfg");
@@ -1339,7 +1316,7 @@ sub installgrub {
 ####################################################
 sub installfs {
 	# parameters
-	my ($label, $casper, $chroot_dir) = @_;
+	my ($label, $casper) = @_;
 	
 	# check if chroot environment exists
 	die "$chroot_dir does not exist\n" unless -d $chroot_dir;
@@ -1376,7 +1353,7 @@ sub installfs {
 	# use it. If it does not exist it must be created
 	# sub dochroot deletes it since filesystem.squashfs
 	# would change if dochroot is invoked.
-	makefs($chroot_dir) unless -f "$chroot_dir/dochroot/filesystem.squashfs";
+	makefs() unless -f "$chroot_dir/dochroot/filesystem.squashfs";
 
 	# empty /chroot1/boot
 	# this must be done after makefs, the config-xxxx-generic file
@@ -1423,10 +1400,10 @@ sub installfs {
 	mkdir $chroot_dir . "/boot/boot";
 		
 	# setup and install grub if this is the first partition
-	installgrub($chroot_dir, $partition_path);
+	installgrub($partition_path);
 	
 	# set grub colours
-	editgrub($chroot_dir);
+	editgrub();
 	
 	# make the persistence file
 	chdir $casper;
@@ -1455,8 +1432,6 @@ sub installfs {
 sub initialise {
 	my ($doinstall, $makefs, $isoimage, $upgrade, $dochroot, $debhomepath, $svnpath, $packages)  = @_;
 
-	# set up chroot dir
-	my $chroot_dir = "/chroot";
 	
 	# die if no /choot and it is not being created
 	if (! -d $chroot_dir) {
@@ -1485,7 +1460,7 @@ sub initialise {
 	# get deleted
 	#==============================================
 
-	createchroot($chroot_dir, $isoimage, $debhomepath, $svnpath) if $isoimage;
+	createchroot($isoimage, $debhomepath, $svnpath) if $isoimage;
 #print "initialise: debhomepath = $debhomepath svnpath = $svnpath\n";
 
 	# -i needs svn and linuxlive
@@ -1513,16 +1488,16 @@ sub initialise {
 		# if chroot environment does not exist die
 		die ("chroot environment does not exist\n") unless -d $chroot_dir;
 		# dochroot must be done
-		dochroot($chroot_dir, $upgrade, $packages);
+		dochroot($upgrade, $packages);
 		
 	} elsif (($doinstall or $makefs) and (! -d "$chroot_dir/dochroot")) {
 		# dochroot must be done if directory dochroot does not exist
-		dochroot($chroot_dir, $upgrade, $packages);
+		dochroot($upgrade, $packages);
 	}
 	
 	
 	# make filesystem.squashfs if not installing
-	makefs($chroot_dir) if $makefs;
+	makefs() if $makefs;
 
 	###########################################################################
 	# install MACRIUM files if -M given
@@ -1571,7 +1546,7 @@ sub initialise {
 	} if $opt_T;
 	
 	# install in LINUXLIVE/UBUNTU
-	installfs($label, $casper, $chroot_dir) if $doinstall;
+	installfs($label, $casper) if $doinstall;
 
 }
 
@@ -1625,7 +1600,7 @@ getopts('mic:ep:hus:S:d:M:R:VD:T:L');
 if ($opt_L) {
 	# restore links before links are loaded
 	restoremainlinks();
-
+	restorechrootlinks ();
 	# now save the links
 	# to the rc file
 	savelinks($svnpathoriginal, $debhomepathoriginal);
@@ -1636,6 +1611,7 @@ if ($opt_L) {
 # read config file if it exists
 # to set links for svn and debhome
 loadlinks();
+print "main: svnpathoriginal = $svnpathoriginal debhomepathoriginal = $debhomepathoriginal\n";
 
 # check version and exit 
 if ($opt_V) {
@@ -1663,6 +1639,7 @@ if ($opt_s or $opt_d) {
 	$debhomepathoriginal = $debhomepath;
 	savelinks($svnpath, $debhomepath);
 }
+
 
 print "main: svnpath = $svnpath debhomepath = $debhomepath\n";
 
