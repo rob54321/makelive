@@ -343,6 +343,10 @@ sub restoremainlinks {
 ######################################################
 sub restorechrootlinks {
 
+	# if chroot_dir/chrootenvironment does not exist
+	# just return
+	return unless -d $chroot_dir . "/chrootenvironment";
+	
 	# /mnt/svn and /mnt/debhome may be
 	# directories.
 	rmdir $chroot_dir . $svn if -d $chroot_dir . $svn;
@@ -356,8 +360,10 @@ sub restorechrootlinks {
 	
 	# make dirs incase they do not exist
 print "restorechrootlinks in chroot: mkdir $chroot_dir" . "$debhomemount\n";
-	mkdir "$chroot_dir" . "$debhomemount" unless -d "$chroot_dir" . "$debhomemount";
-	mkdir "$chroot_dir" . "$svnmount" unless -d "$chroot_dir" . "$svnmount";
+	make_path("$chroot_dir" . "$debhomemount", {owner => "robert", user => "robert", group => "robert"}) unless -d "$chroot_dir" . "$debhomemount";
+
+print "restorechrootlinks in chroot: mkdir $chroot_dir" . "$svnmount\n";
+	make_path("$chroot_dir" . "$svnmount", {owner => "robert", user => "robert", group => "robert"}) unless -d "$chroot_dir" . "$svnmount";
 
 	# make the link for /mnt/debhome -> /chroot_dir/mnt/ad64/debhome in the chroot environment
 	unlink "$chroot_dir" . "$debhome";
@@ -1645,6 +1651,10 @@ if ($opt_s or $opt_d) {
 	# save the changed links
 	$svnpathoriginal = $svnpath;
 	$debhomepathoriginal = $debhomepath;
+
+	# restore links
+	restoremainlinks();
+	restorechrootlinks();
 	savelinks($svnpath, $debhomepath);
 }
 
