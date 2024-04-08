@@ -361,12 +361,12 @@ sub restorechrootlinks {
 	# make the link for /mnt/debhome -> /chroot_dir/mnt/ad64/debhome in the chroot environment
 	unlink "$chroot_dir" . "$debhome";
 	my $rc = system("chroot $chroot_dir ln -v -s $debhomepathoriginal $debhome");
-	die "restorechrootlinks: error making $debhome -> $debhomepathoriginal link in chroot: $!" unless $rc == 0;
+	die "restorechrootlinks in chroot: error making $debhome -> $debhomepathoriginal link in chroot: $!" unless $rc == 0;
 
 	# make the link for /mnt/svn -> /chroot_dir/$svnpath in the chroot environment
 	unlink "$chroot_dir" . "$svn";
 	$rc = system("chroot $chroot_dir ln -v -s $svnpathoriginal $svn");
-	die "restorechrootlinks: Could not make link $svn -> $svnpathoriginal in chroot: $!" unless $rc == 0;
+	die "restorechrootlinks in chroot: Could not make link $svn -> $svnpathoriginal in chroot: $!" unless $rc == 0;
 
 	# set ownership
 	system("chown robert:robert -h $chroot_dir" . "$svn");
