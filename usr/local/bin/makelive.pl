@@ -355,17 +355,20 @@ sub restorechrootlinks {
 	my $svnmount = (fileparse($svnpathoriginal))[1];
 	
 	# make dirs incase they do not exist
+print "restorechrootlinks in chroot: mkdir $chroot_dir" . "$debhomemount\n";
 	mkdir "$chroot_dir" . "$debhomemount" unless -d "$chroot_dir" . "$debhomemount";
 	mkdir "$chroot_dir" . "$svnmount" unless -d "$chroot_dir" . "$svnmount";
 
 	# make the link for /mnt/debhome -> /chroot_dir/mnt/ad64/debhome in the chroot environment
 	unlink "$chroot_dir" . "$debhome";
-	my $rc = system("chroot $chroot_dir ln -v -s $debhomepathoriginal $debhome");
+print "restorechrootlinks in chroot: $debhome -> $debhomepathoriginal\n";
+	my $rc = system("chroot $chroot_dir ln -s $debhomepathoriginal $debhome");
 	die "restorechrootlinks in chroot: error making $debhome -> $debhomepathoriginal link in chroot: $!" unless $rc == 0;
 
 	# make the link for /mnt/svn -> /chroot_dir/$svnpath in the chroot environment
 	unlink "$chroot_dir" . "$svn";
-	$rc = system("chroot $chroot_dir ln -v -s $svnpathoriginal $svn");
+print "restorechrootlinks in chroot: $svn -> $svnpathoriginal\n";
+	$rc = system("chroot $chroot_dir ln -s $svnpathoriginal $svn");
 	die "restorechrootlinks in chroot: Could not make link $svn -> $svnpathoriginal in chroot: $!" unless $rc == 0;
 
 	# set ownership
@@ -681,11 +684,11 @@ sub bindall {
 			# bind svn and debhome ro
 			if ("$dir" eq "$svn" or "$dir" eq "$debhome") {
 				# bind svn and debhome ro
-				$rc = system("mount -v -o ro --bind $dir $chroot_dir" . "$dir");
+				$rc = system("mount -o ro --bind $dir $chroot_dir" . "$dir");
 				die "Could not bind $chroot_dir" . "$dir: $!\n" unless $rc == 0;
 				print "$chroot_dir" . "$dir mounted\n";
 			} else {
-				$rc = system("mount -v --bind $dir $chroot_dir" . "$dir");
+				$rc = system("mount --bind $dir $chroot_dir" . "$dir");
 				die "Could not bind $chroot_dir" . "$dir: $!\n" unless $rc == 0;
 				print "$chroot_dir" . "$dir mounted\n";
 			}
@@ -1616,7 +1619,7 @@ if ($opt_L) {
 # read config file if it exists
 # to set links for svn and debhome
 loadlinks();
-print "main: svnpathoriginal = $svnpathoriginal debhomepathoriginal = $debhomepathoriginal\n";
+#print "main: svnpathoriginal = $svnpathoriginal debhomepathoriginal = $debhomepathoriginal\n";
 
 # check version and exit 
 if ($opt_V) {
@@ -1646,7 +1649,7 @@ if ($opt_s or $opt_d) {
 }
 
 
-print "main: svnpath = $svnpath debhomepath = $debhomepath\n";
+#print "main: svnpath = $svnpath debhomepath = $debhomepath\n";
 
 usage($debhomepath, $svnpath) if $opt_h;
 # return code from functions
