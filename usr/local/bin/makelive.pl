@@ -53,7 +53,7 @@ my $SOURCES = "SOURCES";
 ###################################################
 
 # get command line arguments
-our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_s, $opt_D, $opt_S, $opt_h, $opt_d, $opt_M, $opt_R, $opt_T, $opt_V, $opt_L);
+our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_s, $opt_D, $opt_S, $opt_h, $opt_d, $opt_M, $opt_R, $opt_T, $opt_V, $opt_L, $opt_Z);
 
 #######################################################
 # this script makes a live system on a partition
@@ -710,15 +710,15 @@ sub bindall {
 				# bind svn and debhome ro
 				$rc = system("mount -o ro --bind $dir $chroot_dir" . "$dir");
 				die "Could not bind $chroot_dir" . "$dir to $dir: $!\n" unless $rc == 0;
-				print "$chroot_dir" . "$dir bound to $dir\n";
+				print "$chroot_dir" . "$dir bound to $dir\n" if $debug;
 			} else {
 				$rc = system("mount --bind $dir $chroot_dir" . "$dir");
 				die "Could not bind $chroot_dir" . "$dir to $dir: $!\n" unless $rc == 0;
-				print "$chroot_dir" . "$dir bound to $dir\n";
+				print "$chroot_dir" . "$dir bound to $dir\n" if $debug;
 			}
 		} else {
 			# already mounted
-			print "$chroot_dir" . "$dir is already bound to $dir\n";
+			print "$chroot_dir" . "$dir is already bound to $dir\n" if $debug;
 		}
 	}
 }
@@ -742,12 +742,12 @@ sub unbindall {
 		$rc = system("findmnt $chroot_dir" . "$dir 2>&1 >/dev/null");
 		if ($rc == 0) {
 			# dir mounted, unmount it
-			print "$chroot_dir" . "$dir unmounted from $dir\n";
+			print "$chroot_dir" . "$dir unmounted from $dir\n" if $debug;
 			$rc = system("umount $chroot_dir" . "$dir");
 			die "Could not umount $chroot_dir" . "$dir bound to $dir: $!\n" unless $rc == 0;
 		} else {
 			# dir not mounted
-			print "$chroot_dir" . "$dir not mounted to $dir\n";
+			print "$chroot_dir" . "$dir not mounted to $dir\n" if $debug;
 		}
 	}
 
@@ -836,7 +836,7 @@ sub mountcdrom {
 	# if /mnt/cdrom exists, unmount iso image if it is mounted
 	# mount ubuntu-mate iso image
 	if (-d "/mnt/cdrom") {
-		print "checking if cdrom is mounted\n";
+		print "checking if cdrom is mounted\n" if $debug;
 		$rc = system("findmnt /mnt/cdrom");
 
 		# umount /mnt/cdrom
@@ -879,7 +879,7 @@ sub pathtype {
 	my $repopath = shift @_;
 	my $refdescription = shift @_;
 	my $reponame = basename($repopath);
-#print "pathtype: repopath = $repopath refdescription = $refdescription reponame = $reponame\n";
+	print "pathtype: repopath = $repopath refdescription = $refdescription reponame = $reponame\n" if $debug;
 	
 	# if path = /mnt/device/svn or /mnt/device/a/b/c/d/e/debhome
 	# the match delimeter m? ? only matches once. cannot be used.
@@ -887,7 +887,7 @@ sub pathtype {
 		# path is of form /mnt/something/svn
 		# is 'something a block device'
 		my $device = (split(/\//, $repopath))[2];
-#print "pathtype: device = $device\n";
+		print "pathtype: device = $device\n" if $debug;
 		my $rc = system("blkid -L $device");
 		if ($rc == 0) {
 			# device is a block device
@@ -951,9 +951,9 @@ sub findrepo {
 	# descripion is device or link or directory or file or unknown
 	# type is actual_device or where_link_points_to or directory_name or file_name or 0
 	my $description;
-#print "findrepo: calling pathtype: params repopath = $repopath ref = " . \$description . "\n";
+	print "findrepo: calling pathtype: params repopath = $repopath ref = " . \$description . "\n" if $debug;
 	my $repopathtype = pathtype($repopath, \$description);
-#print "findrepo: repopath = $repopath description = $description repopathtype = $repopathtype\n";
+	print "findrepo: repopath = $repopath description = $description repopathtype = $repopathtype\n" if $debug;
 
 	# check if the repo is found at the repo path
 	if (! -d $repopath) {
@@ -1009,10 +1009,10 @@ sub findrepo {
 		# ro to protect it from being deleted by
 		# createchroot function
 		# get the path type
-#print "findrepo: $reponame exists at $repopath\n";
-#print "findrepo: calling pathtype repopath = $repopath\n";
+		print "findrepo: $reponame exists at $repopath\n" if $debug;
+		print "findrepo: calling pathtype repopath = $repopath\n" if $debug;
 		$repopathtype = pathtype($repopath, \$description);
-#print "findrepo: pathtype: repopathtype = $repopathtype description = $description\n";
+		print "findrepo: pathtype: repopathtype = $repopathtype description = $description\n" if $debug;
 
 		# remount device ro
 		mountdevice($repopathtype, "/mnt/$repopathtype", "ro", "true") if $description eq "device";
@@ -1044,9 +1044,9 @@ sub createchroot {
 	# if svn | debhome mounted on a device
 	# unmount it
 	my $description;
-#print "createchroot: calling pathtype $svnpath " . \$description . "\n";
+	print "createchroot: calling pathtype $svnpath " . \$description . "\n" if $debug;
 	my $device = pathtype($svnpath, \$description);
-#print "createchroot after pathtype: device = $device svnpath = $svnpath description = $description\n";
+print "createchroot after pathtype: device = $device svnpath = $svnpath description = $description\n" if $debug;
 
 	mountdevice($device, "/mnt/$device", "ro", "false") if $description eq "device";
 
@@ -1072,10 +1072,10 @@ sub createchroot {
 		}
 
 		# remove directory
-#print "createchroot: about to remove $chroot_dir\n";
+		print "createchroot: about to remove $chroot_dir\n" if $debug;
 		$rc = system("rm -rf $chroot_dir");
 		die "cannot remove $chroot_dir\n" unless $rc == 0;
-		print "removed $chroot_dir\n";
+		print "removed $chroot_dir\n" if $debug;
 	}
 
 	#####################################################################################
@@ -1088,7 +1088,7 @@ sub createchroot {
 	# the chroot_dir directory must not exist
 	$rc = system("unsquashfs -d " . $chroot_dir . " /mnt/cdrom/casper/filesystem.squashfs");
 	die "Error unsquashing /mnt/cdrom/casper/filesystem.squashfs\n"unless $rc == 0;
-	print "unsquashed filesystem.squashfs\n";
+	print "unsquashed filesystem.squashfs\n" if $debug;
 		
 	# copy resolv.conf and interfaces so network will work
 	system("cp /etc/resolv.conf /etc/hosts " . $chroot_dir . "/etc/");
@@ -1175,7 +1175,7 @@ sub dochroot {
 
 	# install apps in the chroot environment
 	# svn and debhome must be accessible at this point
-# print "dochroot: calling bindall\n";
+	print "dochroot: calling bindall\n" if $debug;
 	bindall ();
 	# chroot/mnt/debhome and /chroot/mnt/svn are bound to /mnt/debhome and /mnt/svn
 	# mount debhome in the chroot environment
@@ -1192,7 +1192,7 @@ sub dochroot {
 	$parameters = $parameters . "-p " . $packages if $packages;
 	
 	# execute liveinstall.sh in the chroot environment
-	print "parameters: $parameters\n" if $parameters;
+	do {print "parameters: $parameters\n" if $parameters;} if $debug;
 
 	# liveinstall is a package in the dehome distribution
 	# so debhome must be setup for liveinstall to be
@@ -1330,7 +1330,7 @@ sub installgrub {
 
 	# remove last char to get the device path eg: /dev/sda
 	chop $device;
-	print "$device\n";
+	print "installgrub: $device\n";
 	system("grub-install --no-floppy --boot-directory=" . $chroot_dir . "/boot --target=i386-pc " . $device);
 	
 	system(" grub-install --no-floppy --boot-directory=" . $chroot_dir . "/boot/EFI --efi-directory="  . $chroot_dir . "/boot --removable --target=x86_64-efi " . $device);
@@ -1364,7 +1364,7 @@ sub installfs {
 	# get partition_path of partition LINUXLIVE/UBUNTU ex: /dev/sda1
 	my $partition_path = `blkid -L $label`;
 	chomp $partition_path;
-	print $label . " is: $partition_path\n";
+	print $label . " is: $partition_path\n" if $debug;
 	
 	# check if the partition, LINUXLIVE  is mounted at any location
 	# un mount it if it is mounted
@@ -1374,7 +1374,7 @@ sub installfs {
 
 	# if label LINUXLIVE|UBUNTU is mounted, un mount it
 	if (defined $mtpt) {
-		print "$label mounted at: $mtpt\n";
+		print "$label mounted at: $mtpt\n" if $debug;
 		$rc = system("umount $mtpt");
 		die "$label cannot be unmounted\n" unless $rc == 0;
 	}
@@ -1477,8 +1477,8 @@ sub initialise {
 		
 	# if p or u given then set chrootuse
 	# if chroot does not exist then set chroot
-	print "packages: $packages\n" if $packages;
-	print "upgrade:\n" if $upgrade;
+	do {print "packages: $packages\n" if $packages;
+	    print "upgrade:\n" if $upgrade;} if $debug;
 	
 	# if creating new chroot
 	# un mount debhomedev
@@ -1494,7 +1494,7 @@ sub initialise {
 	#==============================================
 
 	createchroot($isoimage, $debhomepath, $svnpath) if $isoimage;
-#print "initialise: debhomepath = $debhomepath svnpath = $svnpath\n";
+	print "initialise: debhomepath = $debhomepath svnpath = $svnpath\n" if $debug;
 
 	# -i needs svn and linuxlive
 	# -u -p -e need svn and debhome
@@ -1600,6 +1600,7 @@ sub usage {
 	print "-T full parent directory of MCTREC files, default is $mctrecsource\n";
 	print "-L reset svn and debhome links to defaults and exit\n";
 	print "-V check version and exit\n";
+	print "-Z set debug flag to 1\n";
 	exit 0;
 }
 ##################
@@ -1626,7 +1627,10 @@ sub usage {
 # default parameters for -d default is 8GB
 defaultparameter();
 
-getopts('mic:ep:hus:S:d:M:R:VD:T:L');
+getopts('mic:ep:hus:S:d:M:R:VD:T:LZ');
+
+# turn on debug info if flag set
+$debug = 1 if $opt_Z;
 
 # reset links for svn and debhome to original
 # before loading links.
@@ -1643,7 +1647,7 @@ if ($opt_L) {
 # read config file if it exists
 # to set links for svn and debhome
 loadlinks();
-#print "main: svnpathoriginal = $svnpathoriginal debhomepathoriginal = $debhomepathoriginal\n";
+print "main: svnpathoriginal = $svnpathoriginal debhomepathoriginal = $debhomepathoriginal\n" if $debug;
 
 # check version and exit 
 if ($opt_V) {
@@ -1676,7 +1680,7 @@ if ($opt_s or $opt_d) {
 }
 
 
-#print "main: svnpath = $svnpath debhomepath = $debhomepath\n";
+print "main: svnpath = $svnpath debhomepath = $debhomepath\n" if $debug;
 
 usage($debhomepath, $svnpath) if $opt_h;
 # return code from functions
@@ -1704,5 +1708,5 @@ partitiondisk($opt_D) if $opt_D;
 initialise($opt_i, $opt_m, $opt_c, $opt_u, $opt_e, $debhomepath, $svnpath, $packages) if ($opt_c or $opt_u or $opt_e or $opt_p or $opt_i or $opt_m or $opt_M or $opt_R or $opt_S or $opt_T);
 
 # restore main links
-#print "main: svnpathoriginal = $svnpathoriginal debhomepathoriginal = $debhomepathoriginal\n";
+print "main: svnpathoriginal = $svnpathoriginal debhomepathoriginal = $debhomepathoriginal\n" if $debug;
 restoremainlinks;
