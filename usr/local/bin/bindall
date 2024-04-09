@@ -17,6 +17,8 @@ use warnings;
 my $debhome = "/mnt/debhome";
 my $svn = "/mnt/svn";
 my $chroot_dir = "/chroot";
+# set to 1 for debug info
+my $debug = 0;
 
 #######################################################
 # sub to bind sys tmp dev dev/pts proc for chroot
@@ -67,17 +69,18 @@ sub bindall {
 				# bind svn and debhome ro
 				$rc = system("mount -o ro --bind $dir $chroot_dir" . "$dir");
 				die "Could not bind $chroot_dir" . "$dir to $dir: $!\n" unless $rc == 0;
-				print "$chroot_dir" . "$dir bound to $dir\n";
+				print "$chroot_dir" . "$dir bound to $dir\n" if $debug;
 			} else {
 				$rc = system("mount --bind $dir $chroot_dir" . "$dir");
 				die "Could not bind $chroot_dir" . "$dir to $dir: $!\n" unless $rc == 0;
-				print "$chroot_dir" . "$dir bound to $dir\n";
+				print "$chroot_dir" . "$dir bound to $dir\n" if $debug;
 			}
 		} else {
 			# already mounted
-			print "$chroot_dir" . "$dir is already bound to $dir\n";
+			print "$chroot_dir" . "$dir is already bound to $dir\n" if $debug;
 		}
 	}
 }
-
+# check if cml parameter is set to debug
+$debug = 1 if $ARGV[0] && "$ARGV[0]" eq "debug";
 bindall ();

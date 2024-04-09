@@ -13,6 +13,9 @@ my $svn = "/mnt/svn";
 my $debhomechrootoriginal = "/mnt/ad64/debhome";
 my $svnchrootoriginal = "/mnt/ad64/svn";
 
+# for debug info, set to 1 by cml parameter
+my $debug = 0;
+
 my $chroot_dir = "/chroot";
 
 
@@ -44,21 +47,21 @@ sub restorechrootlinks {
 	my $svnmount = (fileparse($svnchrootoriginal))[1];
 	
 	# make dirs incase they do not exist
-print "restorechrootlinks in chroot: mkdir $chroot_dir" . "$debhomemount\n";
+	print "restorechrootlinks in chroot: mkdir $chroot_dir" . "$debhomemount\n" if $debug;
 	make_path("$chroot_dir" . "$debhomemount", {owner => "robert", user => "robert", group => "robert"}) unless -d "$chroot_dir" . "$debhomemount";
 
-print "restorechrootlinks in chroot: mkdir $chroot_dir" . "$svnmount\n";
+	print "restorechrootlinks in chroot: mkdir $chroot_dir" . "$svnmount\n" if $debug;
 	make_path("$chroot_dir" . "$svnmount", {owner => "robert", user => "robert", group => "robert"}) unless -d "$chroot_dir" . "$svnmount";
 
 	# make the link for /mnt/debhome -> /chroot_dir/mnt/ad64/debhome in the chroot environment
 	unlink "$chroot_dir" . "$debhome";
-print "restorechrootlinks in chroot: $debhome -> $debhomechrootoriginal\n";
+	print "restorechrootlinks in chroot: $debhome -> $debhomechrootoriginal\n" if $debug;
 	my $rc = system("chroot $chroot_dir ln -s $debhomechrootoriginal $debhome");
 	die "restorechrootlinks in chroot: error making $debhome -> $debhomechrootoriginal link in chroot: $!" unless $rc == 0;
 
 	# make the link for /mnt/svn -> /chroot_dir/$svnpath in the chroot environment
 	unlink "$chroot_dir" . "$svn";
-print "restorechrootlinks in chroot: $svn -> $svnchrootoriginal\n";
+	print "restorechrootlinks in chroot: $svn -> $svnchrootoriginal\n" if $debug;
 	$rc = system("chroot $chroot_dir ln -s $svnchrootoriginal $svn");
 	die "restorechrootlinks in chroot: Could not make link $svn -> $svnchrootoriginal in chroot: $!" unless $rc == 0;
 
@@ -89,12 +92,12 @@ sub unbindall {
 		$rc = system("findmnt $chroot_dir" . "$dir 2>&1 >/dev/null");
 		if ($rc == 0) {
 			# dir mounted, unmount it
-			print "$chroot_dir" . "$dir unmounted\n";
+			print "$chroot_dir" . "$dir unmounted\n" if $debug;
 			$rc = system("umount $chroot_dir" . "$dir");
 			die "Could not umount $chroot_dir" . "$dir: $!\n" unless $rc == 0;
 		} else {
 			# dir not mounted
-			print "$chroot_dir" . "$dir not mounted\n";
+			print "$chroot_dir" . "$dir not mounted\n" if $debug;
 		}
 	}
 
@@ -117,5 +120,7 @@ sub unbindall {
 	# restore the links in the chroot environment
 	restorechrootlinks($chroot_dir);
 }
+# check cml parameters
+$debug = 1 if $ARGV[0] && "$ARGV[0]" eq "debug";
 
 unbindall ();
