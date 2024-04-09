@@ -37,7 +37,8 @@ my $sourcessource = $debhome . "/livesytem";
 # config file for saving svn and debhome links
 my $config = "/root/.makelive.rc";
 
-
+# debug flag, set to 1 for debug info
+my $debug = 0;
 
 # sizes of MCTREC and RECOVERY partitions
 my $recoverysize = 1;
@@ -188,7 +189,7 @@ sub mountdevice {
 	if ($mount eq "true") {
 		$rc = system("mount -L $label -o $options $mtpt");
 		die "Could not mount $label at $mtpt -o $options: $!\n" unless $rc == 0;
-		print "mounted $label at $mtpt options: $options\n";
+		print "mounted $label at $mtpt options: $options\n" if $debug;
 	}
 	
 	if ("$wasmounted" eq "true") {
@@ -239,7 +240,8 @@ sub findsource {
 	# the first element is "" since path is /...
 	# remove it 
 	shift @pathelements;
-print "path elements @pathelements\n";
+	print "path elements @pathelements\n" if $debug;
+	
 	# check if the path is on a block device
 	# that is attached, if not die
 	# get the attached block devices
@@ -253,7 +255,7 @@ print "path elements @pathelements\n";
 	my $count = 0;
 	LOOP: foreach my $dir (@pathelements) {
 		foreach my $bdev (@blkdev) {
-#print "bdev $bdev    path elements $dir\n";
+        print "bdev $bdev    path elements $dir\n" if $debug;
 			if ("$dir" eq "$bdev") {
 				$device = $bdev;
 				last LOOP;
@@ -261,7 +263,7 @@ print "path elements @pathelements\n";
 		}
 		$count++;
 	}
-#print "device = $device count = $count\n";
+	print "device = $device count = $count\n" if $debug;
 	# if device was found
 	# try and mount it else source not found -- die
 	if ($device) {
@@ -283,7 +285,7 @@ print "path elements @pathelements\n";
 		mountdevice($device, $mountpoint, "ro", "true");
 		# check if the source exists
 		if ( -d $source ) {
-			print "found $source: mounted $device at $mountpoint\n";
+			print "found $source: mounted $device at $mountpoint\n" if $debug;
 			return;
 		} else {
 			# source not found
@@ -369,21 +371,21 @@ sub restorechrootlinks {
 	my $svnmount = (fileparse($svnchrootoriginal))[1];
 	
 	# make dirs incase they do not exist
-print "restorechrootlinks in chroot: mkdir $chroot_dir" . "$debhomemount\n";
+	print "restorechrootlinks in chroot: mkdir $chroot_dir" . "$debhomemount\n" if $debug;
 	make_path("$chroot_dir" . "$debhomemount", {owner => "robert", user => "robert", group => "robert"}) unless -d "$chroot_dir" . "$debhomemount";
 
-print "restorechrootlinks in chroot: mkdir $chroot_dir" . "$svnmount\n";
+	print "restorechrootlinks in chroot: mkdir $chroot_dir" . "$svnmount\n" if $debug;
 	make_path("$chroot_dir" . "$svnmount", {owner => "robert", user => "robert", group => "robert"}) unless -d "$chroot_dir" . "$svnmount";
 
 	# make the link for /mnt/debhome -> /chroot_dir/mnt/ad64/debhome in the chroot environment
 	unlink "$chroot_dir" . "$debhome";
-print "restorechrootlinks in chroot: $debhome -> $debhomechrootoriginal\n";
+	print "restorechrootlinks in chroot: $debhome -> $debhomechrootoriginal\n" if $debug;
 	my $rc = system("chroot $chroot_dir ln -s $debhomechrootoriginal $debhome");
 	die "restorechrootlinks in chroot: error making $debhome -> $debhomechrootoriginal link in chroot: $!" unless $rc == 0;
 
 	# make the link for /mnt/svn -> /chroot_dir/$svnpath in the chroot environment
 	unlink "$chroot_dir" . "$svn";
-print "restorechrootlinks in chroot: $svn -> $svnchrootoriginal\n";
+	print "restorechrootlinks in chroot: $svn -> $svnchrootoriginal\n" if $debug;
 	$rc = system("chroot $chroot_dir ln -s $svnchrootoriginal $svn");
 	die "restorechrootlinks in chroot: Could not make link $svn -> $svnchrootoriginal in chroot: $!" unless $rc == 0;
 
