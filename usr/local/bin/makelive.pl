@@ -22,6 +22,11 @@ my $chroot_dir = "/chroot";
 my $debhomepathoriginal = "/mnt/ad64/debhome";
 my $svnpathoriginal = "/mnt/ad64/svn";
 
+# for the livesystem the chroot links /mnt/debhone
+# and /mnt/svn point to these values below
+my $debhomechrootoriginal = "/mnt/ad64/debhome";
+my $svnchrootoriginal = "/mnt/ad64/svn";
+
 # set the variables for the sources
 # as they depend on debhomepath
 my $macriumsource = $debhome . "/livesystem";
@@ -338,7 +343,12 @@ sub restoremainlinks {
 }
 ######################################################
 # sub to restore links /mnt/svn /mnt/debhome in chroot
-# to the default original values if they have changed
+# to the default original values for the chroot system
+# these links are only used in the live system.
+# In the chroot the directories /mnt/debhome /mnt/svn
+# are bound to the same in the main system.
+# in the live system /mnt/debhome /mnt/svn are links
+# to /mnt/ad64/debhome and /mnt/ad64/svn by default.
 # parameters: none
 ######################################################
 sub restorechrootlinks {
@@ -347,16 +357,16 @@ sub restorechrootlinks {
 	# just return
 	return unless -d $chroot_dir . "/chrootenvironment";
 	
-	# /mnt/svn and /mnt/debhome may be
-	# directories.
+	# bindall() maded /mnt/svn and /mnt/debhome directories for binding
+	# in the chroot system. restore them to the links for the live system
 	rmdir $chroot_dir . $svn if -d $chroot_dir . $svn;
 	rmdir $chroot_dir . $debhome if -d $chroot_dir . $debhome;
 
 	# debhomepath is of form /mnt/ad64/debhome
 	# svnpath is of form /mnt/ad64/svn
 	# (name, path) = fileparse(fullpath)
-	my $debhomemount = (fileparse($debhomepathoriginal))[1];
-	my $svnmount = (fileparse($svnpathoriginal))[1];
+	my $debhomemount = (fileparse($debhomechrootoriginal))[1];
+	my $svnmount = (fileparse($svnchrootoriginal))[1];
 	
 	# make dirs incase they do not exist
 print "restorechrootlinks in chroot: mkdir $chroot_dir" . "$debhomemount\n";
@@ -367,17 +377,17 @@ print "restorechrootlinks in chroot: mkdir $chroot_dir" . "$svnmount\n";
 
 	# make the link for /mnt/debhome -> /chroot_dir/mnt/ad64/debhome in the chroot environment
 	unlink "$chroot_dir" . "$debhome";
-print "restorechrootlinks in chroot: $debhome -> $debhomepathoriginal\n";
-	my $rc = system("chroot $chroot_dir ln -s $debhomepathoriginal $debhome");
-	die "restorechrootlinks in chroot: error making $debhome -> $debhomepathoriginal link in chroot: $!" unless $rc == 0;
+print "restorechrootlinks in chroot: $debhome -> $debhomechrootoriginal\n";
+	my $rc = system("chroot $chroot_dir ln -s $debhomechrootoriginal $debhome");
+	die "restorechrootlinks in chroot: error making $debhome -> $debhomechrootoriginal link in chroot: $!" unless $rc == 0;
 
 	# make the link for /mnt/svn -> /chroot_dir/$svnpath in the chroot environment
 	unlink "$chroot_dir" . "$svn";
-print "restorechrootlinks in chroot: $svn -> $svnpathoriginal\n";
-	$rc = system("chroot $chroot_dir ln -s $svnpathoriginal $svn");
-	die "restorechrootlinks in chroot: Could not make link $svn -> $svnpathoriginal in chroot: $!" unless $rc == 0;
+print "restorechrootlinks in chroot: $svn -> $svnchrootoriginal\n";
+	$rc = system("chroot $chroot_dir ln -s $svnchrootoriginal $svn");
+	die "restorechrootlinks in chroot: Could not make link $svn -> $svnchrootoriginal in chroot: $!" unless $rc == 0;
 
-	# set ownership
+	# set ownership in chroot environment
 	system("chown robert:robert -h $chroot_dir" . "$svn");
 	system("chown robert:robert -h $chroot_dir" . "$debhome");
 	system("chown robert:robert $chroot_dir" . "/mnt");
@@ -659,8 +669,14 @@ sub bindall {
 	# parameters
 	chdir $chroot_dir or die "$chroot_dir does not exist, exiting\n";
 
-	# bind all in list
 	# bind for all in list
+	# /chroot/proc             binds to /proc
+	# /chroot/dev              binds to /dev
+	# /chroot/dev/pts          binds to /dev/pts
+	# /chroot/tmp              binds to /tmp
+	# /chroot/sys              binds to /sys
+	# /chroot/mnt/svn          binds to /mnt/svn
+	# /chroot/mnt/debhome      binds to /mnt/debhome
 	my @bindlist = ("/proc", "/dev", "/dev/pts", "/tmp", "/sys", "$svn", "$debhome");
 	my $rc;
 
@@ -717,18 +733,19 @@ sub unbindall {
 	die "$chroot_dir does not exist, exiting\n" unless -d $chroot_dir;
 
 	# bind for all in list
+	# reverse order compared to bindall()
 	my @bindlist = ("$debhome", "$svn", "/sys", "/tmp", "/dev/pts", "/dev", "/proc");
 	my $rc;
 	foreach my $dir (@bindlist) {
 		$rc = system("findmnt $chroot_dir" . "$dir 2>&1 >/dev/null");
 		if ($rc == 0) {
 			# dir mounted, unmount it
-			print "$chroot_dir" . "$dir unmounted\n";
+			print "$chroot_dir" . "$dir unmounted from $dir\n";
 			$rc = system("umount $chroot_dir" . "$dir");
-			die "Could not umount $chroot_dir" . "$dir: $!\n" unless $rc == 0;
+			die "Could not umount $chroot_dir" . "$dir bound to $dir: $!\n" unless $rc == 0;
 		} else {
 			# dir not mounted
-			print "$chroot_dir" . "$dir not mounted\n";
+			print "$chroot_dir" . "$dir not mounted to $dir\n";
 		}
 	}
 
@@ -1614,7 +1631,6 @@ getopts('mic:ep:hus:S:d:M:R:VD:T:L');
 if ($opt_L) {
 	# restore links before links are loaded
 	restoremainlinks();
-	restorechrootlinks ();
 	# now save the links
 	# to the rc file
 	savelinks($svnpathoriginal, $debhomepathoriginal);
@@ -1654,7 +1670,6 @@ if ($opt_s or $opt_d) {
 
 	# restore links
 	restoremainlinks();
-	restorechrootlinks();
 	savelinks($svnpath, $debhomepath);
 }
 

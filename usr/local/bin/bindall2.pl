@@ -66,12 +66,12 @@ sub bindall {
 			if ("$dir" eq "$svn" or "$dir" eq "$debhome") {
 				# bind svn and debhome ro
 				$rc = system("mount -v -o ro --bind $dir $chroot_dir" . "$dir");
-				die "Could not bind $chroot_dir" . "$dir: $!\n" unless $rc == 0;
-				print "$chroot_dir" . "$dir mounted\n";
+				die "Could not bind $chroot_dir" . "$dir to $dir: $!\n" unless $rc == 0;
+				print "$chroot_dir" . "$dir mounted on $dir\n";
 			} else {
 				$rc = system("mount -v --bind $dir $chroot_dir" . "$dir");
-				die "Could not bind $chroot_dir" . "$dir: $!\n" unless $rc == 0;
-				print "$chroot_dir" . "$dir mounted\n";
+				die "Could not bind $chroot_dir" . "$dir to $dir: $!\n" unless $rc == 0;
+				print "$chroot_dir" . "$dir mounted on $dir\n";
 			}
 		} else {
 			# already mounted

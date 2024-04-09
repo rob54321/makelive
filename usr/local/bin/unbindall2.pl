@@ -2,80 +2,74 @@
 use strict;
 use warnings;
 use File::Basename;
+use File::Path qw (make_path remove_tree);
 
 my $debhome = "/mnt/debhome";
 my $svn = "/mnt/svn";
 
 # default paths for debhome and svn
-# these are constant
-my $debhomepathoriginal = "/mnt/ad64/debhome";
-my $svnpathoriginal = "/mnt/ad64/svn";
-my $config = "/root/.makelive.rc";
+
+# links in the chroot environment for /mnt/svn /mnt/debhome
+my $debhomechrootoriginal = "/mnt/ad64/debhome";
+my $svnchrootoriginal = "/mnt/ad64/svn";
+
 my $chroot_dir = "/chroot";
 
-###################################################
-# sub to restore links from file
-# for svn | debhome
-# if the file does not exist
-# then use the default settings
-# no parameters passed
-# on failure abort
-###################################################
-sub loadlinks {
-	# see if file exists
-	if (-f $config) {
-		# open and read file
-		open (FH, "<", $config) or die "Could not open $config for reading: $!\n";
 
-		# set the global default variables for svn and debhome
-		$svnpathoriginal = <FH>;
-		chomp($svnpathoriginal);
-		$debhomepathoriginal = <FH>;
-		chomp($debhomepathoriginal);
-		close FH;
-	}
-}
 ######################################################
-# sub to restore links /mnt/svn /mnt/debhome
-# to the default original values if they have changed
-# parameters: chroot directory
+# sub to restore links /mnt/svn /mnt/debhome in chroot
+# to the default original values for the chroot system
+# these links are only used in the live system.
+# In the chroot the directories /mnt/debhome /mnt/svn
+# are bound to the same in the main system.
+# in the live system /mnt/debhome /mnt/svn are links
+# to /mnt/ad64/debhome and /mnt/ad64/svn by default.
+# parameters: none
 ######################################################
-sub restorechrootlinks{
-	my ($chroot_dir) = $_[0];
+sub restorechrootlinks {
 
-	# /mnt/svn and /mnt/debhome may be
-	# directories.
+	# if chroot_dir/chrootenvironment does not exist
+	# just return
+	return unless -d $chroot_dir . "/chrootenvironment";
+	
+	# bindall() maded /mnt/svn and /mnt/debhome directories for binding
+	# in the chroot system. restore them to the links for the live system
 	rmdir $chroot_dir . $svn if -d $chroot_dir . $svn;
 	rmdir $chroot_dir . $debhome if -d $chroot_dir . $debhome;
 
 	# debhomepath is of form /mnt/ad64/debhome
 	# svnpath is of form /mnt/ad64/svn
 	# (name, path) = fileparse(fullpath)
-	my $debhomemount = (fileparse($debhomepathoriginal))[1];
-	my $svnmount = (fileparse($svnpathoriginal))[1];
+	my $debhomemount = (fileparse($debhomechrootoriginal))[1];
+	my $svnmount = (fileparse($svnchrootoriginal))[1];
 	
 	# make dirs incase they do not exist
-	mkdir "$chroot_dir" . "$debhomemount" unless -d "$chroot_dir" . "$debhomemount";
-	mkdir "$chroot_dir" . "$svnmount" unless -d "$chroot_dir" . "$svnmount";
+print "restorechrootlinks in chroot: mkdir $chroot_dir" . "$debhomemount\n";
+	make_path("$chroot_dir" . "$debhomemount", {owner => "robert", user => "robert", group => "robert"}) unless -d "$chroot_dir" . "$debhomemount";
+
+print "restorechrootlinks in chroot: mkdir $chroot_dir" . "$svnmount\n";
+	make_path("$chroot_dir" . "$svnmount", {owner => "robert", user => "robert", group => "robert"}) unless -d "$chroot_dir" . "$svnmount";
 
 	# make the link for /mnt/debhome -> /chroot_dir/mnt/ad64/debhome in the chroot environment
 	unlink "$chroot_dir" . "$debhome";
-	print "unbindall: $debhome -> $debhomepathoriginal\n";
-	my $rc = system("chroot $chroot_dir ln -v -s $debhomepathoriginal $debhome");
-	die "restorechrootlinks: error making $debhome -> $debhomepathoriginal link in chroot: $!" unless $rc == 0;
+print "restorechrootlinks in chroot: $debhome -> $debhomechrootoriginal\n";
+	my $rc = system("chroot $chroot_dir ln -s $debhomechrootoriginal $debhome");
+	die "restorechrootlinks in chroot: error making $debhome -> $debhomechrootoriginal link in chroot: $!" unless $rc == 0;
 
 	# make the link for /mnt/svn -> /chroot_dir/$svnpath in the chroot environment
 	unlink "$chroot_dir" . "$svn";
-	print "unbindall: $svn -> $svnpathoriginal\n";
-	$rc = system("chroot $chroot_dir ln -v -s $svnpathoriginal $svn");
-	die "restorechrootlinks: could not make link $svn -> $svnpathoriginal in chroot: $!" unless $rc == 0;
+print "restorechrootlinks in chroot: $svn -> $svnchrootoriginal\n";
+	$rc = system("chroot $chroot_dir ln -s $svnchrootoriginal $svn");
+	die "restorechrootlinks in chroot: Could not make link $svn -> $svnchrootoriginal in chroot: $!" unless $rc == 0;
 
-	# set ownership
+	# set ownership in chroot environment
 	system("chown robert:robert -h $chroot_dir" . "$svn");
 	system("chown robert:robert -h $chroot_dir" . "$debhome");
 	system("chown robert:robert $chroot_dir" . "/mnt");
 
 }	
+
+
 
 #######################################################
 # sub to unbind sys tmp dev dev/pts proc for chroot
@@ -119,9 +113,6 @@ sub unbindall {
 			die "$dir still contains $nofiles files\n" if $nofiles > 0;
 		}
 	}
-	
-	# load the links from the config file
-	loadlinks();
 	
 	# restore the links in the chroot environment
 	restorechrootlinks($chroot_dir);
