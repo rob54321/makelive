@@ -92,7 +92,7 @@ sub unbindall {
 		$rc = system("findmnt $chroot_dir" . "$dir 2>&1 >/dev/null");
 		if ($rc == 0) {
 			# dir mounted, unmount it
-			print "$chroot_dir" . "$dir unmounted\n" if $debug;
+			print "unmounting $chroot_dir" . "$dir\n" if $debug;
 			$rc = system("umount $chroot_dir" . "$dir");
 			die "Could not umount $chroot_dir" . "$dir: $!\n" unless $rc == 0;
 		} else {
@@ -108,11 +108,13 @@ sub unbindall {
 
 		# make sure $dir is not a link
 		if ( ! -l $dir and -d $dir) {
+			print "unbindall: open dir $dir to check for files\n" if $debug;
 			opendir (my $dh, $dir) || die "Could not open directory $dir: $!\n";
 			my @nofiles = readdir $dh;
 			closedir $dh;
 			# remove count for . and ..
 			my $nofiles = scalar(@nofiles) - 2;
+			print "no of files in dir $dir is $nofiles\n" if $debug;
 			die "$dir still contains $nofiles files\n" if $nofiles > 0;
 		}
 	}

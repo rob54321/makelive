@@ -709,10 +709,8 @@ sub bindall {
 		my $option;
 		if ("$dir" eq "$svn" || "$dir" eq "$debhome") {
 			$option = "-o ro";
-			$option .= " -v" if $debug;
 		} else {
 			$option = "-o rw";
-			$option .= " -v" if $debug;
 		}
 			
 		# check if it is already mounted
@@ -731,13 +729,11 @@ sub bindall {
 				print "mount --bind $sourcedir $chroot_dir" . "$dir\n" if $debug;
 				$rc = system("mount " . $option . " --bind $sourcedir $chroot_dir" . "$dir");
 				die "Could not bind $chroot_dir" . "$dir to $sourcedir: $!\n" unless $rc == 0;
-				print "$chroot_dir" . "$dir bound to $sourcedir\n" if $debug;
 			} else {
 				# bind all except svn and debhome
 				print "mount --bind $dir $chroot_dir" . "$dir\n" if $debug;
 				$rc = system("mount " . $option . " --bind $dir $chroot_dir" . "$dir");
 				die "Could not bind $chroot_dir" . "$dir to $dir: $!\n" unless $rc == 0;
-				print "$chroot_dir" . "$dir bound to $dir\n" if $debug;
 			}
 		} else {
 			# already mounted
