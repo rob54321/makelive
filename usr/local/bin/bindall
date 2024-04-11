@@ -41,9 +41,10 @@ if ($debug) {
 # sub to bind sys tmp dev dev/pts proc for chroot
 # environment
 # access to debhome and svn in the chroot environment
-# is done through the binding of /mnt/debhome to /chroot/mnt/debhome
-# and for svn /mnt/svn to /chroot/mnt/svn
-# the directories are made in by bindall in the
+# is done through the binding of where /mnt/debhome points to
+# to /chroot/mnt/debhome
+# and for svn where /mnt/svn points to to /chroot/mnt/svn
+# the directories are made by bindall in the
 # chroot environment
 # usage: bindall chroot_dir
 # returns: none
@@ -53,8 +54,14 @@ sub bindall {
 	# parameters
 	chdir $chroot_dir or die "$chroot_dir does not exist, exiting\n";
 
-	# bind all in list
 	# bind for all in list
+	# /chroot/proc             binds to /proc
+	# /chroot/dev              binds to /dev
+	# /chroot/dev/pts          binds to /dev/pts
+	# /chroot/tmp              binds to /tmp
+	# /chroot/sys              binds to /sys
+	# /chroot/mnt/svn          binds to where /mnt/svn points to
+	# /chroot/mnt/debhome      binds to where /mnt/debhome points to
 	my @bindlist = ("/proc", "/dev", "/dev/pts", "/tmp", "/sys", "$svn", "$debhome");
 	my $rc;
 

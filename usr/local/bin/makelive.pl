@@ -659,6 +659,105 @@ sub saveversioncodename {
 # sub to bind sys tmp dev dev/pts proc for chroot
 # environment
 # access to debhome and svn in the chroot environment
+# is done through the binding of where /mnt/debhome points to
+# to /chroot/mnt/debhome
+# and for svn where /mnt/svn points to to /chroot/mnt/svn
+# the directories are made by bindall in the
+# chroot environment
+# usage: bindall chroot_dir
+# returns: none
+# exceptions: dies if chroot dir does not exist
+#######################################################
+sub bindall {
+	# parameters
+	chdir $chroot_dir or die "$chroot_dir does not exist, exiting\n";
+
+	# bind for all in list
+	# /chroot/proc             binds to /proc
+	# /chroot/dev              binds to /dev
+	# /chroot/dev/pts          binds to /dev/pts
+	# /chroot/tmp              binds to /tmp
+	# /chroot/sys              binds to /sys
+	# /chroot/mnt/svn          binds to where /mnt/svn points to
+	# /chroot/mnt/debhome      binds to where /mnt/debhome points to
+	my @bindlist = ("/proc", "/dev", "/dev/pts", "/tmp", "/sys", "$svn", "$debhome");
+	my $rc;
+
+	# flag to indicate dirs were bound and need to be 
+	# unbound before being bound again
+	my $runbindall = "false";
+	
+	# if links exist delete them
+	# cannot bind a link to a directory for svn | debhome
+	unlink $chroot_dir . $svn if -l $chroot_dir . $svn;
+	unlink $chroot_dir . $debhome if -l $chroot_dir . $debhome;
+	
+	# make directories for debhome and svn
+	if (! -d $chroot_dir . $svn) {
+		$rc = mkdir "$chroot_dir" . "$svn";
+		die "Could not make directory $chroot_dir" . "$svn" unless $rc;
+	}
+
+	# for debhome
+	if (! -d $chroot_dir . $debhome) {
+		$rc = mkdir "$chroot_dir" . "$debhome";
+		die "Could not make directory $chroot_dir" . "$debhome" unless $rc;
+	}
+	
+	BIND: foreach my $dir (@bindlist) {
+		# svn and debhome are bound read only. all others rw
+		my $option;
+		if ("$dir" eq "$svn" || "$dir" eq "$debhome") {
+			$option = "-o ro";
+			$option .= " -v" if $debug;
+		} else {
+			$option = "-o rw";
+			$option .= " -v" if $debug;
+		}
+			
+		# check if it is already mounted
+		$rc = system("findmnt $chroot_dir" . "$dir 2>&1 >/dev/null");
+		
+		unless ($rc == 0) {
+			# $dir must be accessible
+			# so debhome and svn must be accessible or bind will fail.
+			# bind svn and debhome ro
+			# bind /chroot/mnt/svn to where /mnt/svn points to 
+			# same for debhome
+			if (-l $dir && ("$dir" eq "$svn" || "$dir" eq "$debhome")) {
+				# bind svn and debhome to where link points to in main
+				# get where link points to 
+				my $sourcedir = readlink($dir);
+				$rc = system("mount " . $option . " --bind $sourcedir $chroot_dir" . "$dir");
+				die "Could not bind $chroot_dir" . "$dir to $sourcedir: $!\n" unless $rc == 0;
+				print "$chroot_dir" . "$dir bound to $sourcedir\n" if $debug;
+			} else {
+				# bind all except svn and debhome
+				$rc = system("mount " . $option . " --bind $dir $chroot_dir" . "$dir");
+				die "Could not bind $chroot_dir" . "$dir to $dir: $!\n" unless $rc == 0;
+				print "$chroot_dir" . "$dir bound to $dir\n" if $debug;
+			}
+		} else {
+			# already mounted
+			# exit the foreach loop and unbindall before starting again
+			# set flag to run binall again
+			unbindall();
+
+			$runbindall = "true";
+			last BIND;
+		}
+	}
+	# if dirs were unbound bind them again
+	# check the debug flag
+	if ($runbindall eq "true") {
+		bindall();
+	}
+}
+
+#######################################################
+# sub to bind sys tmp dev dev/pts proc for chroot
+# environment
+# access to debhome and svn in the chroot environment
 # is done through the binding of /mnt/debhome to /chroot/mnt/debhome
 # and for svn /mnt/svn to /chroot/mnt/svn
 # the directories are made in by bindall in the
@@ -667,7 +766,7 @@ sub saveversioncodename {
 # returns: none
 # exceptions: dies if chroot dir does not exist
 #######################################################
-sub bindall {
+sub oldbindall {
 	# parameters
 	chdir $chroot_dir or die "$chroot_dir does not exist, exiting\n";
 
