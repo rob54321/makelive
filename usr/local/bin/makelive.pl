@@ -1145,12 +1145,14 @@ sub createchroot {
 	my $description;
 	print "createchroot: calling pathtype $svnpath " . \$description . "\n" if $debug;
 	my $device = pathtype($svnpath, \$description);
-print "createchroot after pathtype: device = $device svnpath = $svnpath description = $description\n" if $debug;
+print "createchroot after pathtype: device = $device svnpath = $svnpath debhomepath = $debhomepath description = $description svn = $svn debhome = $debhome\n" if $debug;
 
 	mountdevice($device, "/mnt/$device", "ro", "false") if $description eq "device";
 
 	# for debhome
-	$device = pathtype($debhome, \$description);
+	$device = pathtype($debhomepath, \$description);
+print "createchroot after pathtype: device = $device svnpath = $svnpath debhomepath = $debhomepath description = $description svn = $svn debhome = $debhome\n" if $debug;
+
 	mountdevice($device, "/mnt/$device", "ro", "false") if $description eq "device";
 
 	# delete the old chroot environment if it exists
