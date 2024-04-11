@@ -110,11 +110,13 @@ sub bindall {
 				# bind svn and debhome to where link points to in main
 				# get where link points to 
 				my $sourcedir = readlink($dir);
+				print "mount --bind $sourcedir $chroot_dir" . "$dir\n" if $debug;
 				$rc = system("mount " . $option . " --bind $sourcedir $chroot_dir" . "$dir");
 				die "Could not bind $chroot_dir" . "$dir to $sourcedir: $!\n" unless $rc == 0;
 				print "$chroot_dir" . "$dir bound to $sourcedir\n" if $debug;
 			} else {
 				# bind all except svn and debhome
+				print "mount --bind $dir $chroot_dir" . "$dir\n" if $debug;
 				$rc = system("mount " . $option . " --bind $dir $chroot_dir" . "$dir");
 				die "Could not bind $chroot_dir" . "$dir to $dir: $!\n" unless $rc == 0;
 				print "$chroot_dir" . "$dir bound to $dir\n" if $debug;
