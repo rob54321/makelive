@@ -282,7 +282,7 @@ sub findsource {
 		}
 #print "device = $device mountpoint = $mountpoint\n";
 		
-		mountdevice($device, $mountpoint, "ro", "true");
+		mountdevice($device, $mountpoint, "rw", "true");
 		# check if the source exists
 		if ( -d $source ) {
 			print "findsource: found $source: mounted $device at $mountpoint\n" if $debug;
@@ -1506,7 +1506,7 @@ sub installfs {
 
 	# mount the partition LINUXLIVE/UBUNTU under 
 	# chroot/boot, it was unmounted before chroot
-	$rc = mountdevice($label, "$chroot_dir/boot", "ro", "true");
+	$rc = mountdevice($label, "$chroot_dir/boot", "rw", "true");
 
 	# make casper dir if it does not exist
 	if ( -d $casper) {
