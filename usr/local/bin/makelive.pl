@@ -29,10 +29,10 @@ my $svnchrootoriginal = "/mnt/ad64/svn";
 
 # set the variables for the sources
 # as they depend on debhomepath
-my $macriumsource = $debhome . "/livesystem";
+my $macriumsource  = $debhome . "/livesystem";
 my $recoverysource = $debhome . "/livesystem";
-my $mctrecsource = $debhome . "/livsystem";
-my $sourcessource = $debhome . "/livesytem";
+my $mctrecsource   = $debhome . "/livesystem";
+my $sourcessource  = $debhome . "/livesystem";
 
 # config file for saving svn and debhome links
 my $config = "/root/.makelive.rc";
@@ -225,7 +225,7 @@ sub findsource {
 
 	# if the source exists return
 	if (-d $source) {
-		print "found $source";
+		print "found $source\n";
 		return;
 	}
 
@@ -263,10 +263,10 @@ sub findsource {
 		}
 		$count++;
 	}
-	print "device = $device count = $count\n" if $debug;
 	# if device was found
 	# try and mount it else source not found -- die
 	if ($device) {
+		print "device = $device count = $count\n" if $debug;
 		# try and mount it
 		# determine the mount point
 		# path might be /a/b/c/d/MACRIUM
@@ -285,17 +285,25 @@ sub findsource {
 		mountdevice($device, $mountpoint, "ro", "true");
 		# check if the source exists
 		if ( -d $source ) {
-			print "found $source: mounted $device at $mountpoint\n" if $debug;
+			print "findsource: found $source: mounted $device at $mountpoint\n" if $debug;
 			return;
 		} else {
 			# source not found
 			# umount it 
+			print "findsource: source not found source = $source\n" if $debug;
 			system("umount -v $mountpoint");
 			die "Could not find $source with device = $device mounted at $mountpoint\n";
 		}
 	} else {
-		# no device found
-		die "Could not find $source and path is not on a block device\n";
+		# no device found but may be on a directory
+		if (! -d $source) {
+			print "findsource: source not found source = $source\n" if $debug;
+			die "Could not find $source and path is not on a block device\n";
+		} else {
+			# source does exist
+			print "findsource: source found at directory  $source\n" if $debug;
+			return;
+		}
 	}
 }
 
@@ -1377,10 +1385,10 @@ sub installfiles {
 	findsource($source);
 
 	# mount the destination parition
-	$rc = mountdevice($label, "/mnt/$label", "ro", "true");
+	$rc = mountdevice($label, "/mnt/$label", "rw", "true");
 
 	# source found, copy it
-	$rc = system("cp -dRv -T $source /mnt/$label" . "$rootdir");
+	$rc = system("cp -dR -T $source /mnt/$label" . "$rootdir");
 	die "Could not copy $source to /mnt/$label" . "$rootdir: $!\n" unless $rc == 0;
 
 	#un mount the destination drive
