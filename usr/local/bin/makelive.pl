@@ -878,7 +878,7 @@ sub remakelink {
 sub getdevicemtpt {
 	# parameters passed
 	my $path = shift @_;
-	my $refdevicemtpt = shift @_;
+	my $refdevmtpt = shift @_;
 	
 	# find device among elements
 	my @pathelements = split (/\//, $path);
@@ -913,8 +913,8 @@ sub getdevicemtpt {
 
 		# setup the reference to the list to contain
 		# (device, mtpt)
-		$refdevicemtpt->[0] = $device;
-		$refdevicemtpt->[1] = $mtpt;
+		$refdevmtpt->[0] = $device;
+		$refdevmtpt->[1] = $mtpt;
 		print "device = $device mount point = $mtpt\n" if $debug;
 	} else {
 		# leave array devicemtpt empty
