@@ -1,0 +1,93 @@
+$files = {
+           '_<./makelive.pl' => [
+                                  {
+                                    'value' => '1',
+                                    'expr' => undef,
+                                    'text' => '	my ($repopath, $link) = @_;
+',
+                                    'line' => '1128',
+                                    'fname' => './makelive.pl',
+                                    'type' => 'user'
+                                  }
+                                ]
+         };
+$expr_list = [
+               {
+                 'depth' => -1,
+                 'expr' => '$svnpath'
+               },
+               {
+                 'expr' => '$repopath',
+                 'depth' => -1
+               },
+               {
+                 'depth' => -1,
+                 'expr' => '$svnpathoriginal'
+               },
+               {
+                 'depth' => -1,
+                 'expr' => '@desdevmtpt'
+               },
+               {
+                 'expr' => '$refdesdevmtpt',
+                 'depth' => -1
+               },
+               {
+                 'expr' => '$reponame',
+                 'depth' => -1
+               },
+               {
+                 'expr' => '@devmtpt',
+                 'depth' => -1
+               },
+               {
+                 'expr' => '$refdevicemtpt',
+                 'depth' => -1
+               },
+               {
+                 'expr' => '@pathelements',
+                 'depth' => -1
+               },
+               {
+                 'expr' => '$mtpt',
+                 'depth' => -1
+               },
+               {
+                 'expr' => '$device',
+                 'depth' => -1
+               },
+               {
+                 'expr' => '$ele',
+                 'depth' => -1
+               },
+               {
+                 'depth' => -1,
+                 'expr' => '$rc'
+               },
+               {
+                 'depth' => -1,
+                 'expr' => '$label'
+               },
+               {
+                 'expr' => '$options',
+                 'depth' => -1
+               },
+               {
+                 'depth' => -1,
+                 'expr' => '$mount'
+               },
+               {
+                 'depth' => -1,
+                 'expr' => '@target'
+               },
+               {
+                 'expr' => '$wasmounted',
+                 'depth' => -1
+               },
+               {
+                 'expr' => '$noofmounts',
+                 'depth' => -1
+               }
+             ];
+$eval_saved_text = undef;
+$main_win_geometry = '1861x1254+347+55';
