@@ -977,54 +977,78 @@ sub remakelink {
 #######################################################
 # pathtype
 # determins the path type of svn or debhome
-# parameters : repopath, ref to type which will be set
-# returns: actual_device or where_link_points_to or directory_of_svn/debhome or file_name_if_file or 0
-# corresponding to type: "device" or "link" or "directory" or "file" or "unknown"
-# reference to type
+# parameters : repopath, ref to list which will contain (description, device, mount point) if they exist
+# desription: device, link, directory, file or unknown.
+# device: will be device and next element will be mount point if found
+# if description is link next element contains directory pointed to
+# if description is a directory next element is the directory
+# if description is a file next element is the full path to file
+# if description is unknown next element is 0
+# return nothing
 #######################################################
 sub pathtype {
 	my $repopath = shift @_;
-	my $refdescription = shift @_;
-	my $reponame = basename($repopath);
-	print "pathtype: repopath = $repopath refdescription = $refdescription reponame = $reponame\n" if $debug;
+	my $refdesdevmtpt = shift @_;
 	
-	# if path = /mnt/device/svn or /mnt/device/a/b/c/d/e/debhome
-	# the match delimeter m? ? only matches once. cannot be used.
-	if ($repopath =~ m/\/mnt\/.*\/$reponame/) {
-		# path is of form /mnt/something/svn
-		# is 'something a block device'
-		my $device = (split(/\//, $repopath))[2];
-		print "pathtype: device = $device\n" if $debug;
-		my $rc = system("blkid -L $device");
-		if ($rc == 0) {
-			# device is a block device
-			# set the refdescription
-			$$refdescription = "device";
-			return $device;
-		} else {
-			# svn | debhome is on a device
-			# but the device is not attached
-			$$refdescription = "device not attached";
-			return $device;
-		}
+	# get name of svn or debhome
+	my $reponame = basename($repopath);
+	print "pathtype: repopath = $repopath reponame = $reponame\n" if $debug;
+	
+	# if path is on a device get device and mount point
+	# the path could be /a/b/c/ad64/d/e/f/svn | debhome
+	# device would be ad64 and mountpoint would be /a/b/c/ad64.
+	# sub getdevicemtpt returns device and mount point.
+	# if it is not a device return list is empty.
+	# getdevicemtpt(path, ref to array)
+	# array->[0] = device
+	# array->[1] = mountpoint
+	# array undefined if path does not contain a device
+	my @devmtpt;
+	getdevicemtpt($repopath, \@devmtpt);
+	
+	# if path is on a device
+	# then $devmtpt[0] is the defined device
+	# $devmtpt[1] is the mount point for that device path
+	if ($devmtpt[0]) {
+		# path is on a device		
+		print "pathtype: device = $devmtpt[0] mount point is $devmtpt[1]\n" if $debug;
+		# set the description
+		$refdesdevmtpt->[0] = "device";
+		# set the device
+		$refdesdevmtpt->[1] = $devmtpt[0];
+		# set the mount point
+		$refdesdevmtpt->[2] = $devmtpt[1];
+		return;
+
 	} elsif (-l $repopath) {
 		#repopath is a link
-		$$refdescription = "link";
+		$refdesdevmtpt->[0] = "link";
 		# where does the link point to
 		my $destination = readlink $repopath;
-		return $destination;
+		# set arrary[1] to where link points to 
+		$refdesdevmtpt->[1] = $destination;
+		return;
+		
 	} elsif (-d $repopath) {
 		# repopath is a directory
-		$$refdescription = "directory";
-		return $repopath;
+		$refdesdevmtpt[0] = "directory";
+		# set array[1] to actual directory
+		$refdesdevmtpt[1] = $repopath;
+		return;
+
 	} elsif (-f $repopath) {
 		# repopath is a regular file
-		$$refdescription = "file";
-		return $repopath;
+		$refdesdevmtpt->[0] = "file";
+		# set array[1] to the actual file
+		$refdesdevmtpt->[1] = $repopath;
+		return;
+
 	} else {
 		# unknown type
-		$$refdescription =  "unknown";
-		return 0;
+		$refdesdevmtpt->[0] =  "unknown";
+		# set array[1] to 0;
+		$desdevmtpt->[1] = 0;
+		return;
 	}
 }
 
@@ -1057,10 +1081,10 @@ sub findrepo {
 	# as in /mnt/device/svn or /mnt/device/debhome
 	# descripion is device or link or directory or file or unknown
 	# type is actual_device or where_link_points_to or directory_name or file_name or 0
-	my $description;
-	print "findrepo: calling pathtype: params repopath = $repopath ref = " . \$description . "\n" if $debug;
-	my $repopathtype = pathtype($repopath, \$description);
-	print "findrepo: repopath = $repopath description = $description repopathtype = $repopathtype\n" if $debug;
+	my @desdevmtpt;
+	print "findrepo: calling pathtype: params repopath = $repopath ref = " . \@desdevmtpt . "\n" if $debug;
+	pathtype($repopath, \@desdevmtpt);
+	print "findrepo: repopath = $repopath description = $desdevmtpt[0] repopathtype = $desdevmtpt[1]\n" if $debug;
 
 	# check if the repo is found at the repo path
 	if (! -d $repopath) {
@@ -1068,11 +1092,11 @@ sub findrepo {
 		# the path may contain a device
 		# which needs to be mounted
 		# for a device
-		if ($description eq "device") {
-			$rc = mountdevice($repopathtype, "/mnt/$repopathtype", "ro", "true") if $description eq "device";
+		if ($desdevmtpt[0] eq "device") {
+			$rc = mountdevice($desdevmtpt[1], $desdevmtpt[2], "ro", "true");
 			# if $rc >= 1 device was already mounted at correct location
 			# but repo was not found, die
-			die "Device $repopathtype is mounted and $reponame not found\n" if $rc >= 1;
+			die "Device $desdevmtpt[1] is mounted and $reponame not found\n" if $rc >= 1;
 
 			# device is now mounted
 
@@ -1080,33 +1104,33 @@ sub findrepo {
 			# un mount if not
 			if (! -d $repopath) {
 				# svn | debhome not found, umount device and die
-				system("umount -v /mnt/$repopathtype");
-				die "Could not find $reponame on device $repopathtype at $repopath\n";
+				system("umount -v $desdevmtpt[2]");
+				die "Could not find $reponame on device $desdevmtpt[1] at $repopath\n";
 			}
 			# device is mounted
-		} elsif ($description eq "device not attached") {
+		} elsif ($desdevmtpt[0] eq "device not attached") {
 			# svn | debhome is on a device of form /mnt/device/svn | /mnt/device/debhome
 			# but the device is not attached so svn | debhome not available
-			print "$repopathtype is not attached for $repopath\n";
-			print "please attach $repopathtype\n";
-			die "Device $repopathtype not attached, could not find $repopath\n";
+			print "$desdevmtpt[1] is not attached for $repopath\n";
+			print "please attach $desdevmtpt[1]\n";
+			die "Device $desdevmtpt[1] not attached, could not find $repopath\n";
 
 			# device is mounted found repository
-		} elsif ($description eq "directory") {
+		} elsif ($desdevmtpt[0] eq "directory") {
 			# repo path is a directory
 			# and repo not found
 			# die. type is the directory
 			die "Could not find repository $reponame at directory $repopath\n";
-		} elsif ($description eq "link") {
+		} elsif ($desdevmtpt[0] eq "link") {
 			# repository not found at link -> type
-			#$repopathtype  is where the link points to 
-			die "Could not find repository $reponame at link $repopathtype\n";
+			#$desdevmtpt[1]  is where the link points to 
+			die "Could not find repository $reponame at link $desdevmtpt[1]\n";
 
-		} elsif ($description eq "file") {
+		} elsif ($desdevmtpt[0] eq "file") {
 			# the repo path is a file not a directory
 			# therefore it does not exist
 			die "Repository path for $reponame is a file not a directory: $repopath\n";
-		} elsif ($description eq "unknown") {
+		} elsif ($desdevmtpt[0] eq "unknown") {
 			# unknown type
 			die "Repository path for $reponame is unknown: $repopath\n";
 		}
@@ -1118,11 +1142,11 @@ sub findrepo {
 		# get the path type
 		print "findrepo: $reponame exists at $repopath\n" if $debug;
 		print "findrepo: calling pathtype repopath = $repopath\n" if $debug;
-		$repopathtype = pathtype($repopath, \$description);
-		print "findrepo: pathtype: repopathtype = $repopathtype description = $description\n" if $debug;
+		pathtype($repopath, \@desdevmtpt);
+		print "findrepo: pathtype: repopathtype = $desdevmtpt[1] description = $desdevmtpt[0]\n" if $debug;
 
 		# remount device ro
-		mountdevice($repopathtype, "/mnt/$repopathtype", "ro", "true") if $description eq "device";
+		mountdevice($desdevmtpt[1], $desdevmtpt[2], "ro", "true") if $desdevmtpt[0] eq "device";
 
 		# repopathtype may also be a directory
 		# which should be protected, not sure how
@@ -1150,18 +1174,18 @@ sub createchroot {
 		
 	# if svn | debhome mounted on a device
 	# unmount it
-	my $description;
-	print "createchroot: calling pathtype $svnpath " . \$description . "\n" if $debug;
-	my $device = pathtype($svnpath, \$description);
-print "createchroot after pathtype: device = $device svnpath = $svnpath debhomepath = $debhomepath description = $description svn = $svn debhome = $debhome\n" if $debug;
+	my @desdevmtpt;
+	print "createchroot: calling pathtype $svnpath " . \@desdevmtpt . "\n" if $debug;
+	pathtype($svnpath, \@desdevmtpt);
+	print "createchroot after pathtype: device = $desdevmtpt[1] svnpath = $svnpath debhomepath = $debhomepath description = $desdevmtpt[0] svn = $svn debhome = $debhome\n" if $debug;
 
-	mountdevice($device, "/mnt/$device", "ro", "false") if $description eq "device";
+	mountdevice($desdevmtpt[1], $desdevmtpt[2], "ro", "false") if $desdevmtpt[0] eq "device";
 
 	# for debhome
-	$device = pathtype($debhomepath, \$description);
-print "createchroot after pathtype: device = $device svnpath = $svnpath debhomepath = $debhomepath description = $description svn = $svn debhome = $debhome\n" if $debug;
+	pathtype($debhomepath, \@desdevmtpt);
+	print "createchroot after pathtype: device = $desdevmtpt[1] svnpath = $svnpath debhomepath = $debhomepath description = $desdevmtpt[0] svn = $svn debhome = $debhome\n" if $debug;
 
-	mountdevice($device, "/mnt/$device", "ro", "false") if $description eq "device";
+	mountdevice($desdevmtpt[1], $desdevmtpt[2], "ro", "false") if $desdevmtpt[0] eq "device";
 
 	# delete the old chroot environment if it exists
 	# make sure debhome and svn are not mounted
