@@ -199,115 +199,6 @@ sub mountdevice {
 	}
 }
 
-###################################################################
-# sub to find the source files for installfiles sub
-# the source must be a full path with no links it it such as
-#
-#   /mnt/ad64/debhome/livesystem/MACRIUM | MCTREC | RECOVERY | SOURCES
-# or
-#   /home/robert/MACRIUM | MCTREC | RECOVERY | SOURCES
-# or 
-#   /mnt/chaos/MACRIUM
-# parent directory of each source could be MACRIUM, MCTREC, RECOVERY or SOURCES
-# the source could be a block device or a directory
-#
-# if the source exists then return
-# if source never found then die
-# to look for the source
-# 1 check if an element of path is a block device
-# try and mount it if it is
-
-# parameters passed: source path (which cannot contain links)
-###################################################################
-sub findsource {
-	# get source
-	my $source = shift @_;
-
-	# if the source exists return
-	if (-d $source) {
-		print "found $source\n";
-		return;
-	}
-
-	# source does not exist.
-	# check if it is a block device
-	# and try and mount it.
-	
-	# get all path elements of the source
-	my @pathelements = split /\//, $source;
-	chomp(@pathelements);
-	
-	# the first element is "" since path is /...
-	# remove it 
-	shift @pathelements;
-	print "path elements @pathelements\n" if $debug;
-	
-	# check if the path is on a block device
-	# that is attached, if not die
-	# get the attached block devices
-	my @blkdev = `lsblk -l -o LABEL`;
-	chomp(@blkdev);
-	
-	# check if a block device matches
-	# a path element
-	my $device;
-	# used to find index of device element in blkdev
-	my $count = 0;
-	LOOP: foreach my $dir (@pathelements) {
-		foreach my $bdev (@blkdev) {
-        print "bdev $bdev    path elements $dir\n" if $debug;
-			if ("$dir" eq "$bdev") {
-				$device = $bdev;
-				last LOOP;
-			}
-		}
-		$count++;
-	}
-	# if device was found
-	# try and mount it else source not found -- die
-	if ($device) {
-		print "device = $device count = $count\n" if $debug;
-		# try and mount it
-		# determine the mount point
-		# path might be /a/b/c/d/MACRIUM
-		# then device might be c
-		# then mount point is /a/b
-		# all elements before the device in pathelements
-		my $mountpoint = "/";
-		# if path is /mnt/ad64/debhome/livesyste/MACRIUM
-		# then mount point is /mnt/ad64
-		for(my $i=0; $i<=$count; $i++) {
-			# append elements to make path
-			$mountpoint = $mountpoint . $pathelements[$i] . "/";
-		}
-#print "device = $device mountpoint = $mountpoint\n";
-		
-		mountdevice($device, $mountpoint, "rw", "true");
-		# check if the source exists
-		if ( -d $source ) {
-			print "findsource: found $source: mounted $device at $mountpoint\n" if $debug;
-			return;
-		} else {
-			# source not found
-			# umount it 
-			print "findsource: source not found source = $source\n" if $debug;
-			system("umount -v $mountpoint");
-			die "Could not find $source with device = $device mounted at $mountpoint\n";
-		}
-	} else {
-		# no device found but may be on a directory
-		if (! -d $source) {
-			print "findsource: source not found source = $source\n" if $debug;
-			die "Could not find $source and path is not on a block device\n";
-		} else {
-			# source does exist
-			print "findsource: source found at directory  $source\n" if $debug;
-			return;
-		}
-	}
-}
-
-#######################################################
 # sub to restore /mnt/debhome and /mnt/svn links
 # in main system to default values
 # parameters: none
@@ -1211,8 +1102,9 @@ sub findrepo {
 		# figure out how to make a directory read only
 		#==============================================================================
 	}
-	# the path does exist check the link
-	remakelink $repopath, $link;
+	# the path does exist check the link, remake the link if required
+	# $link may or may not exist
+	remakelink $repopath, $link if $link;
 
 	print "found $reponame at $repopath\n";
 }
@@ -1463,7 +1355,7 @@ sub installfiles {
 	# check that the source does exist and copy or else die
 	# find source by mounting block device
 	# retrieved from the path
-	findsource($source);
+	findrepo($source);
 
 	# mount the destination parition
 	$rc = mountdevice($label, "/mnt/$label", "rw", "true");
