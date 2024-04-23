@@ -1032,7 +1032,16 @@ sub findrepo {
 	my @desdevmtpt;
 	print "findrepo: calling pathtype: params repopath = $repopath ref = " . \@desdevmtpt . "\n" if $debug;
 	pathtype($repopath, \@desdevmtpt);
-	print "findrepo: repopath = $repopath description = $desdevmtpt[0] repopathtype = $desdevmtpt[1]\n" if $debug;
+	do {
+		if ($desdevmtpt[0] && $desdevmtpt[0] eq "device") {
+			print "findrepo: repopath = $repopath description = $desdevmtpt[0] device = $desdevmtpt[1] mount point = $desdevmtpt[2]\n";
+		} elsif ($desdevmtpt[0] && $desdevmtpt[0] eq "directory") {
+			print "findrepo: repopath = $repopath description = $desdevmtpt[0] directory = $desdevmtpt[1]\n";
+		} elsif ($desdevmtpt[0] && $desdevmtpt[0] eq "link") {
+			print "findrepo: repopath = $repopath description = $desdevmtpt[0] link = $desdevmtpt[1] link points to = $desdevmtpt[2]\n";
+		} elsif ($desdevmtpt[0] && $desdevmtpt[0] eq "
+			
+			
 
 	# check if the repo is found at the repo path
 	if (! -d $repopath) {
