@@ -181,12 +181,12 @@ sub mountdevice {
 		# all mounts now un mounted for the device
 	}
 
-	# mount the device
-	# make mount directory if not found
-	make_path($mtpt) unless -d $mtpt;
-
-	# only mount if mount flag is true
 	if ($mount eq "true") {
+		# mount the device
+		# make mount directory if not found
+		make_path($mtpt) unless -d $mtpt;
+
+		# only mount if mount flag is true
 		$rc = system("mount -L $label -o $options $mtpt");
 		die "Could not mount $label at $mtpt -o $options: $!\n" unless $rc == 0;
 		print "mounted $label at $mtpt options: $options\n" if $debug;
@@ -1039,29 +1039,46 @@ sub findrepo {
 			print "findrepo: repopath = $repopath description = $desdevmtpt[0] 2nd element = $desdevmtpt[1]\n";
 		}
 	} if $debug;
-
+	# $repodir is the directory the found link points to
+	# on a device. The link may exist on the device pointing
+	# to the repository or source.
 	# check if the repo is found at the repo path
+
 	if (! -d $repopath) {
 		# the repo was not found
 		# the path may contain a device
 		# which needs to be mounted
 		# for a device
+		# on the device there may be a link to the repository or source
 		if ($desdevmtpt[0] eq "device") {
 			$rc = mountdevice($desdevmtpt[1], $desdevmtpt[2], "ro", "true");
-			# if $rc >= 1 device was already mounted at correct location
-			# but repo was not found, die
-			die "Device $desdevmtpt[1] is mounted and $reponame not found\n" if $rc >= 1;
 
-			# device is now mounted
-
-			# check that svn | debhome found
-			# un mount if not
-			if (! -d $repopath) {
-				# svn | debhome not found, umount device and die
+			# device is mounted, the repo or source could be
+			# a directory or a link on the device
+			# check that the repo | source is found.
+			if (! -d $repopath && ! -l $repopath) {
+				# repo | source not found umount device and die
 				system("umount -v $desdevmtpt[2]");
 				die "Could not find $reponame on device $desdevmtpt[1] at $repopath\n";
+			} elsif (-l $repopath) {
+				# repopath is a link
+				# determine where the link points to
+				# that value should have reponame as a suffix
+				# $repodir is the directory where
+				# $repopath points to
+				my $repodir = readlink $repopath;
+				
+				# does repodir have reponame as a basename?
+				if ($reponame ne basename($repodir)) {
+					# repodir is not a directory to the repo | source
+					die "The link $repopath -> $repodir which is not a repository for $reponame\n";
+				}
+			} elsif (-d $repopath) {
+				# repopath is a directory on the device
+				print "$reponame found on device $desdevmtpt[1] mounted at $desdevmtpt[2]\n" if $debug;
 			}
-			# device is mounted
+
+
 		} elsif ($desdevmtpt[0] eq "device not attached") {
 			# svn | debhome is on a device of form /mnt/device/svn | /mnt/device/debhome
 			# but the device is not attached so svn | debhome not available
@@ -1090,7 +1107,7 @@ sub findrepo {
 		}
 	} else {
 		# the repository path exists
-		# if it is on a device, mount the device
+		# if it is a directory on a device, remount the device
 		# ro to protect it from being deleted by
 		# createchroot function
 		# get the path type
