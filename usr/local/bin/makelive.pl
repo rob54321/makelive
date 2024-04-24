@@ -1067,6 +1067,7 @@ sub findrepo {
 				# $repodir is the directory where
 				# $repopath points to
 				my $repodir = readlink $repopath;
+				print "$repopath is a link on device $desdevmtpt[1] mounted at $desdevmtpt[2] and points to $repodir\n" if $debug;
 				
 				# does repodir have reponame as a basename?
 				if ($reponame ne basename($repodir)) {
@@ -1087,24 +1088,43 @@ sub findrepo {
 			die "Device $desdevmtpt[1] not attached, could not find $repopath\n";
 
 			# device is mounted found repository
+
 		} elsif ($desdevmtpt[0] eq "directory") {
 			# repo path is a directory
 			# and repo not found
 			# die. type is the directory
+			print "$repopath is a directory but $reponame was not found there\n" if $debug;
 			die "Could not find repository $reponame at directory $repopath\n";
+
 		} elsif ($desdevmtpt[0] eq "link") {
-			# repository not found at link -> type
-			#$desdevmtpt[1]  is where the link points to 
-			die "Could not find repository $reponame at link $desdevmtpt[1]\n";
+			# $repoath is a link
+			#$desdevmtpt[1]  is where the link points to
+			# check if directory where it points to has reponame as suffix
+			if ($reponame eq basename($desdevmtpt[1])) {
+				# base name of repopath is correct
+				# now check if it exists
+				if (! -d $desdevmtpt[1]) {
+					# the directory of the repo | source does not exist
+					die "$reponame does not exist at $desdevmtpt[1]\n";
+				}	
+
+			} else {	
+				# suffix of directory is not reponame
+				# repo | source not found
+				print "$repopath is a link to $desdevmtpt[1]\n" if $debug;
+				die "Could not find repository $reponame at link $repopath -> $desdevmtpt[1]\n";
+			}
 
 		} elsif ($desdevmtpt[0] eq "file") {
 			# the repo path is a file not a directory
 			# therefore it does not exist
 			die "Repository path for $reponame is a file not a directory: $repopath\n";
+
 		} elsif ($desdevmtpt[0] eq "unknown") {
 			# unknown type
 			die "Repository path for $reponame is unknown: $repopath\n";
 		}
+
 	} else {
 		# the repository path exists
 		# if it is a directory on a device, remount the device
@@ -1125,6 +1145,7 @@ sub findrepo {
 		# figure out how to make a directory read only
 		#==============================================================================
 	}
+
 	# the path does exist check the link, remake the link if required
 	# $link may or may not exist
 	remakelink $repopath, $link if $link;
