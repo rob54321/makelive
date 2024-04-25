@@ -1405,7 +1405,11 @@ sub installfiles {
 	$rc = mountdevice($label, "/mnt/$label", "rw", "true");
 
 	# source found, copy it
-	$rc = system("cp -dR -T $source /mnt/$label" . "$rootdir");
+	# options for debug
+	my $options = "";
+	$options = " -v " if $debug;
+	
+	$rc = system("cp -dR -T $options $source /mnt/$label" . "$rootdir");
 	die "Could not copy $source to /mnt/$label" . "$rootdir: $!\n" unless $rc == 0;
 
 	#un mount the destination drive
