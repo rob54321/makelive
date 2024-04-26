@@ -1281,20 +1281,10 @@ sub dochroot {
 	# and chroot_dir/etc/sources.list.d/debhome.list
 	setaptsources ($codename);
 
-	# copy xwindows themes and icons to /usr/share
+	# ubuntu-install will copy xwindows themes and icons to /usr/share
 	# if themes.tar.xz and icons.tar.xz are found
 	my $rc;
-	if (-f "$debhome/xconfig/themes.tar.xz") {
-		$rc = system("tar --xz -xf $debhome/xconfig/themes.tar.xz -C $chroot_dir/usr/share");
-		die "Could not extract themes from $debhome/themes.tar.xz" unless $rc == 0;
-	}
 
-	# if themes.tar.xz and icons.tar.xz are found
-	if (-f "$debhome/xconfig/icons.tar.xz") {
-		$rc = system("tar --xz -xf $debhome/xconfig/icons.tar.xz -C $chroot_dir/usr/share");
-		die "Could not extract themes from $debhome/xconfig/icons.tar.xz" unless $rc == 0;
-	}
-	
 	#############################################################################################
 	# enter the chroot environment
 	#############################################################################################
