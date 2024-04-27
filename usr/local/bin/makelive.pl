@@ -1153,6 +1153,67 @@ sub findrepo {
 	print "found $reponame at $repopath\n";
 }
 
+################################################################
+# sub to open /mnt/cdrom/casper and read all *.squashfs files
+# ask the user which one to use.
+# parameter passed: the directory to read
+# return the squashfs file
+################################################################
+sub getsquashfs {
+	my $directory = shift @_;
+	
+	# open directory
+	opendir(my $dh, $directory) || die "Can't open directory $directory: $!\n";
+	
+	#read all files into a list
+	my @filelist = readdir $dh;
+	close $dh;
+	
+
+	# remove terminator
+	chomp(@filelist);
+	
+	# remove . and .. from filelist
+	shift @filelist;
+	shift @filelist;
+	# sort into alphabetical order
+	my @sfilelist = sort(@filelist);
+	
+	# list for all .squashfs files
+	my @squashfs;
+	
+	# push all .squashfs files into a new list @squashfs
+	foreach my $file (@sfilelist) {
+		print "file: $file\n" if $debug;
+		
+		push @squashfs, $file if $file =~ /squashfs$/;
+	}
+
+	# file counter for menu
+	my $i;
+	
+	# display list of .squashfs files for selection
+	# in menu
+	for ($i=0; $i < scalar(@squashfs); $i++) {
+		print "$i: $squashfs[$i]\n";
+	}
+	
+	# select a file from the menu
+	print "Enter your selection 0 to "  . $#squashfs . "\n";
+	my $answer = <STDIN>;
+	# check that the number 1 <=  answer <= max = scalar(@squashfs)
+	while ($answer < 0 || $answer > $#squashfs) {
+		# try again
+		print "Try again\n";
+		$answer = <STDIN>;
+	}
+	
+	print "file selected $squashfs[$answer]\n" if $debug;
+	
+	# return file selected
+	return $squashfs[$answer];
+}
+
 ##################################################################
 # sub to set up new chroot environment.
 # the environment is copied from the cdrom
@@ -1212,7 +1273,14 @@ sub createchroot {
 	
 	# unsquash filesystem.squashfs to the chroot directory
 	# the chroot_dir directory must not exist
-	$rc = system("unsquashfs -d " . $chroot_dir . " /mnt/cdrom/casper/filesystem.squashfs");
+	# the new versions of ubuntu-mate and ubuntu do not use
+	# filesystem.squashfs. they use minimal.squashfs, minimal.standard.squashfs etc.
+	# open casper directory to see all squashfs files and
+	# prompt the user whicn one to use.
+
+	my $filename = getsquashfs("/mnt/cdrom/casper");
+	
+	$rc = system("unsquashfs -d " . $chroot_dir . " /mnt/cdrom/casper/" . $filename);
 	die "Error unsquashing /mnt/cdrom/casper/filesystem.squashfs\n"unless $rc == 0;
 	print "unsquashed filesystem.squashfs\n" if $debug;
 		
