@@ -16,6 +16,7 @@
 #######################################################
 use strict;
 use warnings;
+use File::Path qw(make_path);
 
 my $debhome = "/mnt/debhome";
 my $svn = "/mnt/svn";
@@ -76,13 +77,13 @@ sub bindall {
 	
 	# make directories for debhome and svn
 	if (! -d $chroot_dir . $svn) {
-		$rc = mkdir "$chroot_dir" . "$svn";
+		$rc = make_path "$chroot_dir" . "$svn" unless $chroot_dir . $svn;
 		die "Could not make directory $chroot_dir" . "$svn" unless $rc;
 	}
 
 	# for debhome
 	if (! -d $chroot_dir . $debhome) {
-		$rc = mkdir "$chroot_dir" . "$debhome";
+		$rc = make_path "$chroot_dir" . "$debhome" unless $chroot_dir . $debhome;
 		die "Could not make directory $chroot_dir" . "$debhome" unless $rc;
 	}
 	
@@ -114,6 +115,10 @@ sub bindall {
 			} else {
 				# bind all except svn and debhome
 				print "mount --bind $dir $chroot_dir" . "$dir\n" if $debug;
+				
+				# make the chroot dirs if they do not exist
+				make_path $chroot_dir . $dir unless -d $chroot_dir . $dir;
+
 				$rc = system("mount " . $option . " --bind $dir $chroot_dir" . "$dir");
 				die "Could not bind $chroot_dir" . "$dir to $dir: $!\n" unless $rc == 0;
 			}

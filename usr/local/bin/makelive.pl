@@ -593,13 +593,13 @@ sub bindall {
 	
 	# make directories for debhome and svn
 	if (! -d $chroot_dir . $svn) {
-		$rc = mkdir "$chroot_dir" . "$svn";
+		$rc = make_path "$chroot_dir" . "$svn" unless $chroot_dir . $svn;
 		die "Could not make directory $chroot_dir" . "$svn" unless $rc;
 	}
 
 	# for debhome
 	if (! -d $chroot_dir . $debhome) {
-		$rc = mkdir "$chroot_dir" . "$debhome";
+		$rc = make_path "$chroot_dir" . "$debhome" unless $chroot_dir . $debhome;
 		die "Could not make directory $chroot_dir" . "$debhome" unless $rc;
 	}
 	
@@ -631,6 +631,10 @@ sub bindall {
 			} else {
 				# bind all except svn and debhome
 				print "mount --bind $dir $chroot_dir" . "$dir\n" if $debug;
+				# make the directory incase it does not exist
+				make_path $chroot_dir . $dir unless -d $chroot_dir . $dir;
+				
+				# bind the directories
 				$rc = system("mount " . $option . " --bind $dir $chroot_dir" . "$dir");
 				die "Could not bind $chroot_dir" . "$dir to $dir: $!\n" unless $rc == 0;
 			}
@@ -653,75 +657,6 @@ sub bindall {
 	}
 }
 
-#######################################################
-# sub to bind sys tmp dev dev/pts proc for chroot
-# environment
-# access to debhome and svn in the chroot environment
-# is done through the binding of /mnt/debhome to /chroot/mnt/debhome
-# and for svn /mnt/svn to /chroot/mnt/svn
-# the directories are made in by bindall in the
-# chroot environment
-# usage: bindall
-# returns: none
-# exceptions: dies if chroot dir does not exist
-#######################################################
-sub oldbindall {
-	# parameters
-	chdir $chroot_dir or die "$chroot_dir does not exist, exiting\n";
-
-	# bind for all in list
-	# /chroot/proc             binds to /proc
-	# /chroot/dev              binds to /dev
-	# /chroot/dev/pts          binds to /dev/pts
-	# /chroot/tmp              binds to /tmp
-	# /chroot/sys              binds to /sys
-	# /chroot/mnt/svn          binds to /mnt/svn
-	# /chroot/mnt/debhome      binds to /mnt/debhome
-	my @bindlist = ("/proc", "/dev", "/dev/pts", "/tmp", "/sys", "$svn", "$debhome");
-	my $rc;
-
-	# if links exist delete them
-	# cannot bind a link to a directory for svn | debhome
-	unlink $chroot_dir . $svn if -l $chroot_dir . $svn;
-	unlink $chroot_dir . $debhome if -l $chroot_dir . $debhome;
-	
-	# make directories for debhome and svn
-	if (! -d $chroot_dir . $svn) {
-		$rc = mkdir "$chroot_dir" . "$svn";
-		die "Could not make directory $chroot_dir" . "$svn" unless $rc;
-	}
-
-	# for debhome
-	if (! -d $chroot_dir . $debhome) {
-		$rc = mkdir "$chroot_dir" . "$debhome";
-		die "Could not make directory $chroot_dir" . "$debhome" unless $rc;
-	}
-	
-	foreach my $dir (@bindlist) {
-		# check if it is already mounted
-		$rc = system("findmnt $chroot_dir" . "$dir 2>&1 >/dev/null");
-		unless ($rc == 0) {
-			# $dir must be accessible
-			# so debhome and svn must be accessible or bind will fail.
-			# bind svn and debhome ro
-			if ("$dir" eq "$svn" or "$dir" eq "$debhome") {
-				# bind svn and debhome ro
-				$rc = system("mount -o ro --bind $dir $chroot_dir" . "$dir");
-				die "Could not bind $chroot_dir" . "$dir to $dir: $!\n" unless $rc == 0;
-				print "$chroot_dir" . "$dir bound to $dir\n" if $debug;
-			} else {
-				$rc = system("mount --bind $dir $chroot_dir" . "$dir");
-				die "Could not bind $chroot_dir" . "$dir to $dir: $!\n" unless $rc == 0;
-				print "$chroot_dir" . "$dir bound to $dir\n" if $debug;
-			}
-		} else {
-			# already mounted
-			print "$chroot_dir" . "$dir is already bound to $dir\n" if $debug;
-		}
-	}
-}
-
-#######################################################
 # sub to unbind sys tmp dev dev/pts proc for chroot
 # environment
 # usage: unbindall
@@ -798,7 +733,7 @@ deb http://archive.ubuntu.com/ubuntu $codename-proposed  main restricted multive
 
 	# get the public key for debhome
 	# make the /etc/apt/keyrings directory if it does not exist
-	mkdir "/etc/apt/keyrings" unless -d "/etc/apt/keyrings";
+	make_path "/etc/apt/keyrings" unless -d "/etc/apt/keyrings";
 	
 	do 
 	{
@@ -841,7 +776,7 @@ sub mountcdrom {
 		system("umount -v /mnt/cdrom") if $rc == 0;
 	} else {
 		# /mnt/cdrom does not exist, create it
-		mkdir "/mnt/cdrom";
+		make_path "/mnt/cdrom";
 	}
 
 	$rc = system("mount -o ro,loop " . $isoimage . " /mnt/cdrom");
@@ -1297,13 +1232,13 @@ sub createchroot {
 	# an upgrade by liveinstall the new
 	# vmlinuz and initrd will be copied over
 	# the original ones.
-	mkdir "$chroot_dir/oldboot" or die "could not make $chroot_dir/oldboot: $!\n";
+	make_path "$chroot_dir/oldboot" or die "could not make $chroot_dir/oldboot: $!\n";
 	system("cp -vf /mnt/cdrom/casper/vmlinuz /mnt/cdrom/casper/initrd $chroot_dir/oldboot");
 	
 	# copy pool and install files for ubuntu mate
 	# to a temp directory $chroot_dir/isoimage
 	chdir "/mnt/cdrom";
-	mkdir "$chroot_dir/isoimage" unless -d "$chroot_dir/isoimage";
+	make_path "$chroot_dir/isoimage" unless -d "$chroot_dir/isoimage";
 	
 	$rc = system("cp -dR .disk dists install pool preseed " . $chroot_dir . "/isoimage/");
 	die "could not copy dists install pool preseed to $chroot_dir/isoimage: $!\n" unless $rc == 0;
@@ -1318,7 +1253,7 @@ sub createchroot {
 	# make a directory /chrootenvironment
 	# so that init-linux can determine if
 	# it is running in the chroot environment
-	mkdir "$chroot_dir/chrootenvironment" or die "Could not make directory $chroot_dir/chrootenvironment: $!\n";
+	make_path "$chroot_dir/chrootenvironment" or die "Could not make directory $chroot_dir/chrootenvironment: $!\n";
 }
 
 ###############################################
@@ -1593,7 +1528,7 @@ sub installfs {
 		system("rm -rf $casper");
 	}
 	# create directory
-	mkdir $casper;
+	make_path $casper;
 	
 	# createchroot now makes $chroot_dir/oldboot and
 	# copies vmlinuz and initrd from the cdrom to oldboot.
@@ -1618,7 +1553,7 @@ sub installfs {
 	# make a boot directory on LINUXLIVE
 	# so that there is no error message from grub
 	# at boot time that no /boot/ found.
-	mkdir $chroot_dir . "/boot/boot";
+	make_path $chroot_dir . "/boot/boot";
 		
 	# setup and install grub if this is the first partition
 	installgrub($partition_path);
