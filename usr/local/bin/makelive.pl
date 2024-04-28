@@ -279,6 +279,10 @@ sub restorechrootlinks {
 	# make the link for /mnt/debhome -> /chroot_dir/mnt/ad64/debhome in the chroot environment
 	unlink "$chroot_dir" . "$debhome";
 	print "restorechrootlinks in chroot: $debhome -> $debhomechrootoriginal\n" if $debug;
+	
+	# check if chroot/bin/ln exists
+	# die if it does not
+	die "/bin/ln from coreutils does not exist\n" unless -f "/bin/ln";
 	my $rc = system("chroot $chroot_dir ln -s $debhomechrootoriginal $debhome");
 	die "restorechrootlinks in chroot: error making $debhome -> $debhomechrootoriginal link in chroot: $!" unless $rc == 0;
 
@@ -593,13 +597,13 @@ sub bindall {
 	
 	# make directories for debhome and svn
 	if (! -d $chroot_dir . $svn) {
-		$rc = make_path "$chroot_dir" . "$svn" unless $chroot_dir . $svn;
+		$rc = make_path "$chroot_dir" . "$svn" unless -d $chroot_dir . $svn;
 		die "Could not make directory $chroot_dir" . "$svn" unless $rc;
 	}
 
 	# for debhome
 	if (! -d $chroot_dir . $debhome) {
-		$rc = make_path "$chroot_dir" . "$debhome" unless $chroot_dir . $debhome;
+		$rc = make_path "$chroot_dir" . "$debhome" unless -d $chroot_dir . $debhome;
 		die "Could not make directory $chroot_dir" . "$debhome" unless $rc;
 	}
 	
@@ -1221,6 +1225,9 @@ sub createchroot {
 		
 	# copy resolv.conf and interfaces so network will work
 	system("cp /etc/resolv.conf /etc/hosts " . $chroot_dir . "/etc/");
+	
+	# make directory if it does not exist
+	make_path $chroot_dir . "/etc/network" unless -d $chroot_dir . "/etc/network";
 	system("cp /etc/network/interfaces " . $chroot_dir . "/etc/network/");
 
 	system("cp -dR /etc/apt/trusted.gpg.d " . $chroot_dir . "/etc/apt/");

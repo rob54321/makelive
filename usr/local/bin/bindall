@@ -77,13 +77,13 @@ sub bindall {
 	
 	# make directories for debhome and svn
 	if (! -d $chroot_dir . $svn) {
-		$rc = make_path "$chroot_dir" . "$svn" unless $chroot_dir . $svn;
+		$rc = make_path ($chroot_dir . $svn) unless -d $chroot_dir . $svn;
 		die "Could not make directory $chroot_dir" . "$svn" unless $rc;
 	}
 
 	# for debhome
 	if (! -d $chroot_dir . $debhome) {
-		$rc = make_path "$chroot_dir" . "$debhome" unless $chroot_dir . $debhome;
+		$rc = make_path "$chroot_dir" . "$debhome" unless -d $chroot_dir . $debhome;
 		die "Could not make directory $chroot_dir" . "$debhome" unless $rc;
 	}
 	
