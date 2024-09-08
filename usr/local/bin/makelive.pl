@@ -17,6 +17,11 @@ my $debhome = "/mnt/debhome";
 # set up chroot dir
 my $chroot_dir = "/chroot";
 
+# the name of the squashfs file
+# the name could be filesystem.squashfs or minimal.squashfs
+# this value must be restore from a file $chroot_root/isoimage/makelive.restore.rc
+my $squashfsfilename;
+
 # default paths for debhome and svn
 # these are constant
 my $debhomepathoriginal = "/mnt/ad64/debhome";
@@ -464,10 +469,10 @@ sub makefs {
 
 	# if the file exists, delete it
 	# or mksquashfs will fail.
-	unlink "$chroot_dir/dochroot/filesystem.squashfs";
+	unlink "$chroot_dir/dochroot/$squashfsfilename";
 	
 	# make the file system the boot directory must be included, config-xxxx file is needed by initramfs during install
-	my $rc = system("mksquashfs " . $chroot_dir . " $chroot_dir/dochroot/filesystem.squashfs -e oldboot -e dochroot -e upgrade -e packages -e isoimage");
+	my $rc = system("mksquashfs " . $chroot_dir . " $chroot_dir/dochroot/$squashfsfilename -e chrootenvironment -e oldboot -e dochroot -e upgrade -e packages -e isoimage");
 	die "mksquashfs returned and error\n" unless $rc == 0;
 }
 ######################################################
@@ -720,12 +725,12 @@ sub setaptsources {
 	my ($codename) = @_;
 	my $rc;
 	# create sources.list
-	open (SOURCES, ">", "$chroot_dir/etc/apt/sources.list");
-	print SOURCES "deb http://archive.ubuntu.com/ubuntu $codename main restricted multiverse universe
-deb http://archive.ubuntu.com/ubuntu $codename-security main restricted multiverse universe
-deb http://archive.ubuntu.com/ubuntu $codename-updates  main restricted multiverse universe
-deb http://archive.ubuntu.com/ubuntu $codename-proposed  main restricted multiverse universe\n";
-	close SOURCES;
+#	open (SOURCES, ">", "$chroot_dir/etc/apt/sources.list");
+#	print SOURCES "deb http://archive.ubuntu.com/ubuntu $codename main restricted multiverse universe
+#deb http://archive.ubuntu.com/ubuntu $codename-security main restricted multiverse universe
+#deb http://archive.ubuntu.com/ubuntu $codename-updates  main restricted multiverse universe
+#deb http://archive.ubuntu.com/ubuntu $codename-proposed  main restricted multiverse universe\n";
+#	close SOURCES;
 
 	# debhome.sources and debhomepubkey.asc are installed from liveinstall package now.
 	# extract debhome.sources from  subversion to /etc/apt/sources.list.d/debhome.sources
@@ -1149,6 +1154,9 @@ sub getsquashfs {
 	
 	print "file selected $squashfs[$answer]\n" if $debug;
 	
+	# set the name of the squashfs file name
+	$squashfsfilename = $squashfsfilename;
+	
 	# return file selected
 	return $squashfs[$answer];
 }
@@ -1217,11 +1225,14 @@ sub createchroot {
 	# open casper directory to see all squashfs files and
 	# prompt the user whicn one to use.
 
-	my $filename = getsquashfs("/mnt/cdrom/casper");
+	# make the squashfs file name a global name
+	# so it can be created and installed with the same name
+	# set the squashfs file name $squashfsfilename
+	getsquashfs("/mnt/cdrom/casper");
 	
-	$rc = system("unsquashfs -d " . $chroot_dir . " /mnt/cdrom/casper/" . $filename);
-	die "Error unsquashing /mnt/cdrom/casper/filesystem.squashfs\n"unless $rc == 0;
-	print "unsquashed filesystem.squashfs\n" if $debug;
+	$rc = system("unsquashfs -d " . $chroot_dir . " /mnt/cdrom/casper/" . $squashfsfilename);
+	die "Error unsquashing /mnt/cdrom/casper/$squashfsfilename\n"unless $rc == 0;
+	print "unsquashed $squashfsfilename\n" if $debug;
 		
 	# copy resolv.conf and interfaces so network will work
 	system("cp /etc/resolv.conf /etc/hosts " . $chroot_dir . "/etc/");
@@ -1516,7 +1527,7 @@ sub installfs {
 	# use it. If it does not exist it must be created
 	# sub dochroot deletes it since filesystem.squashfs
 	# would change if dochroot is invoked.
-	makefs() unless -f "$chroot_dir/dochroot/filesystem.squashfs";
+	makefs() unless -f "$chroot_dir/dochroot/$squashfsfilename";
 
 	# empty /chroot1/boot
 	# this must be done after makefs, the config-xxxx-generic file
@@ -1577,8 +1588,8 @@ sub installfs {
 	chdir "/root";
 	
 	
-	$rc = system("cp -vf $chroot_dir/dochroot/filesystem.squashfs " . $casper);
-	die "Could not move /tmp/filesystem.squashfs to $casper\n" unless $rc == 0;
+	$rc = system("cp -vf $chroot_dir/dochroot/$squashfsfilename " . $casper);
+	die "Could not move /tmp/$squashfsfilename to $casper\n" unless $rc == 0;
 	
 	# umount chroot boot
 	system("umount " . $chroot_dir . "/boot");
