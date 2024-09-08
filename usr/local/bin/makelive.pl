@@ -490,6 +490,35 @@ sub editgrub {
 }
 
 #######################################################
+# sub to restore squashfs file name to $squashfsfilename
+# parameters: none
+# return: none
+#######################################################
+sub restoresquashfsfilename {
+	# open file or die
+	open FR, "<", "$chroot_dir/isoimage/squashfsfilename.txt" or die "Could not open squashfsfilename.txt: $!\n";
+	$squashfsfilename = <FR>;
+	chomp($squashfsfilename);
+}
+
+#######################################################
+# sub to save the squashfs file name to 
+# chroot_dir/isoimage/squashfs.txt
+# parameters: none
+# return: none
+#######################################################
+sub savesquashfsfilename {
+	# mkdir the directory if it does not exist
+	mkdir "$chroot_dir/isoimage" unless -d "$chroot_dir/isoimage";
+	
+	# open the file for writing
+	# clobber the file if it exists
+	open FW, ">", "$chroot_dir/isomage/squashfsfilename.txt" or die "Could not open squashfsfilename.txt: $!\n";
+	print FW $squashfsfilename;
+	close FW;
+}
+	
+#######################################################
 # sub to write version and code name to disk
 # the version and code name are retrieved
 # from a string in /mnt/cdrom/.disk/info file
@@ -1155,10 +1184,7 @@ sub getsquashfs {
 	print "file selected $squashfs[$answer]\n" if $debug;
 	
 	# set the name of the squashfs file name
-	$squashfsfilename = $squashfsfilename;
-	
-	# return file selected
-	return $squashfs[$answer];
+	$squashfsfilename = $squashfs[$answer];
 }
 
 ##################################################################
@@ -1263,6 +1289,11 @@ sub createchroot {
 
 	# save the version and codename of linux
 	saveversioncodename ();
+	
+	# save the squashfs file name
+	# this must only be done after the squashfs file has been extracted
+	# as unsquashfs wants an empty directory to extract to
+	savesquashfsfilename();
 	
 	# umount cdrom
 	chdir "/root";
@@ -1606,12 +1637,15 @@ sub installfs {
 sub initialise {
 	my ($doinstall, $makefs, $isoimage, $upgrade, $dochroot, $debhomepath, $svnpath, $packages)  = @_;
 
-	
 	# die if no /choot and it is not being created
 	if (! -d $chroot_dir) {
 		die "chroot environment does not exist\n" unless $isoimage;
 	}
 	
+	# restore squashfs file name if chroot environment is not
+	# being created.
+	restoresquashfsfilename() unless $isoimage;
+
 	# some short cuts depending on the parition number
 	my $casper = $chroot_dir . "/boot/casper";
 	my $label = "LINUXLIVE";
@@ -1847,6 +1881,7 @@ partitiondisk($opt_D) if $opt_D;
 
 # initialise variables and invoke subs depending on cmdine parameters
 initialise($opt_i, $opt_m, $opt_c, $opt_u, $opt_e, $debhomepath, $svnpath, $packages) if ($opt_c or $opt_u or $opt_e or $opt_p or $opt_i or $opt_m or $opt_M or $opt_R or $opt_S or $opt_T);
+
 
 # restore main links
 print "main: svnpathoriginal = $svnpathoriginal debhomepathoriginal = $debhomepathoriginal\n" if $debug;
