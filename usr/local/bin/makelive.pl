@@ -513,7 +513,7 @@ sub savesquashfsfilename {
 	
 	# open the file for writing
 	# clobber the file if it exists
-	open FW, ">", "$chroot_dir/isomage/squashfsfilename.txt" or die "Could not open squashfsfilename.txt: $!\n";
+	open FW, ">", "$chroot_dir/isoimage/squashfsfilename.txt" or die "Could not open squashfsfilename.txt: $!\n";
 	print FW $squashfsfilename;
 	close FW;
 }
@@ -1194,7 +1194,7 @@ sub getsquashfs {
 		# use this filename and do not prompt
 		$squashfsfilename = $squashfs[0];
 	}
-	print "squashfs file selected $squashfsfilename\n" if $debug;
+	print "squashfs file selected: $squashfsfilename\n";
 
 }
 
