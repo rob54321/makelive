@@ -509,7 +509,7 @@ sub restoresquashfsfilename {
 #######################################################
 sub savesquashfsfilename {
 	# mkdir the directory if it does not exist
-	mkdir "$chroot_dir/isoimage" unless -d "$chroot_dir/isoimage";
+	make_path "$chroot_dir/isoimage" unless -d "$chroot_dir/isoimage";
 	
 	# open the file for writing
 	# clobber the file if it exists
@@ -1162,29 +1162,40 @@ sub getsquashfs {
 		push @squashfs, $file if $file =~ /squashfs$/;
 	}
 
-	# file counter for menu
-	my $i;
-	
-	# display list of .squashfs files for selection
-	# in menu
-	for ($i=0; $i < scalar(@squashfs); $i++) {
-		print "$i: $squashfs[$i]\n";
+	#######################################################################
+	# if @squashfs only contains one file, then do not prompt
+	# use this filename which will be filesystem.squashfs.
+	# this is the case prior to 24.04
+	#######################################################################
+	if (scalar(@squashfs) > 1) {
+		# file counter for menu
+		my $i;
+		
+		# display list of .squashfs files for selection
+		# in menu
+		for ($i=0; $i < scalar(@squashfs); $i++) {
+			print "$i: $squashfs[$i]\n";
+		}
+		
+		# select a file from the menu
+		print "Enter your selection 0 to "  . $#squashfs . "\n";
+		my $answer = <STDIN>;
+		# check that the number 1 <=  answer <= max = scalar(@squashfs)
+		while ($answer < 0 || $answer > $#squashfs) {
+			# try again
+			print "Try again\n";
+			$answer = <STDIN>;
+		}
+		
+		# set the name of the squashfs file name
+		$squashfsfilename = $squashfs[$answer];
+	} elsif (scalar(@squashfs) == 1) {
+		# there is only one file name
+		# use this filename and do not prompt
+		$squashfsfilename = $squashfs[0];
 	}
-	
-	# select a file from the menu
-	print "Enter your selection 0 to "  . $#squashfs . "\n";
-	my $answer = <STDIN>;
-	# check that the number 1 <=  answer <= max = scalar(@squashfs)
-	while ($answer < 0 || $answer > $#squashfs) {
-		# try again
-		print "Try again\n";
-		$answer = <STDIN>;
-	}
-	
-	print "file selected $squashfs[$answer]\n" if $debug;
-	
-	# set the name of the squashfs file name
-	$squashfsfilename = $squashfs[$answer];
+	print "squashfs file selected $squashfsfilename\n" if $debug;
+
 }
 
 ##################################################################
