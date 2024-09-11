@@ -1296,6 +1296,10 @@ sub createchroot {
 	make_path "$chroot_dir/oldboot" or die "could not make $chroot_dir/oldboot: $!\n";
 	system("cp -vf /mnt/cdrom/casper/vmlinuz /mnt/cdrom/casper/initrd $chroot_dir/oldboot");
 	
+	#########################################################################################
+	# if multiple squashfs files exist in /mnt/cdrom/casper, copy them all except
+	# filesystem.squashfs for version < 24.04 and minimal.squashfs for version >= 24.04
+	
 	# copy pool and install files for ubuntu mate
 	# to a temp directory $chroot_dir/isoimage
 	chdir "/mnt/cdrom";
