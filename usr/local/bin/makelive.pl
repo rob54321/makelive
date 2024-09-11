@@ -22,6 +22,10 @@ my $chroot_dir = "/chroot";
 # this value must be restore from a file $chroot_root/isoimage/makelive.restore.rc
 my $squashfsfilename;
 
+# the version of ubuntu must be available across
+# runs of makelive.pl
+my $version;
+
 # default paths for debhome and svn
 # these are constant
 my $debhomepathoriginal = "/mnt/ad64/debhome";
@@ -539,7 +543,9 @@ sub saveversioncodename {
 	# file is of form:
 	# Ubuntu-MATE 24.04 "Noble Numbat" - Daily amd64 (20231101)
 	# get version , which could be 23.04 or 2300
-	my ($version, $codename);
+	# version must also be saved to disk
+	# so it is available across runs
+	my $codename;
 	
 	my @matches = $string =~ /\s+(\d+\.\d+)\s+/;
 
@@ -1412,9 +1418,12 @@ sub dochroot {
 #######################################################
 # this sub determines the version
 # which will be used for grub
+# and if version >= 24.04 the all *.squashfs must be copied
+# to casper directory
+# the global variable $version is set.
 # the full iso name is in $chroot_dir/isoimage/version.txt
 # parameter passed: none
-# returns version
+# returns none
 # requirements: none
 ######################################################
 sub getversion {
@@ -1426,11 +1435,11 @@ sub getversion {
 
 	# read the file 
 	open ISO, "<", "$chroot_dir/isoimage/version.txt" or die "could not open $chroot_dir/isoimage/isoimage.txt: $!\n";
-	my $version = <ISO>;
+	$version = <ISO>;
 	chomp($version);
 	close ISO;
 	
-	return $version;
+	return;
 }
 
 #################################################
@@ -1491,9 +1500,7 @@ sub installgrub {
 	die "Could not export efi grub\n" unless $rc == 0;
 	
 	# now edit grub.cfg with the new version no.
-	# edit mbr grub and set version
-	# get version
-	my $version = getversion();
+ 	# edit mbr grub and set version
     
 	chdir $chroot_dir . "/boot/grub";
 	system("sed -i -e 's/ubuntu-version/$version/' grub.cfg");
@@ -1590,12 +1597,26 @@ sub installfs {
 	# create directory
 	make_path $casper;
 	
+	###################################################################
+	# note on ubuntu version
+	# prior to 24.04 only filesystem.squashfs existed in casper
+	# from 24.04 onwards minimal.squashfs and many other .squashfs
+	# files exist in casper. All are required in the live system.
+	#
+	# if ubuntu version is < 24.04
 	# createchroot now makes $chroot_dir/oldboot and
 	# copies vmlinuz and initrd from the cdrom to oldboot.
 	# if an upgrade of the kernel was done liveinstall
 	# will have copied the newer vmlinuz and initrd to oldboot
 	# should have done this originally.
 	# vmlinuz and initrd must be copied to casper
+	#
+	# else if ubuntu version is >= 24.04
+	# the original initrd and vmlinuz must be used
+	# all the *.squashfs files must be copied to $casper
+	# an upgrade does not work with version >= 24.04
+	##################################################################
+	
 	$rc = system("cp -fv $chroot_dir/oldboot/initrd $casper");
 	die "Could not copy initrd\n" unless $rc == 0;
 	$rc = system("cp -fv $chroot_dir/oldboot/vmlinuz $casper");
@@ -1653,9 +1674,12 @@ sub initialise {
 		die "chroot environment does not exist\n" unless $isoimage;
 	}
 	
-	# restore squashfs file name if chroot environment is not
+	# restore squashfs file name and version if chroot environment is not
 	# being created.
-	restoresquashfsfilename() unless $isoimage;
+	do  {
+		restoresquashfsfilename();
+		getversion();
+	} unless $isoimage;
 
 	# some short cuts depending on the parition number
 	my $casper = $chroot_dir . "/boot/casper";
