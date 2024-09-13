@@ -19,8 +19,13 @@ my $chroot_dir = "/chroot";
 
 # the name of the squashfs file
 # the name could be filesystem.squashfs or minimal.squashfs
-# this value must be restore from a file $chroot_root/isoimage/makelive.restore.rc
+# this value must be restored from a file $chroot_root/isoimage/makelive.restore.rc
 my $squashfsfilename;
+# list of all squashfs files on the cdrom
+# this list is used to copy all of them to
+# the live system. Required if version >= 24.04
+# this list is restored between runs of makelive
+my @squashfsfilelist;
 
 # the version of ubuntu must be available across
 # runs of makelive.pl
@@ -494,15 +499,26 @@ sub editgrub {
 }
 
 #######################################################
-# sub to restore squashfs file name to $squashfsfilename
+# sub to restore squashfs file name  and list 
+# $squashfsfilename and @squashfs if scalar(@squashfs) > 1
 # parameters: none
 # return: none
 #######################################################
-sub restoresquashfsfilename {
+sub restoresquashfsvars {
 	# open file or die
 	open FR, "<", "$chroot_dir/isoimage/squashfsfilename.txt" or die "Could not open squashfsfilename.txt: $!\n";
 	$squashfsfilename = <FR>;
 	chomp($squashfsfilename);
+	
+	# restore @squashfs if it exists.
+	# @squashfs may not exist if only filesystem.squashfs exists.
+	# if multiple squashfs files exist, minimal.squashfs... then it exists
+	if (-s "$chroot_dir/isoimage/squashfsfilelist.txt") {
+		# reade file
+		open FR, "<", "$chroot_dir/isoimage/squashfsfilelist.xt" or die "Could not open squashfsfilelist.txt: $!\n";
+		@squashfsfilelist = <FR>;
+		chomp(@squashfsfilelist);
+	}
 }
 
 #######################################################
@@ -511,7 +527,7 @@ sub restoresquashfsfilename {
 # parameters: none
 # return: none
 #######################################################
-sub savesquashfsfilename {
+sub savesquashfsvars {
 	# mkdir the directory if it does not exist
 	make_path "$chroot_dir/isoimage" unless -d "$chroot_dir/isoimage";
 	
@@ -519,6 +535,13 @@ sub savesquashfsfilename {
 	# clobber the file if it exists
 	open FW, ">", "$chroot_dir/isoimage/squashfsfilename.txt" or die "Could not open squashfsfilename.txt: $!\n";
 	print FW $squashfsfilename;
+	close FW;
+	
+	# save squashf file list
+	open FW, ">", "$chroot_dir/isoimage/squashfsfilelist.txt" or die "Could not open squashfsfilelist.txt: $!\n";
+	foreach my $file (@squashfsfilelist) {
+		print FW "$file\n";
+	}
 	close FW;
 }
 	
@@ -1135,6 +1158,8 @@ sub findrepo {
 ################################################################
 # sub to open /mnt/cdrom/casper and read all *.squashfs files
 # ask the user which one to use.
+# Also saves the squashfs name in squashfsfilename.txt
+# and saves the list of squashfs files in squashfsfilelist.txt
 # parameter passed: the directory to read
 # return the squashfs file
 ################################################################
@@ -1155,50 +1180,48 @@ sub getsquashfs {
 	# remove . and .. from filelist
 	shift @filelist;
 	shift @filelist;
-	# sort into alphabetical order
-	my @sfilelist = sort(@filelist);
 	
-	# list for all .squashfs files
-	my @squashfs;
-	
-	# push all .squashfs files into a new list @squashfs
-	foreach my $file (@sfilelist) {
+	# push all .squashfs files into a new list @squashfsfilelist
+	foreach my $file (@filelist) {
 		print "file: $file\n" if $debug;
 		
-		push @squashfs, $file if $file =~ /squashfs$/;
+		push @squashfsfilelist, $file if $file =~ /\.squashfs$/;
 	}
 
 	#######################################################################
+	# @squashfsfilelist contains a list of all the .squashfs files in casper
+	# for version >= 24.04 all must be copied to $chroot/isoimage
+	#
 	# if @squashfs only contains one file, then do not prompt
 	# use this filename which will be filesystem.squashfs.
 	# this is the case prior to 24.04
 	#######################################################################
-	if (scalar(@squashfs) > 1) {
+	if (scalar(@squashfsfilelist) > 1) {
 		# file counter for menu
 		my $i;
 		
 		# display list of .squashfs files for selection
 		# in menu
-		for ($i=0; $i < scalar(@squashfs); $i++) {
-			print "$i: $squashfs[$i]\n";
+		for ($i=0; $i < scalar(@squashfsfilelist); $i++) {
+			print "$i: $squashfsfilelist[$i]\n";
 		}
 		
 		# select a file from the menu
-		print "Enter your selection 0 to "  . $#squashfs . "\n";
+		print "Enter your selection 0 to "  . $#squashfsfilelist . "\n";
 		my $answer = <STDIN>;
 		# check that the number 1 <=  answer <= max = scalar(@squashfs)
-		while ($answer < 0 || $answer > $#squashfs) {
+		while ($answer < 0 || $answer > $#squashfsfilelist) {
 			# try again
 			print "Try again\n";
 			$answer = <STDIN>;
 		}
 		
 		# set the name of the squashfs file name
-		$squashfsfilename = $squashfs[$answer];
-	} elsif (scalar(@squashfs) == 1) {
+		$squashfsfilename = $squashfsfilelist[$answer];
+	} elsif (scalar(@squashfsfilelist) == 1) {
 		# there is only one file name
 		# use this filename and do not prompt
-		$squashfsfilename = $squashfs[0];
+		$squashfsfilename = $squashfsfilelist[0];
 	}
 	print "squashfs file selected: $squashfsfilename\n";
 
@@ -1314,7 +1337,7 @@ sub createchroot {
 	# save the squashfs file name
 	# this must only be done after the squashfs file has been extracted
 	# as unsquashfs wants an empty directory to extract to
-	savesquashfsfilename();
+	savesquashfsvars();
 	
 	# umount cdrom
 	chdir "/root";
@@ -1681,7 +1704,7 @@ sub initialise {
 	# restore squashfs file name and version if chroot environment is not
 	# being created.
 	do  {
-		restoresquashfsfilename();
+		restoresquashfsvars();
 		getversion();
 	} unless $isoimage;
 
