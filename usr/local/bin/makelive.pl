@@ -5,6 +5,7 @@ use warnings;
 use Getopt::Std;
 use File::Basename;
 use File::Path qw (make_path);
+use File::Copy;
 
 ###################################################
 # Global constants
@@ -515,7 +516,7 @@ sub restoresquashfsvars {
 	# if multiple squashfs files exist, minimal.squashfs... then it exists
 	if (-s "$chroot_dir/isoimage/squashfsfilelist.txt") {
 		# reade file
-		open FR, "<", "$chroot_dir/isoimage/squashfsfilelist.xt" or die "Could not open squashfsfilelist.txt: $!\n";
+		open FR, "<", "$chroot_dir/isoimage/squashfsfilelist.txt" or die "Could not open squashfsfilelist.txt: $!\n";
 		@squashfsfilelist = <FR>;
 		chomp(@squashfsfilelist);
 	}
@@ -1217,10 +1218,13 @@ sub getsquashfs {
 		}
 		
 		# set the name of the squashfs file name
+		# to unsquash
 		$squashfsfilename = $squashfsfilelist[$answer];
 	} elsif (scalar(@squashfsfilelist) == 1) {
 		# there is only one file name
 		# use this filename and do not prompt
+		# the file name will be filesystem.squashfs
+		# and for ubuntu-mate version < 23.10
 		$squashfsfilename = $squashfsfilelist[0];
 	}
 	print "squashfs file selected: $squashfsfilename\n";
