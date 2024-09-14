@@ -546,7 +546,7 @@ sub savesquashfsvars {
 	foreach my $file (@squashfsfilelist) {
 		print FW "$file\n";
 		# copy squashfs files
-		system("cp -v -f $file $chroot_dir/isoimage/") unless $file eq $squashfsfilename;
+		system("cp -v -f /mnt/cdrom/casper/$file $chroot_dir/isoimage/") unless $file eq $squashfsfilename;
 	}
 	close FW;
 }
@@ -1204,8 +1204,8 @@ sub getsquashfs {
 	#######################################################################
 	if (scalar(@squashfsfilelist) > 1) {
 		# there are multiple squashfs files
-		# miminal.squashfs must be used
-		$squashfsfilename = "miminal.squashfs";
+		# minimal.squashfs must be used
+		$squashfsfilename = "minimal.squashfs";
 
 		##################################################################
 		# code to prompt for a squashfs file
@@ -1706,7 +1706,7 @@ sub installfs {
 	
 	# if there are multiple squashfs files
 	# copy all to casper on hdd
-	# exclude filesystem.squashfs or miminal.squashfs
+	# exclude filesystem.squashfs or minimal.squashfs
 	# since they would have been copied above.
 	foreach my $file (@squashfsfilelist) {
 		system("cp -v -n $chroot_dir/isoimage/$file $casper") unless $file eq $squashfsfilename;
