@@ -539,9 +539,14 @@ sub savesquashfsvars {
 	close FW;
 	
 	# save squashf file list
+	# and copy squashfs file to /chroot/isoimage
+	# except the one that has been extracted $squashfsfilename
+	
 	open FW, ">", "$chroot_dir/isoimage/squashfsfilelist.txt" or die "Could not open squashfsfilelist.txt: $!\n";
 	foreach my $file (@squashfsfilelist) {
 		print FW "$file\n";
+		# copy squashfs files
+		system("cp -v -f $file $chroot_dir/isoimage/") unless $file eq $squashfsfilename;
 	}
 	close FW;
 }
@@ -1198,28 +1203,42 @@ sub getsquashfs {
 	# this is the case prior to 24.04
 	#######################################################################
 	if (scalar(@squashfsfilelist) > 1) {
+		# there are multiple squashfs files
+		# miminal.squashfs must be used
+		$squashfsfilename = "miminal.squashfs";
+
+		##################################################################
+		# code to prompt for a squashfs file
+		# if there is a single squashfs file it is filesystem.squashfs
+		# if there are multiple squashfs files then minimal.squashfs
+		# must be extracted
+		##################################################################
 		# file counter for menu
-		my $i;
+		#my $i;
 		
 		# display list of .squashfs files for selection
 		# in menu
-		for ($i=0; $i < scalar(@squashfsfilelist); $i++) {
-			print "$i: $squashfsfilelist[$i]\n";
-		}
+		#for ($i=0; $i < scalar(@squashfsfilelist); $i++) {
+		#	print "$i: $squashfsfilelist[$i]\n";
+		#}
 		
 		# select a file from the menu
-		print "Enter your selection 0 to "  . $#squashfsfilelist . "\n";
-		my $answer = <STDIN>;
+		#print "Enter your selection 0 to "  . $#squashfsfilelist . "\n";
+		#my $answer = <STDIN>;
 		# check that the number 1 <=  answer <= max = scalar(@squashfs)
-		while ($answer < 0 || $answer > $#squashfsfilelist) {
+		#while ($answer < 0 || $answer > $#squashfsfilelist) {
 			# try again
-			print "Try again\n";
-			$answer = <STDIN>;
-		}
-		
+		#	print "Try again\n";
+		#	$answer = <STDIN>;
+		#}
 		# set the name of the squashfs file name
 		# to unsquash
-		$squashfsfilename = $squashfsfilelist[$answer];
+		# $squashfsfilename = $squashfsfilelist[$answer];
+		##################################################################
+		# end of prompt code. This code is commented out since minimal.squashfs
+		# will be used so prompting does not have to happen
+		##################################################################
+		
 	} elsif (scalar(@squashfsfilelist) == 1) {
 		# there is only one file name
 		# use this filename and do not prompt
@@ -1681,10 +1700,17 @@ sub installfs {
 	# so chroot1/boot can be unmounted
 	chdir "/root";
 	
-	
+	# copy the created squashfs file to the casper directory
 	$rc = system("cp -vf $chroot_dir/dochroot/$squashfsfilename " . $casper);
 	die "Could not move /tmp/$squashfsfilename to $casper\n" unless $rc == 0;
 	
+	# if there are multiple squashfs files
+	# copy all to casper on hdd
+	# exclude filesystem.squashfs or miminal.squashfs
+	# since they would have been copied above.
+	foreach my $file (@squashfsfilelist) {
+		system("cp -v -n $chroot_dir/isoimage/$file $casper") unless $file eq $squashfsfilename;
+	}
 	# umount chroot boot
 	system("umount " . $chroot_dir . "/boot");
 	$rc = system("findmnt " . $chroot_dir . "/boot");
