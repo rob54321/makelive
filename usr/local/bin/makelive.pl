@@ -525,7 +525,7 @@ sub savesquashfsvars {
 	
 	# copy the casper directory to chroot/isoimage/casper
 	# do not copy the extracted file minimal.squashfs or filesystem.squashfs
-	system("rsync -rvz --exclude=$squashfsfilename /mnt/cdrom/casper $chroot_dir/isoimage/");
+	system("rsync -rvz --exclude=*initrd --exclude=*vmlinuz --exclude=*$squashfsfilename /mnt/cdrom/casper $chroot_dir/isoimage/");
 }
 	
 #######################################################
@@ -1618,8 +1618,8 @@ sub installfs {
 	$rc = system("cp -vf $chroot_dir/dochroot/$squashfsfilename " . $casper);
 	die "Could not copy /tmp/$squashfsfilename to $casper\n" unless $rc == 0;
 	
-	# copy the casper dir from cdrom to linuxlive/boot
-	system("rsync -rzv $chroot_dir/isoimage/casper $casper");
+	# copy the casper dir from chroot to linuxlive/boot
+	system("rsync -rzv --exclude=*vmlinuz --exclude=*initrd --exclude=*$squashfsfilename $chroot_dir/isoimage/casper $chroot_dir/boot/");
 
 	# umount chroot boot
 	system("umount " . $chroot_dir . "/boot");
