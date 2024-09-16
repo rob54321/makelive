@@ -22,11 +22,6 @@ my $chroot_dir = "/chroot";
 # the name could be filesystem.squashfs or minimal.squashfs
 # this value must be restored from a file $chroot_root/isoimage/makelive.restore.rc
 my $squashfsfilename;
-# list of all squashfs files on the cdrom
-# this list is used to copy all of them to
-# the live system. Required if version >= 24.04
-# this list is restored between runs of makelive
-my @squashfsfilelist;
 
 # the version of ubuntu must be available across
 # runs of makelive.pl
@@ -510,16 +505,6 @@ sub restoresquashfsvars {
 	open FR, "<", "$chroot_dir/isoimage/squashfsfilename.txt" or die "Could not open squashfsfilename.txt: $!\n";
 	$squashfsfilename = <FR>;
 	chomp($squashfsfilename);
-	
-	# restore @squashfs if it exists.
-	# @squashfs may not exist if only filesystem.squashfs exists.
-	# if multiple squashfs files exist, minimal.squashfs... then it exists
-	if (-s "$chroot_dir/isoimage/squashfsfilelist.txt") {
-		# reade file
-		open FR, "<", "$chroot_dir/isoimage/squashfsfilelist.txt" or die "Could not open squashfsfilelist.txt: $!\n";
-		@squashfsfilelist = <FR>;
-		chomp(@squashfsfilelist);
-	}
 }
 
 #######################################################
@@ -538,17 +523,9 @@ sub savesquashfsvars {
 	print FW $squashfsfilename;
 	close FW;
 	
-	# save squashf file list
-	# and copy squashfs file to /chroot/isoimage
-	# except the one that has been extracted $squashfsfilename
-	
-	open FW, ">", "$chroot_dir/isoimage/squashfsfilelist.txt" or die "Could not open squashfsfilelist.txt: $!\n";
-	foreach my $file (@squashfsfilelist) {
-		print FW "$file\n";
-		# copy squashfs files
-		system("cp -v -f /mnt/cdrom/casper/$file $chroot_dir/isoimage/") unless $file eq $squashfsfilename;
-	}
-	close FW;
+	# copy the casper directory to chroot/isoimage/casper
+	# do not copy the extracted file minimal.squashfs or filesystem.squashfs
+	system("rsync -rvz --exclude=$squashfsfilename /mnt/cdrom/casper $chroot_dir/isoimage/");
 }
 	
 #######################################################
@@ -1172,82 +1149,19 @@ sub findrepo {
 sub getsquashfs {
 	my $directory = shift @_;
 	
-	# open directory
-	opendir(my $dh, $directory) || die "Can't open directory $directory: $!\n";
-	
-	#read all files into a list
-	my @filelist = readdir $dh;
-	close $dh;
-	
-
-	# remove terminator
-	chomp(@filelist);
-	
-	# remove . and .. from filelist
-	shift @filelist;
-	shift @filelist;
-	
-	# push all .squashfs files into a new list @squashfsfilelist
-	foreach my $file (@filelist) {
-		print "file: $file\n" if $debug;
-		
-		push @squashfsfilelist, $file if $file =~ /\.squashfs$/;
-	}
-
-	#######################################################################
-	# @squashfsfilelist contains a list of all the .squashfs files in casper
-	# for version >= 24.04 all must be copied to $chroot/isoimage
-	#
-	# if @squashfs only contains one file, then do not prompt
-	# use this filename which will be filesystem.squashfs.
-	# this is the case prior to 24.04
-	#######################################################################
-	if (scalar(@squashfsfilelist) > 1) {
-		# there are multiple squashfs files
-		# minimal.squashfs must be used
+	# determine if filesystem.squashfs or miminal.squashfs exists
+	if ( -s "$directory/filesystem.squashfs") {
+		# set squashfs filename
+		$squashfsfilename = "filesystem.squashfs";
+	} elsif (-s "$directory/minimal.squashfs") {
+		# set squashfs file name
 		$squashfsfilename = "minimal.squashfs";
-
-		##################################################################
-		# code to prompt for a squashfs file
-		# if there is a single squashfs file it is filesystem.squashfs
-		# if there are multiple squashfs files then minimal.squashfs
-		# must be extracted
-		##################################################################
-		# file counter for menu
-		#my $i;
-		
-		# display list of .squashfs files for selection
-		# in menu
-		#for ($i=0; $i < scalar(@squashfsfilelist); $i++) {
-		#	print "$i: $squashfsfilelist[$i]\n";
-		#}
-		
-		# select a file from the menu
-		#print "Enter your selection 0 to "  . $#squashfsfilelist . "\n";
-		#my $answer = <STDIN>;
-		# check that the number 1 <=  answer <= max = scalar(@squashfs)
-		#while ($answer < 0 || $answer > $#squashfsfilelist) {
-			# try again
-		#	print "Try again\n";
-		#	$answer = <STDIN>;
-		#}
-		# set the name of the squashfs file name
-		# to unsquash
-		# $squashfsfilename = $squashfsfilelist[$answer];
-		##################################################################
-		# end of prompt code. This code is commented out since minimal.squashfs
-		# will be used so prompting does not have to happen
-		##################################################################
-		
-	} elsif (scalar(@squashfsfilelist) == 1) {
-		# there is only one file name
-		# use this filename and do not prompt
-		# the file name will be filesystem.squashfs
-		# and for ubuntu-mate version < 23.10
-		$squashfsfilename = $squashfsfilelist[0];
+	} else {
+		# neither file exists
+		# print error message and exit
+		die "Neither filesystem.squashfs nor minimal.squashfs exist. Exiting..\n";
 	}
-	print "squashfs file selected: $squashfsfilename\n";
-
+	
 }
 
 ##################################################################
@@ -1702,15 +1616,11 @@ sub installfs {
 	
 	# copy the created squashfs file to the casper directory
 	$rc = system("cp -vf $chroot_dir/dochroot/$squashfsfilename " . $casper);
-	die "Could not move /tmp/$squashfsfilename to $casper\n" unless $rc == 0;
+	die "Could not copy /tmp/$squashfsfilename to $casper\n" unless $rc == 0;
 	
-	# if there are multiple squashfs files
-	# copy all to casper on hdd
-	# exclude filesystem.squashfs or minimal.squashfs
-	# since they would have been copied above.
-	foreach my $file (@squashfsfilelist) {
-		system("cp -v -n $chroot_dir/isoimage/$file $casper") unless $file eq $squashfsfilename;
-	}
+	# copy the casper dir from cdrom to linuxlive/boot
+	system("rsync -rzv $chroot_dir/isoimage/casper $casper");
+
 	# umount chroot boot
 	system("umount " . $chroot_dir . "/boot");
 	$rc = system("findmnt " . $chroot_dir . "/boot");
