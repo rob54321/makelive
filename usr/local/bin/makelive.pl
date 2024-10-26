@@ -7,10 +7,14 @@ use File::Basename;
 use File::Path qw (make_path);
 use File::Copy;
 
+# command line arguments
+our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_s, $opt_D, $opt_S, $opt_h, $opt_d, $opt_M, $opt_R, $opt_T, $opt_V, $opt_L, $opt_Z, $opt_w, $opt_W);
+
 ###################################################
 # Global constants
 ###################################################
 # global constant links for debhome and subversion
+
 # sources for macrium and recovery
 # the source directory is the root of MACRIUM, MCTREC, RECOVERY or SOURCES
 my $svn = "/mnt/svn";
@@ -62,8 +66,6 @@ my $SOURCES = "SOURCES";
 
 ###################################################
 
-# get command line arguments
-our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_s, $opt_D, $opt_S, $opt_h, $opt_d, $opt_M, $opt_R, $opt_T, $opt_V, $opt_L, $opt_Z);
 
 #######################################################
 # this script makes a live system on a partition
@@ -316,7 +318,7 @@ sub restorechrootlinks {
 # partition 3: rest of disk ntfs LABEL = ele
 # all data on the disk is deleted.
 # the partitions are also formatted.
-# parameters passed: partition size in GB
+# parameters passed: partition 1 size in GB
 # sub aborts on any error
 # requires: disk for MACRIUM to be attached, not mounted
 ######################################################
@@ -372,8 +374,14 @@ sub partitiondisk {
 		$p4start .= "GB";
 		
 		# delete all partitions and make new ones
-		$rc = system("parted -s --align optimal $device mktable msdos mkpart primary fat32 $p1start $p1end mkpart primary fat32 $p2start $p2end mkpart primary fat32 $p3start $p3end mkpart primary ntfs  $p4start $p4end set 1 boot on");
-		die "aborting: error partitioning $device\n" unless $rc == 0;
+		# if opt_w set (default) make partition 4 ntfs
+		if ($opt_w) {
+			$rc = system("parted -s --align optimal $device mktable msdos mkpart primary fat32 $p1start $p1end mkpart primary fat32 $p2start $p2end mkpart primary fat32 $p3start $p3end mkpart primary ntfs  $p4start $p4end set 1 boot on");
+			die "aborting: error partitioning $device\n" unless $rc == 0;
+		} elsif($opt_W) {
+			$rc = system("parted -s --align optimal $device mktable msdos mkpart primary fat32 $p1start $p1end mkpart primary fat32 $p2start $p2end mkpart primary fat32 $p3start $p3end mkpart primary ext4  $p4start $p4end set 1 boot on");
+			die "aborting: error partitioning $device\n" unless $rc == 0;
+		}
 
 		# format the first partition
 		# the sleep is needed to let the disk settle
@@ -398,8 +406,16 @@ sub partitiondisk {
 
 		# format forth partition
 		print "formatting partition " . $device . "4\n";
-		$rc = system("mkfs.ntfs -v -Q -L ele  " . $device . "4");
-		die "aborting: error formatting " . $device . "4\n" unless $rc == 0;
+
+		# if opt_w set format to ntfs and label ele
+		if ($opt_w) {
+			$rc = system("mkfs.ntfs -v -Q -L ele  " . $device . "4");
+			die "aborting: error formatting " . $device . "4\n" unless $rc == 0;
+		} elsif($opt_W) {
+			# partition to ext4 and label writable
+			$rc = system("mkfs.ext4 -v -j -L writable " . $device . "4");
+			die "aborting: error formatting " . $device . "4\n" unless $rc == 0;
+		}
 
 	} else {
 		print "$device was not partitioned\n";
@@ -1615,9 +1631,12 @@ sub installfs {
 	editgrub();
 	
 	# make the persistence file
-	chdir $casper;
-	system("dd if=/dev/zero of=writable bs=1M count=3000");
-	system("mkfs.ext4 -v -j -F writable");
+	# if $opt_w is set
+	if ($opt_w) {
+		chdir $casper;
+		system("dd if=/dev/zero of=writable bs=1M count=3000");
+		system("mkfs.ext4 -v -j -F writable");
+	}
 
 	# so chroot1/boot can be unmounted
 	chdir "/root";
@@ -1786,6 +1805,8 @@ sub usage {
 	print "-L reset svn and debhome links to defaults and exit\n";
 	print "-V check version and exit\n";
 	print "-Z set debug flag to 1\n";
+	print "-w persistence file is /casper/writable - default\n";
+	print "-W persistence partition is partition 4\n";
 	exit 0;
 }
 ##################
@@ -1799,6 +1820,18 @@ sub usage {
 # -s full path to subersion
 # -d full path to dehome
 # -D optional size in GB of partition
+# -e do chroot
+# -m make filesystem.squashfs or minimal.squashfs if version >23.10
+# -i install the image
+# -M path install MACRIUM files
+# -R path install Recovery files
+# -T path install MCTREC files
+# -L reset svn and debhome links to default and exit
+# -V display version and exit
+# -Z set debug flag to 1
+# -w use /casper/writable as persistence file (default)
+# -W use last partition (4) ext4 label writable as persistence partition.
+# 
 # One or both iso's can be given.
 # package list in quotes, if given
 
@@ -1812,10 +1845,27 @@ sub usage {
 # default parameters for -d default is 8GB
 defaultparameter();
 
-getopts('mic:ep:hus:S:d:M:R:VD:T:LZ');
+getopts('mic:ep:hus:S:d:M:R:VD:T:LZwW');
 
 # turn on debug info if flag set
 $debug = 1 if $opt_Z;
+
+# $opt_w and $opt_W are mutually exclusive
+# if neither set default is persistence file
+# is /casper/writable
+# if both are set it is and error
+die "-w and -W cannot both be set\n" if $opt_w and $opt_W;
+
+# if neither opt_w and opt_W are set then set opt_w (default)
+$opt_w = 1 if ! defined($opt_w) and ! defined($opt_W);
+
+do {
+	print "w = $opt_w\n" if $opt_w;
+	print "W = $opt_W\n" if $opt_W;
+	print "w and W undefined\n" if ! defined($opt_w) and ! defined($opt_W);
+	print "exiting...\n"; } if $debug;
+
+
 
 # reset links for svn and debhome to original
 # before loading links.
