@@ -1630,13 +1630,25 @@ sub installfs {
 	# set grub colours
 	editgrub();
 	
-	# make the persistence file
-	# if $opt_w is set
-	if ($opt_w) {
+	# make the persistence file if 
+	# there is no partition labeled writable.
+	# This is done instead of checking opt_w because
+	# opt_w is not persistent across runs of makelive
+	# if partition 'writable' does not exist
+	# then write persistence to file
+	# get the partition labels
+	my $partitionfound = "false";
+	
+	my @partlist = `lsblk -o LABEL`;
+	foreach my $label (@partlist) {
+		$partitionfound = "true" if $label =~ /^writable$/;
+	}
+
+	do {
 		chdir $casper;
 		system("dd if=/dev/zero of=writable bs=1M count=3000");
 		system("mkfs.ext4 -v -j -F writable");
-	}
+	} if $partitionfound eq "false";
 
 	# so chroot1/boot can be unmounted
 	chdir "/root";
