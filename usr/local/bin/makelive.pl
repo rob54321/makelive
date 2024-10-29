@@ -1416,7 +1416,7 @@ sub dochroot {
 }
 
 #######################################################
-# this sub determines the version
+# this sub determines the version and distro name
 # which will be used for grub
 # and if version >= 24.04 the all *.squashfs must be copied
 # to casper directory
@@ -1426,19 +1426,24 @@ sub dochroot {
 # returns none
 # requirements: none
 ######################################################
-sub getversion {
+sub getversionname {
 	
 	################################
 	# determine the version for grub
 	# get the iso name from $chroot_dir/isoimage/isoimage.txt
 	################################
 
-	# read the file 
+	# read the file for version
 	open ISO, "<", "$chroot_dir/isoimage/version.txt" or die "could not open $chroot_dir/isoimage/isoimage.txt: $!\n";
 	$version = <ISO>;
 	chomp($version);
 	close ISO;
 	
+	# read the file for distro name
+	open ISO, "<", "$chroot_dir/isoimage/distroname.txt" or die "could not open $chroot_dir/isoimage/distroname.txt: $!\n";
+	$distroname = <ISO>;
+	chomp($distroname);
+	close ISO;
 	return;
 }
 
@@ -1709,7 +1714,7 @@ sub initialise {
 	# being created.
 	do  {
 		restoresquashfsvars();
-		getversion();
+		getversionname();
 	} unless $isoimage;
 
 	# some short cuts depending on the parition number
