@@ -27,9 +27,10 @@ my $chroot_dir = "/chroot";
 # this value must be restored from a file $chroot_root/isoimage/makelive.restore.rc
 my $squashfsfilename;
 
-# the version of ubuntu must be available across
+# the version of ubuntu and the distro name must be available across
 # runs of makelive.pl
 my $version;
+my $distroname;
 
 # default paths for debhome and svn
 # these are constant
@@ -557,42 +558,43 @@ sub saveversioncodename {
 	# read this file and store the codename in chroot_dir/isoimage/codename.txt
 	# and store the version in chroot_dir/isoimage/version.txt
 	#open /mnt/cdrom/.disk/info for reading
-	open DISK, "<", "/mnt/cdrom/.disk/info" or die "could not open /mnt/cdrom/.disk/info: $!\n";
-	my $string = <DISK>;
+	open INFO, "<", "/mnt/cdrom/.disk/info" or die "could not open /mnt/cdrom/.disk/info: $!\n";
+	my $string = <INFO>;
 	chomp($string);
-	close DISK;
+	close INFO;
 	
+	############################################################
+	# get the version
+	############################################################
 	# file is of form:
 	# Ubuntu-MATE 24.04 "Noble Numbat" - Daily amd64 (20231101)
-	# get version , which could be 23.04 or 2300
+	# get version , which could be 23.04 or 24.04.1
 	# version must also be saved to disk
 	# so it is available across runs
 	my $codename;
 	
-	my @matches = $string =~ /\s+(\d+\.\d+)\s+/;
-
-	# if nothing found search for version of form 2300
-	# with no decimal point
-	if (@matches == 0) {
-		# match of form 2300 not found
-		@matches = $string =~ /\s+(\d+)\s+/;
-		if (@matches == 0) {
-			# could not find the version of form 2300 or 23.04
-			# enter it manually
-			print "Could not find the version of linux, enter it below\n";
-			$version = <STDIN>;
-			chomp($version);
-		} else {
-			# version found 
-			$version = $matches[0];
-		}
+	# search for 24.04.1 first
+	if ($string =~ /(\d+\.\d+\.\d+)/) {
+		# found xx.xx.x
+		$version = $&;
+	} elsif ($string =~ /(\d+\.\d+)/) {
+		# found xx.xx form
+		$version = $&;
+	}elsif ($string =~ /(\d+)/) {
+		# found xxxx form
+		$version = $&;
 	} else {
-		# match found of form 23.04
-		$version = $matches[0];
+		# no version found prompt for version
+		# enter it manually
+		print "Could not find the version of linux, enter it below\n";
+		$version = <STDIN>;
+		chomp($version);
 	}
 	
+	###############################################################
 	# get the codename
-	@matches = $string =~ /\s+"(\w+)\s+/;
+	###############################################################
+	my @matches = $string =~ /\s+"(\w+)\s+/;
 	if (@matches == 0) {
 		# the code name could not be found
 		# enter it manually
@@ -606,18 +608,36 @@ sub saveversioncodename {
 
 	# convert codename to lower case
 	$codename = lc $codename;
+
+	################################################################
+	# get the distribution name
+	# Ubuntu or ubuntu-mate etc
+	################################################################
 	
-	print "codename = $codename: version = $version\n";
+	if ($string =~ /^[A-Za-z-]+\b/) {
+		$distroname = $&;
+	} else {
+		# name not found prompt for it
+		print "The distrobution name could not be found, enter it below\n";
+		$distroname = <STDIN>;
+		chomp($distroname);
+	}
+	
+	print "distroname = $distroname: codename = $codename: version = $version\n";
 
 	# write codename and version to files in chroot_dir/isoimage/codename.txt
 	# and chroot_dir/isoimage/version.txt
 	open VERSION, ">", "$chroot_dir/isoimage/version.txt" or die "could not save $version to $chroot_dir/isoimage/version.txt: $!\n";
 	print VERSION "$version";
 	close VERSION;
+
 	open CODENAME, ">", "$chroot_dir/isoimage/codename.txt" or die "could not save $codename to $chroot_dir/isoimage/codename.txt: $!\n";
 	print CODENAME "$codename";
 	close CODENAME;
 
+	open DISTRONAME, ">", "$chroot_dir/isoimage/distroname.txt" or die "could not save $distroname to $chroot_dir/isoimage/distroname.txt: $!\n";
+	print DISTRONAME "$distroname";
+	close DISTRONAME;
 }
 
 #######################################################
@@ -1487,6 +1507,11 @@ sub installgrub {
 	chdir $chroot_dir . "/boot/EFI/grub";
 	system("sed -i -e 's/ubuntu-version/$version/' grub.cfg");
 
+	# edit grub.cfg distro-name
+	system("sed -i -e 's/distro-name/$distroname/' grub.cfg");
+	chdir $chroot_dir . "/boot/EFI/grub";
+	system("sed -i -e 's/distro-name/$distroname/' grub.cfg");
+	
 	# this doesn't seem necessary from MACRIUM version 7.3
 	# rename macrium file to stop only macrium_pe booting
 	#system("mv " . $chroot_dir . "/boot/EFI/Microsoft/Boot/bootmgfw.efi "
