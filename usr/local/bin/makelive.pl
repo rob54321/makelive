@@ -1678,6 +1678,25 @@ sub installfs {
 		chdir $casper;
 		system("dd if=/dev/zero of=writable bs=1M count=3000");
 		system("mkfs.ext4 -v -j -F writable");
+		
+		# now copy /var/lib/dpkg from the chroot dir
+		# to the upper/var/lib/dpkg on the writable.
+		# this is necessary as the status file
+		# gets overlayed.
+		# mount /mnt/writable
+		make_path "/mnt/writable" unless -d "/mnt/writable";
+		$rc = system("mount writable /mnt/writable");
+		die "Could not mount writable: $!\n" unless $rc == 0;
+		
+		# mkdir the directories on writable
+		make_path "/mnt/writable/var/lib/";
+		
+		# copy the dpkg directory
+		copy ($chroot_dir . "/var/lib/dpkg", "/mnt/writable/upper/var/lib/") or die "Could not copy dpkg files to /mnt/writable/var/lib/\n";
+		
+		# umount /mnt/writable
+		sysem("umount /mnt/writable");
+
 	} if $partitionfound eq "false";
 
 	# so chroot1/boot can be unmounted
