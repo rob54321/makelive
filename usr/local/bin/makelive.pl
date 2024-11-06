@@ -1692,7 +1692,8 @@ sub installfs {
 		make_path "/mnt/writable/var/lib/";
 		
 		# copy the dpkg directory
-		copy ($chroot_dir . "/var/lib/dpkg", "/mnt/writable/upper/var/lib/") or die "Could not copy dpkg files to /mnt/writable/var/lib/\n";
+		$rc = system("cp -a /var/lib/dpkg /mnt/writable/upper/var/lib/");
+		die "Could not copy /var/lib/dpkg /mnt/writable/upper/lib\n" unless $rc == 0;
 		
 		# umount /mnt/writable
 		sysem("umount /mnt/writable");
