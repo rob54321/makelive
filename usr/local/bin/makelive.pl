@@ -1699,7 +1699,7 @@ sub installfs {
 		make_path "/mnt/writable/upper/var/lib/";
 		
 		# copy the dpkg directory
-		$rc = system("cp -av " . $chroot_dir . "/var/lib/dpkg /mnt/writable/upper/var/lib/");
+		$rc = system("cp -a " . $chroot_dir . "/var/lib/dpkg /mnt/writable/upper/var/lib/");
 		die "Could not copy /var/lib/dpkg /mnt/writable/upper/lib\n" unless $rc == 0;
 		
 		# umount /mnt/writable
@@ -1707,6 +1707,9 @@ sub installfs {
 
 	} else {
 		# the writable parition was found
+		# delete casper/writable. It may exist from a previous run
+		unlink $casper . "/writable";
+
 		# mount it , make directories upper/var/lib/
 		# and copy dpkg dir from chroot to upper/var/lib
 		$rc = system("mount -L writable /mnt/writable");
@@ -1716,8 +1719,8 @@ sub installfs {
 		make_path "/mnt/writable/upper/var/lib";
 		
 		# copy dpkg files
-		$rc = system("cp -av " . $chroot_dir . "/var/lib/dpkg /mnt/writable/upper/var/lib/");
-		die "Could not copy $chroot_dir/var/lib/dpkg to /mnt/writable/upper/var/lib\n";
+		$rc = system("cp -a " . $chroot_dir . "/var/lib/dpkg /mnt/writable/upper/var/lib/");
+		die "Could not copy $chroot_dir/var/lib/dpkg to /mnt/writable/upper/var/lib\n" unless $rc == 0;
 		
 		# umount /mnt/writable
 		system("umount /mnt/writable");
