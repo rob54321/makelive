@@ -1696,7 +1696,7 @@ sub installfs {
 		die "Could not mount writable: $!\n" unless $rc == 0;
 		
 		# mkdir the directories on writable
-		make_path "/mnt/writable/var/lib/";
+		make_path "/mnt/writable/upper/var/lib/";
 		
 		# copy the dpkg directory
 		$rc = system("cp -av " . $chroot_dir . "/var/lib/dpkg /mnt/writable/upper/var/lib/");
