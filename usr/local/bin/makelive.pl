@@ -1674,7 +1674,15 @@ sub installfs {
 		$partitionfound = "true" if $label =~ /^writable$/;
 	}
 
-	do {
+	# create the writable persistence file
+	# in the casper directory if there is no
+	# writable parition. Also copy the dpkg dir
+	# to the writable file since it gets overlayed.
+
+	# make the path to mount the persistence file
+	make_path "/mnt/writable" unless -d "/mnt/writable";
+
+	if ($partitionfound eq "false") {
 		chdir $casper;
 		system("dd if=/dev/zero of=writable bs=1M count=3000");
 		system("mkfs.ext4 -v -j -F writable");
@@ -1684,7 +1692,6 @@ sub installfs {
 		# this is necessary as the status file
 		# gets overlayed.
 		# mount /mnt/writable
-		make_path "/mnt/writable" unless -d "/mnt/writable";
 		$rc = system("mount writable /mnt/writable");
 		die "Could not mount writable: $!\n" unless $rc == 0;
 		
@@ -1692,13 +1699,29 @@ sub installfs {
 		make_path "/mnt/writable/var/lib/";
 		
 		# copy the dpkg directory
-		$rc = system("cp -a /var/lib/dpkg /mnt/writable/upper/var/lib/");
+		$rc = system("cp -av " . $chroot_dir . "/var/lib/dpkg /mnt/writable/upper/var/lib/");
 		die "Could not copy /var/lib/dpkg /mnt/writable/upper/lib\n" unless $rc == 0;
 		
 		# umount /mnt/writable
-		sysem("umount /mnt/writable");
+		system("umount /mnt/writable");
 
-	} if $partitionfound eq "false";
+	} else {
+		# the writable parition was found
+		# mount it , make directories upper/var/lib/
+		# and copy dpkg dir from chroot to upper/var/lib
+		$rc = system("mount -L writable /mnt/writable");
+		die "Could not mount writable partition on /mnt/writable\n" unless $rc == 0;
+		
+		# make directories
+		make_path "/mnt/writable/upper/var/lib";
+		
+		# copy dpkg files
+		$rc = system("cp -av " . $chroot_dir . "/var/lib/dpkg /mnt/writable/upper/var/lib/");
+		die "Could not copy $chroot_dir/var/lib/dpkg to /mnt/writable/upper/var/lib\n";
+		
+		# umount /mnt/writable
+		system("umount /mnt/writable");
+	}
 
 	# so chroot1/boot can be unmounted
 	chdir "/root";
