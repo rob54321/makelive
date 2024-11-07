@@ -8,7 +8,7 @@ use File::Path qw (make_path);
 use File::Copy;
 
 # command line arguments
-our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_s, $opt_D, $opt_S, $opt_h, $opt_d, $opt_M, $opt_R, $opt_T, $opt_V, $opt_L, $opt_Z, $opt_w, $opt_W);
+our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_s, $opt_D, $opt_S, $opt_h, $opt_d, $opt_M, $opt_R, $opt_T, $opt_V, $opt_L, $opt_Z, $opt_W);
 
 ###################################################
 # Global constants
@@ -31,6 +31,14 @@ my $squashfsfilename;
 # runs of makelive.pl
 my $version;
 my $distroname;
+
+# the default size of the linuxlive partition in GB
+# and the default size of the writable partition in GB
+my $defaultlinuxsize = 15;
+my $defaultwritablesize = 10;
+
+# sizes of MCTREC partition in GB
+my $mctrecsize = 8;
 
 # default paths for debhome and svn
 # these are constant
@@ -55,9 +63,6 @@ my $config = "/root/.makelive.rc";
 # debug flag, set to 1 for debug info
 my $debug = 0;
 
-# sizes of MCTREC and RECOVERY partitions
-my $recoverysize = 1;
-my $mctrecsize = 8;
 
 # parent directory of sources
 my $MACRIUM = "MACRIUM";
@@ -313,19 +318,20 @@ sub restorechrootlinks {
 }	
 ######################################################
 # sub to delete all partitions and make a
-# partition 1: 1G fat32 for MACRIUM REFLECT LABEL = MACRIUM uuid = AED6-434E
-# partition 2: 8G (default - or selectable) fat32 for linux live LABEL = LINUXLIVE uuid = 3333-3333
-# partition 3: 2G fat32 LABEL =  RECOVERY uuid = 4444-4444
+# partition 1: default=15G  fat32 for MACRIUM REFLECT LABEL = MACRIUM uuid = AED6-434E and LINUXLIVE
+# partition 2: 8G fat 32 MCTREC windows media creation tool 2222-2222
+# partition 3: default=10GB writable ext4 for persistence partition
 # partition 3: rest of disk ntfs LABEL = ele
 # all data on the disk is deleted.
 # the partitions are also formatted.
-# parameters passed: partition 1 size in GB
+# parameters passed: partition 1 LINUXLIVE/MACRIUM size in GB, partition 3 writable size in GB
 # sub aborts on any error
 # requires: disk for MACRIUM to be attached, not mounted
 ######################################################
 sub partitiondisk {
-	# get size of first partition
-	my $linuxlivesize = $_[0];
+	# get size LINUXLIVE and writable partitions
+	my $linuxlivesize = shift @_;
+	my $writablesize = shift @_;
 
 	# show devices attached
 	print "######################################################\n";
@@ -352,16 +358,16 @@ sub partitiondisk {
 	if ($answer =~ /^yes$/i) {
 		print "partitioning $device\n";
 
-		# partition 1: LINUXLIVE partition size is passed as a parameter to this sub
-		# partition 2: MCTREC size is 8GB media tool creation recovery
-		# partition 3: RECOVERY size is 1Gb
-		# partition 4: ele partition is 100% and contains sources for RECOVERY
+		# partition 1: LINUXLIVE partition fat32 size is passed as a parameter to this sub
+		# partition 2: MCTREC size is 8GB fat32 media tool creation recovery
+		# partition 3: writable partition ext4 for persistence
+		# partition 4: ele partition ntfs is up to 100%
 		my $p1start = 0;
 		my $p1end = $linuxlivesize;
 		my $p2start = $p1end;
 		my $p2end = $p2start + $mctrecsize; 
 		my $p3start = $p2end;
-		my $p3end = $p3start + $recoverysize;
+		my $p3end = $p3start + $writablesize;
 		my $p4start = $p3end;
 		my $p4end = "100%";
 
@@ -375,14 +381,9 @@ sub partitiondisk {
 		$p4start .= "GB";
 		
 		# delete all partitions and make new ones
-		# if opt_w set (default) make partition 4 ntfs
-		if ($opt_w) {
-			$rc = system("parted -s --align optimal $device mktable msdos mkpart primary fat32 $p1start $p1end mkpart primary fat32 $p2start $p2end mkpart primary fat32 $p3start $p3end mkpart primary ntfs  $p4start $p4end set 1 boot on");
-			die "aborting: error partitioning $device\n" unless $rc == 0;
-		} elsif($opt_W) {
-			$rc = system("parted -s --align optimal $device mktable msdos mkpart primary fat32 $p1start $p1end mkpart primary fat32 $p2start $p2end mkpart primary fat32 $p3start $p3end mkpart primary ext4  $p4start $p4end set 1 boot on");
-			die "aborting: error partitioning $device\n" unless $rc == 0;
-		}
+		# p1 = LINUXLIVE/MACRIUM p2 = MCTREC p3 = writable p4 = ele
+		$rc = system("parted -s --align optimal $device mktable gpt mkpart p1 fat32 $p1start $p1end mkpart p2 fat32 $p2start $p2end mkpart p3 ext4 $p3start $p3end mkpart p4 ntfs  $p4start $p4end set 1 boot on");
+		die "aborting: error partitioning $device\n" unless $rc == 0;
 
 		# format the first partition
 		# the sleep is needed to let the disk settle
@@ -390,33 +391,25 @@ sub partitiondisk {
 		# if partition size is bigger than 12GB
 		sleep 2;
 
-		# format partition 1
+		# format partition 1 LINUXLIVE/MACRIUM
 		print "formatting partition " . $device . "1\n";
 		$rc = system( "mkfs.vfat -v -n LINUXLIVE -i AED6434E " . $device . "1");
 		die "aborting: error formatting " . $device . "1\n" unless $rc == 0;
 
-		# format second partition
+		# format partition 2 MCTREC
 		print "formatting partition " . $device . "2\n";
 		$rc = system("mkfs.vfat -v -n MCTREC -i 22222222 " . $device . "2");
 		die "aborting: error formatting " . $device . "2\n" unless $rc == 0;
 
-		# format third partition
+		# format parition 3 writable
 		print "formatting partition " . $device . "3\n";
-		$rc = system("mkfs.vfat -v -n RECOVERY -i 33333333 " . $device . "3");
+		$rc = system("mkfs.ext4 -v -j -L writable " . $device . "3");
 		die "aborting: error formatting " . $device . "3\n" unless $rc == 0;
 
-		# format forth partition
+		# format parition 4 ele
 		print "formatting partition " . $device . "4\n";
-
-		# if opt_w set format to ntfs and label ele
-		if ($opt_w) {
-			$rc = system("mkfs.ntfs -v -Q -L ele  " . $device . "4");
-			die "aborting: error formatting " . $device . "4\n" unless $rc == 0;
-		} elsif($opt_W) {
-			# partition to ext4 and label writable
-			$rc = system("mkfs.ext4 -v -j -L writable " . $device . "4");
-			die "aborting: error formatting " . $device . "4\n" unless $rc == 0;
-		}
+		$rc = system("mkfs.ntfs -v -Q -L ele  " . $device . "4");
+		die "aborting: error formatting " . $device . "4\n" unless $rc == 0;
 
 	} else {
 		print "$device was not partitioned\n";
@@ -440,7 +433,8 @@ sub defaultparameter {
 	# -u is for unmounting any drive
 	# the default argument, if not given on the command line is all drives
 	my %defparam = ( -c => "none",
-			 -D => 8,
+			 -D => $defaultlinuxsize,
+			 -W => $defaultwritablesize,
 			 -M => "$macriumsource",
 			 -R => "$recoverysource",
 			 -S => "$sourcessource",
@@ -1918,7 +1912,7 @@ sub usage {
 # -V display version and exit
 # -Z set debug flag to 1
 # -w use /casper/writable as persistence file (default)
-# -W use last partition (4) ext4 label writable as persistence partition.
+# -W make a persistence partion of size given by -W or default = 10GB
 # 
 # One or both iso's can be given.
 # package list in quotes, if given
@@ -1933,27 +1927,10 @@ sub usage {
 # default parameters for -d default is 8GB
 defaultparameter();
 
-getopts('mic:ep:hus:S:d:M:R:VD:T:LZwW');
+getopts('mic:ep:hus:S:d:M:R:VD:T:LZW');
 
 # turn on debug info if flag set
 $debug = 1 if $opt_Z;
-
-# $opt_w and $opt_W are mutually exclusive
-# if neither set default is persistence file
-# is /casper/writable
-# if both are set it is and error
-die "-w and -W cannot both be set\n" if $opt_w and $opt_W;
-
-# if neither opt_w and opt_W are set then set opt_w (default)
-$opt_w = 1 if ! defined($opt_w) and ! defined($opt_W);
-
-do {
-	print "w = $opt_w\n" if $opt_w;
-	print "W = $opt_W\n" if $opt_W;
-	print "w and W undefined\n" if ! defined($opt_w) and ! defined($opt_W);
-	print "exiting...\n"; } if $debug;
-
-
 
 # reset links for svn and debhome to original
 # before loading links.
@@ -2024,8 +2001,18 @@ if ($opt_c) {
 # so the questions can be answered
 # at the begining
 # $opt_D is the size of GB of the partition
+# opt_W is the size in GB of the writable partition
+# opt_W may or may not have been given 
+# on the command line
+my $writablesize;
 
-partitiondisk($opt_D) if $opt_D;
+if ($opt_W) {
+	$writablesize = $opt_W;
+} else {
+	$writablesize = $defaultwritablesize;
+}
+
+partitiondisk($opt_D, $writablesize) if $opt_D;
 
 # initialise variables and invoke subs depending on cmdine parameters
 initialise($opt_i, $opt_m, $opt_c, $opt_u, $opt_e, $debhomepath, $svnpath, $packages) if ($opt_c or $opt_u or $opt_e or $opt_p or $opt_i or $opt_m or $opt_M or $opt_R or $opt_S or $opt_T);
