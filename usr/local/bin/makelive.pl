@@ -1877,8 +1877,7 @@ sub usage {
 	print "-L reset svn and debhome links to defaults and exit\n";
 	print "-V check version and exit\n";
 	print "-Z set debug flag to 1\n";
-	print "-w persistence file is /casper/writable - default\n";
-	print "-W persistence partition is partition 4\n";
+	print "-W (size in GB) default is 10GB persistence partition\n";
 	exit 0;
 }
 ##################
