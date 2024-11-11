@@ -1314,7 +1314,7 @@ sub createchroot {
 	
 	# save kernversion to chroot_dir/isoimage/kernelversion.txt
 	open FH, ">", "$chroot_dir/isoimage/kernelversion.txt";
-	print FH $kernelversion . "\n";
+	print FH $kernelversion;
 	close FH;
 
 	# save the version and codename of linux
