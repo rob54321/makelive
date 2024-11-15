@@ -1298,23 +1298,21 @@ sub createchroot {
 	$rc = system("cp -dR .disk dists install pool preseed " . $chroot_dir . "/isoimage/");
 	die "could not copy dists install pool preseed to $chroot_dir/isoimage: $!\n" unless $rc == 0;
 	
-	# get the kernel version from file
+	# get the installed kernel package name
+	# of the installed kernel in the cdrom
 	# chroot_dir/isoimage/pool/main/l/linux-signed/linux-image-XXXXXX-generic_amd64.deb
 	# and save it to chroot_dir/
-	my $kernelfile = `ls $chroot_dir/isoimage/pool/main/l/linux-signed`;
-
-	# get version from file linux-image-XXXXXX-generic
-	$kernelfile =~ /linux-image-(.*)-generic/;
-	my $kernelversion;
-	if (defined($1)) {
-		$kernelversion = $1;
-	} else {
-		die "Could not determine kernel version\n";
-	}
+	my $defaultkernel = `ls $chroot_dir/isoimage/pool/main/l/linux-signed`;
+	chomp $defaultkernel;
+	
+	# get the package name of the kernel installed on the cdrom
+	# this kernel, modules, headers must never be uninstalled
+	# uninstallkernel.pl uses this file to prevent the
+	# default kernel, modules, headers from being uninstalled.
 	
 	# save kernversion to chroot_dir/isoimage/kernelversion.txt
-	open FH, ">", "$chroot_dir/isoimage/kernelversion.txt";
-	print FH $kernelversion;
+	open FH, ">", "$chroot_dir/isoimage/defaultkernalpackage.txt";
+	print FH $defaultkernel;
 	close FH;
 
 	# save the version and codename of linux
