@@ -1544,7 +1544,7 @@ sub installgrub {
 	print "installgrub: $device\n";
 	
 	# LINUXLIVE is mounted under /chroot/boot/LINUXLIVE
-	system("grub-install --no-floppy --boot-directory=" . $chroot_dir . "/boot --target=i386-pc " . $device);
+#	system("grub-install --no-floppy --boot-directory=" . $chroot_dir . "/boot --target=i386-pc " . $device);
 	
 	system(" grub-install --uefi-secure-boot --no-floppy --boot-directory=" . $chroot_dir . "/boot/EFI --efi-directory="  . $chroot_dir . "/boot --removable --target=x86_64-efi " . $device);
 	
