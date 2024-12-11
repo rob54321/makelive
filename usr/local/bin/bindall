@@ -17,6 +17,10 @@
 use strict;
 use warnings;
 use File::Path qw(make_path);
+use Getopt::Std;
+
+# default option -b is /chroot or parameter can be supplied
+our ($opt_b, $opt_h);
 
 my $debhome = "/mnt/debhome";
 my $svn = "/mnt/svn";
@@ -38,7 +42,60 @@ if ($debug) {
 	$unbindall = "/usr/local/bin/unbindall";
 }
 
-#######################################################
+
+sub usage {
+	print "-b chroot directory, default is $chroot_dir\n";
+	exit 0;
+}
+
+##############################################################################
+# this sub operates on the list @ARGV
+# all the switches in the ARGV list are checked to see if they have arguments
+# if they do not have arguments, the default arguments are inserted into ARGV
+# so that getopts will not fail.
+# no parameters are passed and none are returned.
+# requires: none
+##############################################################################
+sub defaultparameter {
+
+	# hash supplying default arguments to switches
+	# -b is for mounting bit locker drives
+	# -v is for mounting vera containers
+	# -u is for unmounting any drive
+	# the default argument, if not given on the command line is all drives
+	my %defparam = ( -b => "$chroot_dir");
+
+	# for each switch in the defparam hash find it's index and insert default arguments if necessary
+	foreach my $switch (keys(%defparam)) {
+		# find index of position of -*
+		my $i = 0;
+		foreach my $param (@ARGV) {
+			# check for a -b and that it is not the last parameter
+			if ($param eq $switch) {
+				if ($i < $#ARGV) {
+					# -* has been found at $ARGV[$i] and it is not the last parameter
+					# if the next parameter is a switch -something
+					# then -* has no arguments
+					# check if next parameter is a switch
+					if ($ARGV[$i+1] =~ /^-/) {
+						# -* is followed by a switch and is not the last switch
+						# insert the 2 default filenames as a string at index $i+1
+						my $index = $i + 1;
+						splice @ARGV, $index, 0, $defparam{$switch};
+					}
+				} else {
+					# the switch is the last in the list so def arguments must be appended
+					my $index = $i + 1;
+					splice @ARGV, $index, 0, $defparam{$switch}; 
+				}
+			}
+			# increment index counter
+			$i++;
+		}
+	}
+} 
+
+########################################################
 # sub to bind sys tmp dev dev/pts proc for chroot
 # environment
 # access to debhome and svn in the chroot environment
@@ -52,7 +109,10 @@ if ($debug) {
 # exceptions: dies if chroot dir does not exist
 #######################################################
 sub bindall {
+	
 	# parameters
+	my $chroot_dir = shift @_;
+	
 	chdir $chroot_dir or die "$chroot_dir does not exist, exiting\n";
 
 	# bind for all in list
@@ -139,4 +199,15 @@ sub bindall {
 	}
 }
 
-bindall ();
+# get command line options
+# and use default parameter
+defaultparameter();
+
+# -b change root directory, default is /chroot
+# -h is for help
+getopts('b:h');
+
+# invoke help if -h given
+usage() if $opt_h;
+
+bindall ($opt_b);
