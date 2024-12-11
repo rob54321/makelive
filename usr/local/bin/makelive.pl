@@ -8,7 +8,7 @@ use File::Path qw (make_path);
 use File::Copy;
 
 # command line arguments
-our($opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_s, $opt_D, $opt_S, $opt_h, $opt_d, $opt_M, $opt_R, $opt_T, $opt_V, $opt_L, $opt_Z, $opt_W);
+our($opt_b, $opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_s, $opt_D, $opt_S, $opt_h, $opt_d, $opt_M, $opt_R, $opt_T, $opt_V, $opt_L, $opt_Z, $opt_W);
 
 ###################################################
 # Global constants
@@ -433,6 +433,7 @@ sub defaultparameter {
 	# -u is for unmounting any drive
 	# the default argument, if not given on the command line is all drives
 	my %defparam = ( -c => "none",
+			 -b -> $chroot_dir,
 			 -D => $defaultlinuxsize,
 			 -W => $defaultwritablesize,
 			 -M => "$macriumsource",
@@ -643,7 +644,7 @@ sub saveversioncodename {
 # and for svn where /mnt/svn points to to /chroot/mnt/svn
 # the directories are made by bindall in the
 # chroot environment
-# usage: bindall chroot_dir
+# usage: bindall no parameters
 # returns: none
 # exceptions: dies if chroot dir does not exist
 #######################################################
@@ -739,7 +740,7 @@ sub bindall {
 
 # sub to unbind sys tmp dev dev/pts proc for chroot
 # environment
-# usage: unbindall
+# usage: unbindall no parameters
 # returns: none
 # exceptions: dies if chroot dir does not exist
 #######################################################
@@ -1859,6 +1860,7 @@ sub initialise {
 
 sub usage {
 	my ($debhomepath, $svnpath) = @_;
+	print "-b chroot dir or default parameter /chroot\n";
 	print "-c iso name, create changeroot -- needs iso image\n";
 	print "-u do a full-upgrade -- needs svn debhome\n";
 	print "-e run dochroot -- needs svn debhome\n";
@@ -1883,6 +1885,7 @@ sub usage {
 ##################
 
 # command line parameters
+# -b chroot directory or default parameter
 # -c ubuntu-mate iso name or none (default)
 # -p "package list of extra packages
 # -u upgrade or not
@@ -1914,7 +1917,10 @@ sub usage {
 # default parameters for -d default is 8GB
 defaultparameter();
 
-getopts('mic:ep:hus:S:d:M:R:VD:T:LZW');
+getopts('b:mic:ep:hus:S:d:M:R:VD:T:LZW');
+
+# if -b is given use parameter, otherwise default parameter will be used
+$chroot_dir = $opt_b if $opt_b;
 
 # turn on debug info if flag set
 $debug = 1 if $opt_Z;
