@@ -429,7 +429,7 @@ sub defaultparameter {
 	# -u is for unmounting any drive
 	# the default argument, if not given on the command line is all drives
 	my %defparam = ( -c => "none",
-			 -b -> $chroot_dir,
+			 -b => $chroot_dir,
 			 -D => $defaultlinuxsize,
 			 -W => $defaultwritablesize,
 			 -M => "$macriumsource",
