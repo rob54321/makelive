@@ -8,18 +8,18 @@ use File::Path qw (make_path);
 use File::Copy;
 
 # command line arguments
-our($opt_b, $opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_s, $opt_D, $opt_S, $opt_h, $opt_d, $opt_M, $opt_R, $opt_T, $opt_V, $opt_L, $opt_Z, $opt_W);
+our($opt_b, $opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_s, $opt_D, $opt_S, $opt_h, $opt_d, $opt_M, $opt_T, $opt_V, $opt_L, $opt_Z, $opt_W);
 
 ###################################################
 # Global constants
 ###################################################
 # global constant links for debhome and subversion
 
-# sources for macrium and recovery
-# the source directory is the root of MACRIUM, MCTREC, RECOVERY or SOURCES
+# sources for macrium and windows media creattion tool
+# the source directory is the root of MACRIUM, MCTREC
 my $svn = "/mnt/svn";
 my $debhome = "/mnt/debhome";
-# set up chroot dir
+# set up a default chroot dir
 my $chroot_dir = "/chroot";
 
 # the name of the squashfs file
@@ -53,9 +53,7 @@ my $svnchrootoriginal = "/mnt/ad64/svn";
 # set the variables for the sources
 # as they depend on debhomepath
 my $macriumsource  = $debhome . "/livesystem";
-my $recoverysource = $debhome . "/livesystem";
 my $mctrecsource   = $debhome . "/livesystem";
-my $sourcessource  = $debhome . "/livesystem";
 
 # config file for saving svn and debhome links
 my $config = "/root/.makelive.rc";
@@ -67,8 +65,6 @@ my $debug = 0;
 # parent directory of sources
 my $MACRIUM = "MACRIUM";
 my $MCTREC = "MCTREC";
-my $RECOVERY = "RECOVERY";
-my $SOURCES = "SOURCES";
 
 ###################################################
 
@@ -79,8 +75,8 @@ my $SOURCES = "SOURCES";
 # and format a disk for the live system.
 # partition 1: 8G fat32 for LINUXLIVE and MACRIUM
 # partition 2: 8G fat32 for MCTREC
-# partition 3: 1G fat32 for RECOVERY
-# partition 4: 100% ntfs for ele contains sources directory for RECOVERY
+# partition 3: 10G default for writable ext4
+# partition 4: 100% ntfs for ele contains
 #
 #
 #######################################################
@@ -359,7 +355,7 @@ sub partitiondisk {
 		print "partitioning $device\n";
 
 		# partition 1: LINUXLIVE partition fat32 size is passed as a parameter to this sub
-		# partition 2: MCTREC size is 8GB fat32 media tool creation recovery
+		# partition 2: MCTREC size is 8GB fat32 media tool creation tool
 		# partition 3: writable partition ext4 for persistence
 		# partition 4: ele partition ntfs is up to 100%
 		my $p1start = 0;
@@ -437,8 +433,6 @@ sub defaultparameter {
 			 -D => $defaultlinuxsize,
 			 -W => $defaultwritablesize,
 			 -M => "$macriumsource",
-			 -R => "$recoverysource",
-			 -S => "$sourcessource",
 			 -T => "$mctrecsource");
 
 	# for each switch in the defparam hash find it's index and insert default arguments if necessary
@@ -1460,8 +1454,8 @@ sub getversionname {
 }
 
 #################################################
-# copies files for MACRIUM -M, RECOVERY and SOURCES -R or -S, MCTREC -T
-# the root directories of the soures must be MACRIUM or RECOVERY or SOURCES
+# copies files for MACRIUM -M, MCTREC -T
+# the root directories of the soures must be MACRIUM and MCTREC
 # needs /mnt/debhome by default
 # the files are copied to the respective partition
 # parameter: full path to source eg /mnt/debhome/livesystem/MACRIUM, partition label, target root directory on partition
@@ -1809,7 +1803,6 @@ sub initialise {
 
 	###########################################################################
 	# install MACRIUM files if -M given
-	# install RECOVERY and SOURCES files if -R or -S given
 	# install MCTREC files if -T given
 	###########################################################################
 	# setup the fullname source from the parent directory
@@ -1817,35 +1810,6 @@ sub initialise {
 		$opt_M = $opt_M . "/" . $MACRIUM;
 		installfiles($opt_M, "LINUXLIVE", "/");
 	} if $opt_M;
-
-	do {
-		# for recovery files
-		# if opt_R is set append /RECOVERY
-		# else set opt_R to default + /RECOVERY
-		if ($opt_R) {
-			# opt_R set append RECOVERY
-			$opt_R = $opt_R . "/" . $RECOVERY;
-		} else {
-			# opt_R not set
-			$opt_R = $recoverysource . "/" . $RECOVERY;
-		}
-		
-		installfiles("$opt_R", "RECOVERY", "/");
-
-		# for sources
-		# if opt_S is set append /sources
-		# else set opt_S to default + /sources
-		if ($opt_S) {
-			# opt_S is set, append /sources
-			$opt_S = $opt_S . "/" . $SOURCES;
-		} else {
-			# opt_S is not set, set it to default + /sources		
-			$opt_S = $sourcessource . "/" . $SOURCES;
-		}
-		# install the files
-		installfiles("$opt_S", "ele", "/sources");
-		
-	} if $opt_R or $opt_S;
 
 	# for MCTREC files
 	do {
@@ -1860,7 +1824,7 @@ sub initialise {
 
 sub usage {
 	my ($debhomepath, $svnpath) = @_;
-	print "-b chroot dir or default parameter /chroot\n";
+	print "-b chroot dir or default parameter $chroot_dir\n";
 	print "-c iso name, create changeroot -- needs iso image\n";
 	print "-u do a full-upgrade -- needs svn debhome\n";
 	print "-e run dochroot -- needs svn debhome\n";
@@ -1871,8 +1835,6 @@ sub usage {
 	print "-D size of LINUXLIVE partition in GB default is 8GB fat32\n";
 	print "-i install the image to LINUXLIVE\n";
 	print "-M full parent directory of MACRIUM files, default is $macriumsource\n";
-	print "-R full parent directory of RECOVERY files, default is $recoverysource\n";
-	print "-S full parent directory of SOURCES files, default is $sourcessource\n";
 	print "-T full parent directory of MCTREC files, default is $mctrecsource\n";
 	print "-L reset svn and debhome links to defaults and exit\n";
 	print "-V check version and exit\n";
@@ -1896,7 +1858,6 @@ sub usage {
 # -m make filesystem.squashfs or minimal.squashfs if version >23.10
 # -i install the image
 # -M path install MACRIUM files
-# -R path install Recovery files
 # -T path install MCTREC files
 # -L reset svn and debhome links to default and exit
 # -V display version and exit
@@ -1917,7 +1878,7 @@ sub usage {
 # default parameters for -d default is 8GB
 defaultparameter();
 
-getopts('b:mic:ep:hus:S:d:M:R:VD:T:LZW');
+getopts('b:mic:ep:hus:d:M:VD:T:LZW');
 
 # if -b is given use parameter, otherwise default parameter will be used
 $chroot_dir = $opt_b if $opt_b;
@@ -2008,7 +1969,7 @@ if ($opt_W) {
 partitiondisk($opt_D, $writablesize) if $opt_D;
 
 # initialise variables and invoke subs depending on cmdine parameters
-initialise($opt_i, $opt_m, $opt_c, $opt_u, $opt_e, $debhomepath, $svnpath, $packages) if ($opt_c or $opt_u or $opt_e or $opt_p or $opt_i or $opt_m or $opt_M or $opt_R or $opt_S or $opt_T);
+initialise($opt_i, $opt_m, $opt_c, $opt_u, $opt_e, $debhomepath, $svnpath, $packages) if ($opt_c or $opt_u or $opt_e or $opt_p or $opt_i or $opt_m or $opt_M or $opt_T);
 
 
 # restore main links

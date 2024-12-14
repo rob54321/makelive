@@ -6,7 +6,7 @@ use File::Path qw (make_path remove_tree);
 use Getopt::Std;
 
 # for default parameter
-our ($opt_b, $opt_h);
+our ($opt_b, $opt_d, $opt_h);
 
 my $debhome = "/mnt/debhome";
 my $svn = "/mnt/svn";
@@ -20,11 +20,14 @@ my $svnchrootoriginal = "/mnt/ad64/svn";
 # for debug info, set to 1 by cml parameter
 my $debug = 0;
 
+# default chroot root dir
+# -b parameter can change this
 my $chroot_dir = "/chroot";
 
 
 sub usage {
 	print "-b chroot directory, default is $chroot_dir\n";
+	print "-d turn debug on\n";
 	exit 0;
 }
 
@@ -39,9 +42,8 @@ sub usage {
 sub defaultparameter {
 
 	# hash supplying default arguments to switches
-	# -b is for mounting bit locker drives
-	# -v is for mounting vera containers
-	# -u is for unmounting any drive
+	# -b parameter changes the root directory of the change root environment
+	
 	# the default argument, if not given on the command line is all drives
 	my %defparam = ( -b => "$chroot_dir");
 
@@ -133,14 +135,12 @@ sub restorechrootlinks {
 #######################################################
 # sub to unbind sys tmp dev dev/pts proc for chroot
 # environment
-# usage: unbindall ($opt_b)
+# usage: unbindall ()
 # returns: none
 # exceptions: dies if chroot dir does not exist
 #######################################################
 sub unbindall {
 	# parameters
-	my $chroot_dir = shift @_;
-
 	die "$chroot_dir does not exist, exiting\n" unless -d $chroot_dir;
 
 	# bind for all in list
@@ -180,17 +180,22 @@ sub unbindall {
 	# restore the links in the chroot environment
 	restorechrootlinks($chroot_dir);
 }
-# check cml parameters
-$debug = 1 if $ARGV[0] && "$ARGV[0]" eq "debug";
 
 # get command line options
 # and use default parameter
 defaultparameter();
 
 # -b change root directory, default is /chroot
-getopts('b:h');
+# -d turns on debug
+getopts('b:dh');
+
+# turn debug on
+$debug = 1 if $opt_d;
+
+# set default chroot directory
+$chroot_dir = $opt_b if $opt_b;
 
 # invoke help if -h given
 usage() if $opt_h;
 
-unbindall ($opt_b);
+unbindall ();

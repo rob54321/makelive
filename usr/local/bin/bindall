@@ -20,7 +20,8 @@ use File::Path qw(make_path);
 use Getopt::Std;
 
 # default option -b is /chroot or parameter can be supplied
-our ($opt_b, $opt_h);
+# -d implies debug = 1
+our ($opt_b, $opt_d, $opt_h);
 
 my $debhome = "/mnt/debhome";
 my $svn = "/mnt/svn";
@@ -31,20 +32,10 @@ my $debug = 0;
 # bindall and unbindall binaries
 my ($bindall, $unbindall);
 
-# check if cml parameter is set to debug
-$debug = 1 if $ARGV[0] && "$ARGV[0]" eq "debug";
-# check the debug flag
-if ($debug) {
-	$bindall = "/usr/local/bin/bindall debug";
-	$unbindall = "/usr/local/bin/unbindall debug";
-} else {
-	$bindall = "/usr/local/bin/bindall";
-	$unbindall = "/usr/local/bin/unbindall";
-}
-
 
 sub usage {
 	print "-b chroot directory, default is $chroot_dir\n";
+	print "-d turn debug on\n";
 	exit 0;
 }
 
@@ -59,10 +50,7 @@ sub usage {
 sub defaultparameter {
 
 	# hash supplying default arguments to switches
-	# -b is for mounting bit locker drives
-	# -v is for mounting vera containers
-	# -u is for unmounting any drive
-	# the default argument, if not given on the command line is all drives
+	# -b parameter sets the root directory of the change root environment
 	my %defparam = ( -b => "$chroot_dir");
 
 	# for each switch in the defparam hash find it's index and insert default arguments if necessary
@@ -104,15 +92,13 @@ sub defaultparameter {
 # and for svn where /mnt/svn points to to /chroot/mnt/svn
 # the directories are made by bindall in the
 # chroot environment
-# usage: bindall chroot_dir
+# usage: bindall()
 # returns: none
 # exceptions: dies if chroot dir does not exist
 #######################################################
 sub bindall {
 	
 	# parameters
-	my $chroot_dir = shift @_;
-	
 	chdir $chroot_dir or die "$chroot_dir does not exist, exiting\n";
 
 	# bind for all in list
@@ -185,7 +171,7 @@ sub bindall {
 		} else {
 			# already mounted
 			# exit the foreach loop and unbindall before starting again
-			# set flag to run binall again
+			# set flag to run bindall again
 			system("$unbindall");
 
 			$runbindall = "true";
@@ -199,15 +185,32 @@ sub bindall {
 	}
 }
 
+#############################################
+# unbindall and bindall may have to be invoked
+# again if some dirs are already bound.
+# they must be invoked with the original parameters.
+# check if cml parameter is set to debug
+# this is for recall
+# check also if -b parameter was given
+$bindall = "/usr/local/bin/bindall @ARGV";
+$unbindall = "/usr/local/bin/unbindall @ARGV";
+
 # get command line options
 # and use default parameter
 defaultparameter();
 
 # -b change root directory, default is /chroot
 # -h is for help
-getopts('b:h');
+# -d is for debug
+getopts('b:dh');
+
+# if -d given, debug
+$debug = 1 if $opt_d;
+
+# set default chroot directory
+$chroot_dir = $opt_b if $opt_b;
 
 # invoke help if -h given
 usage() if $opt_h;
 
-bindall ($opt_b);
+bindall ();
