@@ -1290,8 +1290,11 @@ sub createchroot {
 	chdir "/mnt/cdrom";
 	make_path "$chroot_dir/isoimage" unless -d "$chroot_dir/isoimage";
 	
-	$rc = system("cp -dR .disk dists install pool preseed " . $chroot_dir . "/isoimage/");
-	die "could not copy dists install pool preseed to $chroot_dir/isoimage: $!\n" unless $rc == 0;
+	# if directory preseed exists, copy it to chroot_dir/isoimage
+	system("cp -dR preseed " . $chroot_dir . "/isoimage/") if -d "preseed";
+
+	$rc = system("cp -dR .disk dists install pool " . $chroot_dir . "/isoimage/");
+	die "Exiting...could not copy dists install pool to $chroot_dir/isoimage: $!\n" unless $rc == 0;
 	
 	# get the installed kernel package name
 	# of the installed kernel in the cdrom
