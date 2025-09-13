@@ -1305,8 +1305,8 @@ sub createchroot {
 	# of the installed kernel in the cdrom
 	# chroot_dir/isoimage/pool/main/l/linux-signed/linux-image-XXXXXX-generic_amd64.deb
 	# and save it to chroot_dir/
-	my $defaultkernel = `ls $chroot_dir/isoimage/pool/main/l/linux-signed`;
-	chomp $defaultkernel;
+	# my $defaultkernel = `ls $chroot_dir/isoimage/pool/main/l/linux-signed`;
+	# chomp $defaultkernel;
 	
 	# get the package name of the kernel installed on the cdrom
 	# this kernel, modules, headers must never be uninstalled
@@ -1314,9 +1314,9 @@ sub createchroot {
 	# default kernel, modules, headers from being uninstalled.
 	
 	# save kernversion to chroot_dir/isoimage/kernelversion.txt
-	open FH, ">", "$chroot_dir/isoimage/defaultkernalpackage.txt";
-	print FH $defaultkernel;
-	close FH;
+#	open FH, ">", "$chroot_dir/isoimage/defaultkernalpackage.txt";
+#	print FH $defaultkernel;
+#	close FH;
 
 	#########################################################################################
 	# end of the code that needs to be re thought
