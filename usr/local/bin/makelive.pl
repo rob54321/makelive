@@ -1296,6 +1296,11 @@ sub createchroot {
 	$rc = system("cp -dR .disk dists install pool " . $chroot_dir . "/isoimage/");
 	die "Exiting...could not copy dists install pool to $chroot_dir/isoimage: $!\n" unless $rc == 0;
 	
+
+	#########################################################################################
+	# this code needs to re thought as the olderversions of ubuntu don't have the file
+	# linux-signed
+	#########################################################################################
 	# get the installed kernel package name
 	# of the installed kernel in the cdrom
 	# chroot_dir/isoimage/pool/main/l/linux-signed/linux-image-XXXXXX-generic_amd64.deb
@@ -1312,6 +1317,10 @@ sub createchroot {
 	open FH, ">", "$chroot_dir/isoimage/defaultkernalpackage.txt";
 	print FH $defaultkernel;
 	close FH;
+
+	#########################################################################################
+	# end of the code that needs to be re thought
+	#########################################################################################
 
 	# save the version and codename of linux
 	saveversioncodename ();
