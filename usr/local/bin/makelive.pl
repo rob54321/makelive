@@ -1847,6 +1847,7 @@ sub usage {
 	print "-s full path to subversion, default is $svnpath\n";
 	print "-D size of LINUXLIVE partition in GB default is 8GB fat32\n";
 	print "-i install the image to LINUXLIVE\n";
+	print "-g set graphical.target";
 	print "-M full parent directory of MACRIUM files, default is $macriumsource\n";
 	print "-T full parent directory of MCTREC files, default is $mctrecsource\n";
 	print "-L reset svn and debhome links to defaults and exit\n";
