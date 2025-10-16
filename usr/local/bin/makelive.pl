@@ -8,7 +8,7 @@ use File::Path qw (make_path);
 use File::Copy;
 
 # command line arguments
-our($opt_b, $opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_s, $opt_D, $opt_S, $opt_h, $opt_d, $opt_M, $opt_T, $opt_V, $opt_L, $opt_Z, $opt_W);
+our($opt_b, $opt_g, $opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_s, $opt_D, $opt_S, $opt_h, $opt_d, $opt_M, $opt_T, $opt_V, $opt_L, $opt_Z, $opt_W);
 
 ###################################################
 # Global constants
@@ -1393,7 +1393,8 @@ sub dochroot {
 	my $parameters = " ";
 	$parameters = "-u " if $upgrade;
 	$parameters = $parameters . "-p " . $packages if $packages;
-	
+	$parameters = $parameters . "-g " if $opt_g;
+		
 	# execute liveinstall.sh in the chroot environment
 	do {print "parameters: $parameters\n" if $parameters;} if $debug;
 
@@ -1869,6 +1870,7 @@ sub usage {
 # -e do chroot
 # -m make filesystem.squashfs or minimal.squashfs if version >23.10
 # -i install the image
+# -g set grapchical.target
 # -M path install MACRIUM files
 # -T path install MCTREC files
 # -L reset svn and debhome links to default and exit
@@ -1890,7 +1892,7 @@ sub usage {
 # default parameters for -d default is 8GB
 defaultparameter();
 
-getopts('b:mic:ep:hus:d:M:VD:T:LZW');
+getopts('gb:mic:ep:hus:d:M:VD:T:LZW');
 
 # if -b is given use parameter, otherwise default parameter will be used
 $chroot_dir = $opt_b if $opt_b;
