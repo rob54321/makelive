@@ -1393,7 +1393,7 @@ sub dochroot {
 	my $parameters = " ";
 	$parameters = "-u " if $upgrade;
 	$parameters = $parameters . "-p " . $packages if $packages;
-	$parameters = $parameters . "-g " if $opt_g;
+	$parameters = $parameters . " -g " if $opt_g;
 		
 	# execute liveinstall.sh in the chroot environment
 	do {print "liveinstall parameters: $parameters\n" if $parameters;} if 1;
