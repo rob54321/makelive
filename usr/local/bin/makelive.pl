@@ -1396,7 +1396,7 @@ sub dochroot {
 	$parameters = $parameters . "-g " if $opt_g;
 		
 	# execute liveinstall.sh in the chroot environment
-	do {print "parameters: $parameters\n" if $parameters;} if $debug;
+	do {print "liveinstall parameters: $parameters\n" if $parameters;} if 1;
 
 	# liveinstall is a package in the dehome distribution
 	# so debhome must be setup for liveinstall to be
