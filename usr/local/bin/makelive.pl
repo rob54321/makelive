@@ -45,6 +45,9 @@ my $mctrecsize = 8;
 my $debhomepathoriginal = "/mnt/ad64/debhome";
 my $svnpathoriginal = "/mnt/ad64/svn";
 
+# set default target
+my $defaulttarget = "multi-user.target";
+
 # for the livesystem the chroot links /mnt/debhone
 # and /mnt/svn point to these values below
 my $debhomechrootoriginal = "/mnt/ad64/debhome";
@@ -86,14 +89,17 @@ my $MCTREC = "MCTREC";
 # to a file so it can be loaded
 # one or two links may change
 # so write one or two links if both change
+# the target is also saved
 # params 1 svnpath
 #        2 dehomepath
+#        3 mult-user.target / graphical.target
 #######################################################
 sub savelinks {
 	# get the directories pointed to by links
 	# first svn the debhome
 	my $svnpath = shift @_;
 	my $debhomepath = shift @_;
+	my $target = shift @_;
 
 	# write them to a disk file
 	# /root/makelive.rc
@@ -101,11 +107,12 @@ sub savelinks {
 	open (MKRC, ">", $config) or die "Could not open $config for writing: $!\n";
 	print MKRC "$svnpath\n";
 	print MKRC "$debhomepath\n";
+	print MKRC "$target\n";
 	close MKRC;
 }
 
 ###################################################
-# sub to restore links from file
+# sub to restore links and target from file
 # for svn | debhome
 # if the file does not exist
 # then use the default settings
@@ -123,6 +130,8 @@ sub loadlinks {
 		chomp($svnpathoriginal);
 		$debhomepathoriginal = <FH>;
 		chomp($debhomepathoriginal);
+		$defaulttarget = <FH>;
+		chomp($defaulttarget);
 		close FH;
 	}
 }
@@ -1850,7 +1859,7 @@ sub usage {
 	print "-g set graphical.target";
 	print "-M full parent directory of MACRIUM files, default is $macriumsource\n";
 	print "-T full parent directory of MCTREC files, default is $mctrecsource\n";
-	print "-L reset svn and debhome links to defaults and exit\n";
+	print "-L reset svn and debhome links to defaults, set target to multi-user.target  and exit\n";
 	print "-V check version and exit\n";
 	print "-Z set debug flag to 1\n";
 	print "-W (size in GB) default is 10GB persistence partition\n";
@@ -1874,7 +1883,7 @@ sub usage {
 # -g set grapchical.target
 # -M path install MACRIUM files
 # -T path install MCTREC files
-# -L reset svn and debhome links to default and exit
+# -L reset svn and debhome links and target  to default and exit
 # -V display version and exit
 # -Z set debug flag to 1
 # -w use /casper/writable as persistence file (default)
@@ -1908,15 +1917,15 @@ if ($opt_L) {
 	restoremainlinks();
 	# now save the links
 	# to the rc file
-	savelinks($svnpathoriginal, $debhomepathoriginal);
+	savelinks($svnpathoriginal, $debhomepathoriginal, $defaulttarget);
 
 	# exit
 	exit 0;
 }
 # read config file if it exists
-# to set links for svn and debhome
+# to set links for svn and debhome and target
 loadlinks();
-print "main: svnpathoriginal = $svnpathoriginal debhomepathoriginal = $debhomepathoriginal\n" if $debug;
+print "main: svnpathoriginal = $svnpathoriginal debhomepathoriginal = $debhomepathoriginal defaulttarget = $defaulttarget\n" if $debug;
 
 # check version and exit 
 if ($opt_V) {
@@ -1930,28 +1939,37 @@ $debhomepath = $opt_d if $opt_d;
 
 my $svnpath = $svnpathoriginal;
 
-
 # setup svn path if it has changed
 # done here for usage sub
 # svnpath overrides previous path
 # if it has changed
 $svnpath = $opt_s if $opt_s;
 
+# setup graphical environment if -g given
+if ($opt_g) {
+	# -g given
+	$target = ;
+else {
+	# -g not given use default
+	$target = $defaulttarget;
+}
+
+
 # save the links if they have changed
-if ($opt_s or $opt_d) {
+if ($opt_s or $opt_d or $opt_g) {
 	# save the changed links
 	$svnpathoriginal = $svnpath;
 	$debhomepathoriginal = $debhomepath;
 
 	# restore links
 	restoremainlinks();
-	savelinks($svnpath, $debhomepath);
+	savelinks($svnpath, $debhomepath, $target);
 }
 
 
-print "main: svnpath = $svnpath debhomepath = $debhomepath\n" if $debug;
+print "main: svnpath = $svnpath debhomepath = $debhomepath target = $target\n" if $debug;
 
-usage($debhomepath, $svnpath) if $opt_h;
+usage($debhomepath, $svnpath, $target) if $opt_h;
 # return code from functions
 my $rc;
 
