@@ -231,44 +231,47 @@ sub mountdevice {
 	}
 }
 
-# sub to restore /mnt/debhome and /mnt/svn links
-# in main system to default values
-# parameters: none
+# sub to set /mnt/debhome and /mnt/svn links
+# to current or default values
+# parameters: debhomepath, svnpath
 #######################################################
-sub restoremainlinks {
-	# restore links in main system
+sub setlinks {
+	# get the parameters
+	my $debhomepath = shift @_;
+	my $svnpath = shift @_;
+	
 	# to the original values
 	my $link;
 
 	# for svn
 	if (-l $svn) {
 		$link = readlink $svn;
-		if ("$link" ne "$svnpathoriginal") {
+		if ("$link" ne "$svnpath") {
 			unlink $svn;
-			symlink ($svnpathoriginal, $svn);
+			symlink ($svnpath, $svn);
 			# set ownership
 			system("chown robert:robert -h $svn");
 		}
 	} else {
 		# link does not exist
 		# make it
-		symlink ($svnpathoriginal, $svn);
+		symlink ($svnpath, $svn);
 		# set ownership
 		system("chown robert:robert -h $svn");
 	}
 	# for debhome
 	if (-l $debhome) {
 		$link = readlink $debhome;
-		if ("$link" ne "$debhomepathoriginal") {
+		if ("$link" ne "$debhomepath") {
 			unlink $debhome;
-			symlink ($debhomepathoriginal, $debhome);
+			symlink ($debhomepath, $debhome);
 			# set ownership
 			system("chown robert:robert -h $debhome");
 		}
 	} else {
 		# link does not exist
 		# make it
-		symlink ($debhomepathoriginal, $debhome);
+		symlink ($debhomepath, $debhome);
 		# set ownership
 		system("chown robert:robert -h $debhome");
 	}
@@ -1368,11 +1371,11 @@ sub createchroot {
 # in the chroot environment
 # installfs will use filesystem.squashfs if it exists
 # also requires svn if packages and or upgrade are done.
-# parameters: chroot_directory, upgrade, packages_list
+# parameters: chroot_directory, upgrade, packages_list, target
 # requires: /mnt/debhome and /mnt/svn to be binded to debhome and svn
 ###############################################
 sub dochroot {
-	my ($upgrade, $packages) = @_;
+	my ($upgrade, $packages, $target) = @_;
 
 	# get codename
 	open CDN, "<", "$chroot_dir/isoimage/codename.txt" or die "could not open $chroot_dir/isoimage/codename.txt: $!\n";
@@ -1411,7 +1414,8 @@ sub dochroot {
 	my $parameters = " ";
 	$parameters = "-u " if $upgrade;
 	$parameters = $parameters . "-p " . $packages if $packages;
-	$parameters = $parameters . " -g " if $opt_g;
+	# if -g was given on command line set graphical.target
+	$parameters = $parameters . " -g " if $target eq "graphical.target";
 		
 	# execute liveinstall.sh in the chroot environment
 	do {print "liveinstall parameters: $parameters\n" if $parameters;} if 1;
@@ -1754,10 +1758,10 @@ sub installfs {
 # sub to initialise the setup of the LINUXLIVE partition.
 # if -c given create new chroot from scratch or use existing one
 # parameters passed:
-# createchroot, ubuntuiso-name, upgrade, debhome path, svn full path, packages list)
+# createchroot, ubuntuiso-name, upgrade, debhome path, svn full path, packages list, target)
 ####################################################
 sub initialise {
-	my ($doinstall, $makefs, $isoimage, $upgrade, $dochroot, $debhomepath, $svnpath, $packages)  = @_;
+	my ($doinstall, $makefs, $isoimage, $upgrade, $dochroot, $debhomepath, $svnpath, $packages, $target)  = @_;
 
 	# die if no /choot and it is not being created
 	if (! -d $chroot_dir) {
@@ -1821,11 +1825,11 @@ sub initialise {
 		# if chroot environment does not exist die
 		die ("chroot environment does not exist\n") unless -d $chroot_dir;
 		# dochroot must be done
-		dochroot($upgrade, $packages);
+		dochroot($upgrade, $packages, $target);
 		
 	} elsif (($doinstall or $makefs) and (! -d "$chroot_dir/dochroot")) {
 		# dochroot must be done if directory dochroot does not exist
-		dochroot($upgrade, $packages);
+		dochroot($upgrade, $packages, $target);
 	}
 	
 	
@@ -1854,7 +1858,7 @@ sub initialise {
 }
 
 sub usage {
-	my ($debhomepath, $svnpath) = @_;
+	my ($debhomepath, $svnpath, $target) = @_;
 	print "-b chroot dir or default parameter $chroot_dir\n";
 	print "-c iso name, create changeroot -- needs iso image\n";
 	print "-u do a full-upgrade -- needs svn debhome\n";
@@ -1865,7 +1869,7 @@ sub usage {
 	print "-s full path to subversion, default is $svnpath\n";
 	print "-D size of LINUXLIVE partition in GB default is 8GB fat32\n";
 	print "-i install the image to LINUXLIVE\n";
-	print "-g set graphical.target";
+	print "-g set graphical.target,default is $target\n";
 	print "-M full parent directory of MACRIUM files, default is $macriumsource\n";
 	print "-T full parent directory of MCTREC files, default is $mctrecsource\n";
 	print "-L reset svn and debhome links to defaults, set target to multi-user.target  and exit\n";
@@ -1922,8 +1926,8 @@ $debug = 1 if $opt_Z;
 # reset links for svn and debhome to original
 # before loading links.
 if ($opt_L) {
-	# restore links before links are loaded
-	restoremainlinks();
+	# set links to default
+	setlinks($debhomepathoriginal, $svnpathoriginal);
 	# now save the links
 	# to the rc file
 	savelinks($svnpathoriginal, $debhomepathoriginal, $defaulttarget);
@@ -1931,16 +1935,18 @@ if ($opt_L) {
 	# exit
 	exit 0;
 }
-# read config file if it exists
-# to set links for svn and debhome and target
-loadlinks();
-print "main: svnpathoriginal = $svnpathoriginal debhomepathoriginal = $debhomepathoriginal defaulttarget = $defaulttarget\n" if $debug;
-
 # check version and exit 
 if ($opt_V) {
 	system("dpkg-query -W makelive");
 	exit 0;
 }
+
+# read config file if it exists
+# to set links for svn and debhome and target
+# if there is no config file the default values will be set
+# if -d or -s or -g will override these values
+(my $debhomepath, my $svnpath, my $target) = loadlinks();
+print "main: svnpath = $svnpath debhomepath = $debhomepath target = $target\n" if $debug;
 
 # debhomepath, svnpath and target must be set for the default values.
 # If they are changed by command line switches then those
@@ -1948,23 +1954,18 @@ if ($opt_V) {
 # by loadlinks so that their values are maintaned across runs
 # of makelive.
 
-my $debhomepath = $debhomepathoriginal;
 $debhomepath = $opt_d if $opt_d;
 
-my $svnpath = $svnpathoriginal;
 $svnpath = $opt_s if $opt_s;
 
-my $target = $defaulttarget;
 $target = $graphicaltarget if $opt_g;
 
 # save the links if they have changed
 if ($opt_s or $opt_d or $opt_g) {
-	# save the changed links
-	$svnpathoriginal = $svnpath;
-	$debhomepathoriginal = $debhomepath;
 
-	# restore links
-	restoremainlinks();
+	# set the new links
+	setlinks($debhomepath, $svnpath);
+	# save the new links and target
 	savelinks($svnpath, $debhomepath, $target);
 }
 
@@ -2004,9 +2005,8 @@ if ($opt_W) {
 partitiondisk($opt_D, $writablesize) if $opt_D;
 
 # initialise variables and invoke subs depending on cmdine parameters
-initialise($opt_i, $opt_m, $opt_c, $opt_u, $opt_e, $debhomepath, $svnpath, $packages) if ($opt_c or $opt_u or $opt_e or $opt_p or $opt_i or $opt_m or $opt_M or $opt_T);
+initialise($opt_i, $opt_m, $opt_c, $opt_u, $opt_e, $debhomepath, $svnpath, $packages, $target) if ($opt_c or $opt_u or $opt_e or $opt_p or $opt_i or $opt_m or $opt_M or $opt_T);
 
 
 # restore main links
-print "main: svnpathoriginal = $svnpathoriginal debhomepathoriginal = $debhomepathoriginal\n" if $debug;
-restoremainlinks;
+# setlinks($debhompath, $svnpath, $target);
