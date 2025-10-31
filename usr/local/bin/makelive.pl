@@ -47,6 +47,8 @@ my $svnpathoriginal = "/mnt/ad64/svn";
 
 # set default target
 my $defaulttarget = "multi-user.target";
+# graphical target
+my $graphicaltarget = "graphical.target";
 
 # for the livesystem the chroot links /mnt/debhone
 # and /mnt/svn point to these values below
@@ -113,10 +115,11 @@ sub savelinks {
 
 ###################################################
 # sub to restore links and target from file
-# for svn | debhome
+# for svn | debhome and target
 # if the file does not exist
 # then use the default settings
 # no parameters passed
+# values for debhomepath, svnpath, target returned.
 # on failure abort
 ###################################################
 sub loadlinks {
@@ -125,14 +128,20 @@ sub loadlinks {
 		# open and read file
 		open (FH, "<", $config) or die "Could not open $config for reading: $!\n";
 
-		# set the global default variables for svn and debhome
-		$svnpathoriginal = <FH>;
-		chomp($svnpathoriginal);
-		$debhomepathoriginal = <FH>;
-		chomp($debhomepathoriginal);
-		$defaulttarget = <FH>;
-		chomp($defaulttarget);
+		# set the current values for debhomepath, svnpath and target
+		my $svnpath = <FH>;
+		chomp($svnpath);
+		my $debhomepath = <FH>;
+		chomp($debhomepath);
+		my $target = <FH>;
+		chomp($target);
 		close FH;
+		
+		# return the values
+		return ($debhomepath, $svnpath, $target);
+	} else {
+		# values not changed return default values
+		return ($debhomepathoriginal, $svnpathoriginal, $defaulttarget);
 	}
 }
 			
@@ -1933,27 +1942,20 @@ if ($opt_V) {
 	exit 0;
 }
 
-# setup debhome if it has changed from the default
+# debhomepath, svnpath and target must be set for the default values.
+# If they are changed by command line switches then those
+# new values must be saved by savelinks and restored
+# by loadlinks so that their values are maintaned across runs
+# of makelive.
+
 my $debhomepath = $debhomepathoriginal;
 $debhomepath = $opt_d if $opt_d;
 
 my $svnpath = $svnpathoriginal;
-
-# setup svn path if it has changed
-# done here for usage sub
-# svnpath overrides previous path
-# if it has changed
 $svnpath = $opt_s if $opt_s;
 
-# setup graphical environment if -g given
-if ($opt_g) {
-	# -g given
-	$target = ;
-else {
-	# -g not given use default
-	$target = $defaulttarget;
-}
-
+my $target = $defaulttarget;
+$target = $graphicaltarget if $opt_g;
 
 # save the links if they have changed
 if ($opt_s or $opt_d or $opt_g) {
