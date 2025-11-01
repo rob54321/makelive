@@ -1,0 +1,4 @@
+#!/usr/bin/bash
+# remove /root/.makelive.rc if it exists
+test -f /root/.makelive.rc && rm -vf /root/.makelive.rc
+exit 0
