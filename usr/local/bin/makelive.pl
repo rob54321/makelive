@@ -1971,15 +1971,13 @@ if ($opt_g) {
 }
 
 # save the links if they have changed
-if ($opt_s or $opt_d or $opt_g) {
+if ($opt_s or $opt_d or $opt_g or $opt_n) {
 
 	# set the new links
 	setlinks($debhomepath, $svnpath);
 	# save the new links and target
 	savelinks($svnpath, $debhomepath, $target);
 }
-
-
 print "main: svnpath = $svnpath debhomepath = $debhomepath target = $target\n" if $debug;
 
 usage($debhomepath, $svnpath, $target) if $opt_h;
