@@ -8,7 +8,7 @@ use File::Path qw (make_path);
 use File::Copy;
 
 # command line arguments
-our($opt_b, $opt_g, $opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_s, $opt_D, $opt_S, $opt_h, $opt_d, $opt_M, $opt_T, $opt_V, $opt_L, $opt_Z, $opt_W);
+our($opt_b, $opt_g, $opt_n, $opt_m, $opt_i, $opt_c, $opt_e, $opt_u, $opt_p, $opt_s, $opt_D, $opt_S, $opt_h, $opt_d, $opt_M, $opt_T, $opt_V, $opt_L, $opt_Z, $opt_W);
 
 ###################################################
 # Global constants
@@ -1414,8 +1414,10 @@ sub dochroot {
 	my $parameters = " ";
 	$parameters = "-u " if $upgrade;
 	$parameters = $parameters . "-p " . $packages if $packages;
-	# if -g was given on command line set graphical.target
+	# set graphical.target if -g was given or previously given
 	$parameters = $parameters . " -g " if $target eq "graphical.target";
+	# set multi-user.target if -n was given or previously given
+	$parameters = $parameters . " -n " if $target eq "multi-user.target";
 		
 	# execute liveinstall.sh in the chroot environment
 	do {print "liveinstall parameters: $parameters\n" if $parameters;} if 1;
@@ -1870,6 +1872,7 @@ sub usage {
 	print "-D size of LINUXLIVE partition in GB default is 8GB fat32\n";
 	print "-i install the image to LINUXLIVE\n";
 	print "-g set graphical.target,default is $target\n";
+	print "-n set multi-user.target, default is $target\n";
 	print "-M full parent directory of MACRIUM files, default is $macriumsource\n";
 	print "-T full parent directory of MCTREC files, default is $mctrecsource\n";
 	print "-L reset svn and debhome links to defaults, set target to multi-user.target  and exit\n";
@@ -1894,6 +1897,7 @@ sub usage {
 # -m make filesystem.squashfs or minimal.squashfs if version >23.10
 # -i install the image
 # -g set grapchical.target
+# -n set multi-user.target
 # -M path install MACRIUM files
 # -T path install MCTREC files
 # -L reset svn and debhome links and target  to default and exit
@@ -1915,7 +1919,7 @@ sub usage {
 # default parameters for -d default is 8GB
 defaultparameter();
 
-getopts('gb:mic:ep:hus:d:M:VD:T:LZW');
+getopts('gnb:mic:ep:hus:d:M:VD:T:LZW');
 
 # if -b is given use parameter, otherwise default parameter will be used
 $chroot_dir = $opt_b if $opt_b;
@@ -1958,7 +1962,13 @@ $debhomepath = $opt_d if $opt_d;
 
 $svnpath = $opt_s if $opt_s;
 
-$target = $graphicaltarget if $opt_g;
+# set target environment
+if ($opt_g) {
+	$target = $graphicaltarget;
+} elsif ($opt_n) {
+	# set multi-user environment;
+	$target = $defaulttarget;
+}
 
 # save the links if they have changed
 if ($opt_s or $opt_d or $opt_g) {
