@@ -819,13 +819,13 @@ sub setaptsources {
 #deb http://archive.ubuntu.com/ubuntu $codename-proposed  main restricted multiverse universe\n";
 #	close SOURCES;
 
-	# debhome.sources and debhomepubkey.asc are installed from liveinstall package now.
-	# extract debhome.sources from  subversion to /etc/apt/sources.list.d/debhome.sources
+	# debhome-amd64.sources and debhomepubkey.asc are installed from liveinstall package now.
+	# extract debhome-amd64.sources from  subversion to /etc/apt/sources.list.d/debhome-amd64.sources
 	do 
 	{
-		$rc = system("svn export --force file://$svn/root/my-linux/sources/amd64/debhome.sources  " . $chroot_dir . "/etc/apt/sources.list.d/");
-		die "Could not export debhome.sources from svn\n" unless $rc == 0;
-	} unless ( -f $chroot_dir . "/etc/apt/sources.list.d/debhome.sources");
+		$rc = system("svn export --force file://$svn/root/my-linux/sources/amd64/debhome-amd64.sources  " . $chroot_dir . "/etc/apt/sources.list.d/");
+		die "Could not export debhome-amd64.sources from svn\n" unless $rc == 0;
+	} unless ( -f $chroot_dir . "/etc/apt/sources.list.d/debhome-amd64.sources");
 
 	# get the public key for debhome
 	# make the /etc/apt/keyrings directory if it does not exist
