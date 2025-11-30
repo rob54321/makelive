@@ -1318,6 +1318,12 @@ sub createchroot {
 	$rc = system("cp -dR .disk dists install pool " . $chroot_dir . "/isoimage/");
 	die "Exiting...could not copy dists install pool to $chroot_dir/isoimage: $!\n" unless $rc == 0;
 	
+	# dist directory contains two links , stable and unstable, delete them
+	# as they cannot be copied to a vfat drive on the live system.
+	unlink $chroot_dir . "/isoimage/dists/unstable" if -l $chroot_dir . "/isoimage/dists/unstable";
+	unlink $chroot_dir . "/isoimage/dists/stable" if -l $chroot_dir . "/isoimage/dists/stable";
+
+	
 
 	#########################################################################################
 	# this code needs to re thought as the olderversions of ubuntu don't have the file
