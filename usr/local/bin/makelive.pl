@@ -1313,6 +1313,7 @@ sub createchroot {
 	
 	# if directory preseed exists, copy it to chroot_dir/isoimage
 	system("cp -dR preseed " . $chroot_dir . "/isoimage/") if -d "preseed";
+	die "Exiting...could not copy preseed to $chroot_dir/isoimage: $!\n" unless $rc == 0;
 
 	$rc = system("cp -dR .disk dists install pool " . $chroot_dir . "/isoimage/");
 	die "Exiting...could not copy dists install pool to $chroot_dir/isoimage: $!\n" unless $rc == 0;
@@ -1690,7 +1691,11 @@ sub installfs {
 	
 	# copy pool and install files for ubuntu mate
 	chdir "$chroot_dir/isoimage";
-	system("cp -dR .disk dists install pool preseed " . $chroot_dir . "/boot/");
+	# copy preseed directory if it exists
+	system("cp -dR preseed " . $chroot_dir . "/boot/") if -d "preseed";
+	
+	# copy other directories
+	system("cp -dR .disk dists install pool " . $chroot_dir . "/boot/");
 	
 	# make a boot directory on LINUXLIVE
 	# so that there is no error message from grub
