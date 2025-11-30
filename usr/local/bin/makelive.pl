@@ -823,8 +823,8 @@ sub setaptsources {
 	# extract debhome-amd64.sources from  subversion to /etc/apt/sources.list.d/debhome-amd64.sources
 	do 
 	{
-		$rc = system("svn export --force file://$svn/root/my-linux/sources/amd64/debhome-amd64.sources  " . $chroot_dir . "/etc/apt/sources.list.d/");
-		die "Could not export debhome-amd64.sources from svn\n" unless $rc == 0;
+		$rc = system("cp -v /mnt/debhome/debhome-amd64.sources  " . $chroot_dir . "/etc/apt/sources.list.d/");
+		die "Could not copy /mnt/debhome/debhome-amd64.sources to " . $chroot_dir . "/etc/apt/sources.list.d\n" unless $rc == 0;
 	} unless ( -f $chroot_dir . "/etc/apt/sources.list.d/debhome-amd64.sources");
 
 	# get the public key for debhome
@@ -833,8 +833,8 @@ sub setaptsources {
 	
 	do 
 	{
-		$rc = system("svn export --force file://$svn/root/my-linux/sources/gpg/debhomepubkey.asc  " . $chroot_dir . "/etc/apt/keyrings/");
-		die "Could not export debhomepubkey.asc from svn\n" unless $rc == 0;
+		$rc = system("cp -v /mnt/debhome/debhomepubkey.asc  " . $chroot_dir . "/etc/apt/keyrings/");
+		die "Could not copy /mnt/debhome/debhomepubkey.asc to " . $chroot_dir . "/etc/apt/keyrings\n" unless $rc == 0;
 	} unless (-f $chroot_dir . "/etc/apt/keyrings/debhomepubkey.asc");	
 
 }
