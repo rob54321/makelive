@@ -1363,7 +1363,7 @@ sub createchroot {
 	umountcdrom;
 
 	# make a directory /chrootenvironment
-	# so that init-linux can determine if
+	# so that init-live can determine if
 	# it is running in the chroot environment
 	make_path "$chroot_dir/chrootenvironment" or die "Could not make directory $chroot_dir/chrootenvironment: $!\n";
 }
