@@ -811,21 +811,15 @@ sub unbindall {
 sub setaptsources {
 	my ($codename) = @_;
 	my $rc;
-	# create sources.list
-#	open (SOURCES, ">", "$chroot_dir/etc/apt/sources.list");
-#	print SOURCES "deb http://archive.ubuntu.com/ubuntu $codename main restricted multiverse universe
-#deb http://archive.ubuntu.com/ubuntu $codename-security main restricted multiverse universe
-#deb http://archive.ubuntu.com/ubuntu $codename-updates  main restricted multiverse universe
-#deb http://archive.ubuntu.com/ubuntu $codename-proposed  main restricted multiverse universe\n";
-#	close SOURCES;
-
-	# debhome-amd64.sources and debhomepubkey.asc are installed from liveinstall package now.
-	# extract debhome-amd64.sources from  subversion to /etc/apt/sources.list.d/debhome-amd64.sources
+	# copy existing /etc/apt/sources.list.d/debhome-amd64.list /chroot/etc/apt/sources.list.d/
+	# liveinstall must export the secret key from the host to /tmp/debhomeseckey.gpg and import it to
+	# the chroot environment
+	# copy existing public key /etc/apt/keyrings/debhomepubkey.gpg /chroot/etc/apt/keyrings/debhomepubkey.gpg
 	do 
 	{
-		$rc = system("cp -v /mnt/debhome/debhome-amd64.sources  " . $chroot_dir . "/etc/apt/sources.list.d/");
-		die "Could not copy /mnt/debhome/debhome-amd64.sources to " . $chroot_dir . "/etc/apt/sources.list.d\n" unless $rc == 0;
-	} unless ( -f $chroot_dir . "/etc/apt/sources.list.d/debhome-amd64.sources");
+		$rc = system("cp -v /etc/apt/sources.list.d/debhome-amd64.list  " . $chroot_dir . "/etc/apt/sources.list.d/");
+		die "Could not copy /etc/apt/sources.list.d/debhome-amd64.list to " . $chroot_dir . "/etc/apt/sources.list.d\n" unless $rc == 0;
+	} unless ( -f $chroot_dir . "/etc/apt/sources.list.d/debhome-amd64.list");
 
 	# get the public key for debhome
 	# make the /etc/apt/keyrings directory if it does not exist
@@ -833,9 +827,9 @@ sub setaptsources {
 	
 	do 
 	{
-		$rc = system("cp -v /mnt/debhome/debhomepubkey.asc  " . $chroot_dir . "/etc/apt/keyrings/");
-		die "Could not copy /mnt/debhome/debhomepubkey.asc to " . $chroot_dir . "/etc/apt/keyrings\n" unless $rc == 0;
-	} unless (-f $chroot_dir . "/etc/apt/keyrings/debhomepubkey.asc");	
+		$rc = system("cp -v /etc/apt/keyrings/debhomepubkey.gpg  " . $chroot_dir . "/etc/apt/keyrings/");
+		die "Could not copy /etc/apt/keyrings/debhomepubkey.gpg to " . $chroot_dir . "/etc/apt/keyrings\n" unless $rc == 0;
+	} unless (-f $chroot_dir . "/etc/apt/keyrings/debhomepubkey.gpg");	
 
 }
 ############################################################
