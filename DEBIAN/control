@@ -1,5 +1,5 @@
 Package: makelive
-Version: 3.4.8
+Version: 3.4.9
 Architecture: all
 Maintainer: Robert Key robkey@mighty.co.za
 Depends: subversion, git, initialise-linux, grub-pc-bin

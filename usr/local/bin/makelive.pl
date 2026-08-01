@@ -169,7 +169,7 @@ sub mountdevice {
 	
 	# if no options given, use defaults
 	# which is read only
-	$options = "ro" unless ($options);
+	$options = "rw" unless ($options);
 
 	# check if device is mounted and if mounted multiple times
 	my @target = `findmnt --source LABEL=$label -o TARGET`;
@@ -724,6 +724,9 @@ sub bindall {
 				print "mount --bind $sourcedir $chroot_dir" . "$dir\n" if $debug;
 				$rc = system("mount " . $option . " --bind $sourcedir $chroot_dir" . "$dir");
 				die "Could not bind $chroot_dir" . "$dir to $sourcedir: $!\n" unless $rc == 0;
+				$rc = system("mount -o remount,bind,ro $sourcedir $chroot_dir" . "$dir");
+				die "Could not make $chroot_dir" . "$dir ro: $!\n" unless $rc == 0;
+
 			} else {
 				# bind all except svn and debhome
 				print "mount --bind $dir $chroot_dir" . "$dir\n" if $debug;
@@ -817,17 +820,17 @@ sub setaptsources {
 	# copy existing public key /etc/apt/keyrings/debhomepubkey.gpg /chroot/etc/apt/keyrings/debhomepubkey.gpg
 	do 
 	{
-		$rc = system("cp -v /etc/apt/sources.list.d/debhome-amd64.list  " . $chroot_dir . "/etc/apt/sources.list.d/");
+		$rc = system("cp -v /etc/apt/sources.list.d/debhome-amd64.list " . $chroot_dir . "/etc/apt/sources.list.d/");
 		die "Could not copy /etc/apt/sources.list.d/debhome-amd64.list to " . $chroot_dir . "/etc/apt/sources.list.d\n" unless $rc == 0;
 	} unless ( -f $chroot_dir . "/etc/apt/sources.list.d/debhome-amd64.list");
 
 	# get the public key for debhome
 	# make the /etc/apt/keyrings directory if it does not exist
-	make_path "/etc/apt/keyrings" unless -d "/etc/apt/keyrings";
+	make_path "$chroot_dir/etc/apt/keyrings" unless -d "$chroot_dir/etc/apt/keyrings";
 	
 	do 
 	{
-		$rc = system("cp -v /etc/apt/keyrings/debhomepubkey.gpg  " . $chroot_dir . "/etc/apt/keyrings/");
+		$rc = system("cp -v /etc/apt/keyrings/debhomepubkey.gpg " . $chroot_dir . "/etc/apt/keyrings/");
 		die "Could not copy /etc/apt/keyrings/debhomepubkey.gpg to " . $chroot_dir . "/etc/apt/keyrings\n" unless $rc == 0;
 	} unless (-f $chroot_dir . "/etc/apt/keyrings/debhomepubkey.gpg");	
 
@@ -1162,7 +1165,7 @@ sub findrepo {
 		print "findrepo: pathtype: repopathtype = $desdevmtpt[1] description = $desdevmtpt[0]\n" if $debug;
 
 		# remount device ro
-		mountdevice($desdevmtpt[1], $desdevmtpt[2], "ro", "true") if $desdevmtpt[0] eq "device";
+		mountdevice($desdevmtpt[1], $desdevmtpt[2], "rw", "true") if $desdevmtpt[0] eq "device";
 
 		# repopathtype may also be a directory
 		# which should be protected, not sure how
