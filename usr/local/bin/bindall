@@ -158,6 +158,9 @@ sub bindall {
 				print "mount --bind $sourcedir $chroot_dir" . "$dir\n" if $debug;
 				$rc = system("mount " . $option . " --bind $sourcedir $chroot_dir" . "$dir");
 				die "Could not bind $chroot_dir" . "$dir to $sourcedir: $!\n" unless $rc == 0;
+				$rc = system("mount -o remount,bind,ro $sourcedir $chroot_dir" . "$dir");
+				die "Could not make $chroot_dir" . "$dir ro $!\n" unless $rc == 0;
+
 			} else {
 				# bind all except svn and debhome
 				print "mount --bind $dir $chroot_dir" . "$dir\n" if $debug;
