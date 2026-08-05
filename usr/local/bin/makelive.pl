@@ -1697,8 +1697,11 @@ sub installfs {
 	# copy preseed directory if it exists
 	system("cp -dR preseed " . $chroot_dir . "/boot/") if -d "preseed";
 	
+	# copy install if it exists
+	system("cp -dR install " . $chroot_dir . "/boot/") if -d "install";
+	
 	# copy other directories
-	system("cp -dR .disk dists install pool " . $chroot_dir . "/boot/");
+	system("cp -dR .disk dists pool " . $chroot_dir . "/boot/");
 	
 	# make a boot directory on LINUXLIVE
 	# so that there is no error message from grub
