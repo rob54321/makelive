@@ -1312,8 +1312,11 @@ sub createchroot {
 	system("cp -dR preseed " . $chroot_dir . "/isoimage/") if -d "preseed";
 	die "Exiting...could not copy preseed to $chroot_dir/isoimage: $!\n" unless $rc == 0;
 
-	$rc = system("cp -dR .disk dists install pool " . $chroot_dir . "/isoimage/");
-	die "Exiting...could not copy dists install pool to $chroot_dir/isoimage: $!\n" unless $rc == 0;
+	$rc = system("cp -dR install " . $chroot_dir . "/isoimage/") if -d "install";
+	die "Exiting...could not copy install to $chroot_dir/isoimage: $!\n" unless $rc == 0;
+
+	$rc = system("cp -dR .disk dists pool " . $chroot_dir . "/isoimage/");
+	die "Exiting...could not copy dists pool to $chroot_dir/isoimage: $!\n" unless $rc == 0;
 	
 	# dist directory contains two links , stable and unstable, delete them
 	# as they cannot be copied to a vfat drive on the live system.
