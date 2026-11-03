@@ -219,8 +219,8 @@ sub mountdevice {
 		make_path($mtpt) unless -d $mtpt;
 
 		# only mount if mount flag is true
-		$rc = system("mount -L $label -o $options $mtpt");
-		die "Could not mount $label at $mtpt -o $options: $!\n" unless $rc == 0;
+		# $rc = system("mount -L $label -o $options $mtpt");
+		# die "Could not mount $label at $mtpt -o $options: $!\n" unless $rc == 0;
 		print "mounted $label at $mtpt options: $options\n" if $debug;
 	}
 	
@@ -1525,7 +1525,8 @@ sub installfiles {
 	# options for debug
 	my $options = "";
 	$options = " -v " if $debug;
-	
+print "source = $source: /mnt/label = /mnt/$label: root directory = $rootdir\n";
+exit 0;	
 	$rc = system("cp -dR -T $options $source /mnt/$label" . "$rootdir");
 	die "Could not copy $source to /mnt/$label" . "$rootdir: $!\n" unless $rc == 0;
 
@@ -1787,8 +1788,8 @@ sub initialise {
 	# restore squashfs file name and version if chroot environment is not
 	# being created.
 	do  {
-		restoresquashfsvars();
-		getversionname();
+#		restoresquashfsvars();
+#		getversionname();
 	} unless $isoimage;
 
 	# some short cuts depending on the parition number
